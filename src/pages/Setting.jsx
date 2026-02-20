@@ -1704,7 +1704,7 @@ const resetUserForm = () => {
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
+              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
                 <div>
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -1717,7 +1717,7 @@ const resetUserForm = () => {
                       <X size={24} />
                     </button>
                   </div>
-                  <div className="mt-6">
+                  <div className="mt-6 max-h-[70vh] overflow-y-auto">
                     <form onSubmit={isEditing ? handleUpdateUser : handleAddUser}>
                       <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                         <div className="sm:col-span-3">
@@ -1837,7 +1837,7 @@ const resetUserForm = () => {
                       {/* In the User Modal form - Replace the existing department field */}
 <div className="sm:col-span-6">
   <label htmlFor="departments" className="block text-sm font-medium text-gray-700">
-    Departments (Multiple Selection)
+    Department 
   </label>
   
   {/* Dropdown trigger button */}
@@ -1848,68 +1848,44 @@ const resetUserForm = () => {
       className="w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
     >
       <div className="flex justify-between items-center">
-        <span className="block truncate">
+        <span className={`block truncate ${userForm.departments.length === 0 ? 'text-gray-400' : 'text-gray-900'}`}>
           {userForm.departments.length === 0 
-            ? 'Select Departments' 
-            : `${userForm.departments.length} department(s) selected`}
+            ? 'Select a department' 
+            : userForm.departments[0]}
         </span>
         <ChevronDown size={16} className={`text-gray-400 transition-transform ${showDeptDropdown ? 'rotate-180' : ''}`} />
       </div>
     </button>
     
-    {/* Dropdown with checkboxes */}
+    {/* Dropdown list */}
     {showDeptDropdown && (
-      <div className="absolute z-50 mt-1 w-full bg-white shadow-lg border border-gray-300 rounded-md max-h-60 overflow-y-auto">
-        <div className="p-2">
-          {/* Select All option */}
-          <div className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-            <input
-              type="checkbox"
-              id="selectAllDepartments"
-              checked={userForm.departments.length === availableDepartments.length && availableDepartments.length > 0}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setUserForm(prev => ({ ...prev, departments: availableDepartments }));
-                } else {
-                  setUserForm(prev => ({ ...prev, departments: [] }));
-                }
-              }}
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="selectAllDepartments" className="ml-3 text-sm text-gray-700 cursor-pointer">
-              Select All
-            </label>
-          </div>
-          
-          <div className="border-t border-gray-200 my-2"></div>
-          
-          {/* Department checkboxes */}
-          {availableDepartments.map((dept, index) => (
-            <div key={index} className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-              <input
-                type="checkbox"
-                id={`dept-${index}`}
-                checked={userForm.departments.includes(dept)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setUserForm(prev => ({ 
-                      ...prev, 
-                      departments: [...prev.departments, dept] 
-                    }));
-                  } else {
-                    setUserForm(prev => ({ 
-                      ...prev, 
-                      departments: prev.departments.filter(d => d !== dept) 
-                    }));
-                  }
+      <div className="absolute z-50 mt-1 w-full bg-white shadow-lg border border-gray-300 rounded-md max-h-60 overflow-y-auto dropdown-scrollbar" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="p-1">
+          {availableDepartments.map((dept, index) => {
+            const isSelected = userForm.departments.includes(dept);
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => {
+                  // Single selection logic: Replace the entire array with the new selection
+                  setUserForm(prev => ({ 
+                    ...prev, 
+                    departments: [dept] 
+                  }));
+                  setShowDeptDropdown(false); // Close dropdown on selection
                 }}
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor={`dept-${index}`} className="ml-3 text-sm text-gray-700 cursor-pointer">
+                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                  isSelected 
+                    ? 'bg-blue-50 text-blue-700 font-medium' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
                 {dept}
-              </label>
-            </div>
-          ))}
+                {isSelected && <span className="float-right text-blue-600">✓</span>}
+              </button>
+            );
+          })}
           
           {/* No departments available */}
           {availableDepartments.length === 0 && (
@@ -1920,37 +1896,6 @@ const resetUserForm = () => {
         </div>
       </div>
     )}
-  </div>
-  
-  {/* Selected departments display */}
-  <div className="mt-2">
-    <p className="text-xs font-medium text-gray-700 mb-1">Selected Departments:</p>
-    <div className="flex flex-wrap gap-1">
-      {userForm.departments.length > 0 ? (
-        userForm.departments.map((dept, index) => (
-          <span 
-            key={index} 
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-          >
-            {dept}
-            <button
-              type="button"
-              onClick={() => {
-                setUserForm(prev => ({
-                  ...prev,
-                  departments: prev.departments.filter(d => d !== dept)
-                }));
-              }}
-              className="text-blue-600 hover:text-blue-800 focus:outline-none"
-            >
-              <X size={12} />
-            </button>
-          </span>
-        ))
-      ) : (
-        <span className="text-xs text-gray-500">No departments selected</span>
-      )}
-    </div>
   </div>
 </div>
 

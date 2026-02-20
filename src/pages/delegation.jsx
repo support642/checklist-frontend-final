@@ -74,7 +74,6 @@ function DelegationDataPage() {
   const [userRemarksInput, setUserRemarksInput] = useState({}); // Track user reply input
   const [userRemarksSubmitting, setUserRemarksSubmitting] = useState(false);
   const [mainStatusFilter, setMainStatusFilter] = useState("pending"); // 'all', 'pending', 'completed'
-  const [activeNameTab, setActiveNameTab] = useState("EA"); // 'EA' or 'Gyan Ranjan Das'
   const [unifiedTypeFilter, setUnifiedTypeFilter] = useState("all"); // 'all', 'pending', 'approval'
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
@@ -300,13 +299,10 @@ function DelegationDataPage() {
   }, [delegation_done, debouncedSearchTerm, startDate, endDate, userRole, username, mainStatusFilter]);
 
   const pendingApprovalCount = useMemo(() => {
-    const targetName = "gyan ranjan das";
     return filteredApprovalData.filter(item => {
-      const isGyan = (item.name || "").toLowerCase().includes(targetName);
-      const matchesTab = activeNameTab === "EA" ? !isGyan : isGyan;
-      return matchesTab && item.admin_done !== 'Done' && item.status === 'completed';
+      return item.admin_done !== 'Done' && item.status === 'completed';
     }).length;
-  }, [filteredApprovalData, activeNameTab]);
+  }, [filteredApprovalData]);
 
   const filteredDelegationTasks = useMemo(() => {
     if (!delegation) return [];
@@ -384,20 +380,8 @@ function DelegationDataPage() {
       });
     }
 
-    // Apply Person Tab Filter (EA vs Gyan Ranjan Das)
-    const targetName = "gyan ranjan das";
-    const showNameTabs = userRole === 'admin' || userRole === 'super_admin' || (username || "").toLowerCase().includes(targetName);
-    
-    if (showNameTabs) {
-      if (activeNameTab === "EA") {
-        combined = combined.filter(item => !(item.name || "").toLowerCase().includes(targetName));
-      } else if (activeNameTab === "Gyan Ranjan Das") {
-        combined = combined.filter(item => (item.name || "").toLowerCase().includes(targetName));
-      }
-    }
-
     return combined.sort((a, b) => (b.task_id || 0) - (a.task_id || 0));
-  }, [filteredDelegationTasks, filteredApprovalData, unifiedTypeFilter, mainStatusFilter, activeNameTab, userRole, username]);
+  }, [filteredDelegationTasks, filteredApprovalData, unifiedTypeFilter, mainStatusFilter]);
 
   const StatusBadge = ({ status, adminDone, type }) => {
     // If it's an approval item and admin has marked it Done
@@ -1217,13 +1201,13 @@ const handleSubmit = async () => {
                   >
                     {markingAsDone ? "..." : `Approve (${selectedDelegationItems.length})`}
                   </button>
-                  <button
+                  {/* <button
                     onClick={handleSendWhatsApp}
                     disabled={selectedItems.size === 0 || sendingWhatsApp}
                     className="flex-1 rounded-md bg-emerald-500 py-2 px-3 text-white hover:bg-emerald-600 disabled:opacity-50 text-xs font-medium"
                   >
                     WhatsApp
-                  </button>
+                  </button> */}
                   {/* NEW: Revert Button */}
                   <button
                     onClick={handleRevertToPending}
@@ -1256,30 +1240,6 @@ const handleSubmit = async () => {
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
           <div className="bg-linear-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-3 sm:p-4">
             <div className="flex justify-between items-center">
-              {(userRole === 'admin' || userRole === 'super_admin' || (username || "").toLowerCase().includes("gyan ranjan das")) && (
-                <div className="flex space-x-1 p-0.5 bg-purple-100 rounded-lg">
-                  <button
-                    onClick={() => setActiveNameTab("EA")}
-                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
-                      activeNameTab === "EA"
-                        ? "bg-white text-purple-700 shadow-sm"
-                        : "text-purple-400 hover:text-purple-600"
-                    }`}
-                  >
-                    EA
-                  </button>
-                  <button
-                    onClick={() => setActiveNameTab("Gyan Ranjan Das")}
-                    className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
-                      activeNameTab === "Gyan Ranjan Das"
-                        ? "bg-white text-purple-700 shadow-sm"
-                        : "text-purple-400 hover:text-purple-600"
-                    }`}
-                  >
-                    Gyan Ranjan Das
-                  </button>
-                </div>
-              )}
               {pendingApprovalCount > 0 && unifiedTypeFilter !== 'pending' && (
                 <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse font-bold ml-auto">
                   {pendingApprovalCount} Awaiting Approval

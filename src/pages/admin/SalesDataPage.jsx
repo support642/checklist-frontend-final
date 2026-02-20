@@ -1024,7 +1024,7 @@ const submissionData = await Promise.all(
                 </button>
               )}
               {/* WhatsApp Button - For Admin and Super Admin */}
-              {!showHistory && (userRole === "admin" || userRole === "super_admin") && selectedItems.size > 0 && (
+              {/* {!showHistory && (userRole === "admin" || userRole === "super_admin") && selectedItems.size > 0 && (
                 <button
                   onClick={handleSendWhatsApp}
                   disabled={sendingWhatsApp}
@@ -1037,7 +1037,7 @@ const submissionData = await Promise.all(
                     </>
                   )}
                 </button>
-              )}
+              )} */}
             </div>
 
             {/* Admin Submit Button for History View */}

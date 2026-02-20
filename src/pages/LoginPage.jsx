@@ -105,8 +105,8 @@ const LoginPage = () => {
       <div className="w-full max-w-md shadow-lg border border-blue-200 rounded-lg bg-white">
         <div className="space-y-1 p-4 bg-gradient-to-r from-blue-100 to-purple-100 rounded-t-lg">
           <img
-            src="/shrishyam.png"
-            alt="Shri Shyam Logo"
+            src="/Rama_TMT_logo.png"
+            alt="Rama TMT Logo"
             className="h-16 w-auto mx-auto"
           />
           <h2 className="text-2xl font-bold text-blue-700 p-2 text-center">Checklist & Delegation</h2>

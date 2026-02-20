@@ -461,7 +461,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
           </h1>
           <div className="flex items-center">
             <img
-              src="/shrishyam.png"
+              src="/Rama_TMT_logo.png"
               alt="Company Logo"
               className="h-7 w-auto md:h-10 lg:h-12 transition-all duration-300"
             />
