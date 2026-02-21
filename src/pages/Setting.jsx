@@ -868,7 +868,9 @@ const handleEditUser = (userId) => {
     const dept = department.find(d => d.id === deptId);
     setDeptForm({
       name: dept.department,  // Match your API response field names
-      givenBy: dept.given_by
+      givenBy: dept.given_by,
+      unit: dept.unit || '',
+      division: dept.division || ''
     });
     setCurrentDeptId(deptId);
     setShowDeptModal(true);
@@ -954,7 +956,9 @@ const resetUserForm = () => {
   const resetDeptForm = () => {
     setDeptForm({
       name: '',
-      givenBy: ''
+      givenBy: '',
+      unit: '',
+      division: ''
     });
     setDeptRows([{ unit: '', division: '', department: '' }]);
     setCurrentDeptId(null);
@@ -1534,6 +1538,12 @@ const resetUserForm = () => {
                 Department Name
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Unit
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Division
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -1547,6 +1557,8 @@ const resetUserForm = () => {
                   <tr key={dept.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.department}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.unit || '—'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.division || '—'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
                         {localStorage.getItem('role') === 'super_admin' && (
@@ -1563,7 +1575,7 @@ const resetUserForm = () => {
                 ))
             ) : (
               <tr>
-                <td colSpan="3" className="px-6 py-4 text-center text-sm text-gray-500">
+                <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                   No departments found
                 </td>
               </tr>
@@ -2131,6 +2143,34 @@ const resetUserForm = () => {
                               name="name"
                               id="name"
                               value={deptForm.name}
+                              onChange={handleDeptInputChange}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            />
+                          </div>
+                          
+                          <div className="sm:col-span-3">
+                            <label htmlFor="unit" className="block text-sm font-medium text-gray-700">
+                              Unit
+                            </label>
+                            <input
+                              type="text"
+                              name="unit"
+                              id="unit"
+                              value={deptForm.unit || ''}
+                              onChange={handleDeptInputChange}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-3">
+                            <label htmlFor="division" className="block text-sm font-medium text-gray-700">
+                              Division
+                            </label>
+                            <input
+                              type="text"
+                              name="division"
+                              id="division"
+                              value={deptForm.division || ''}
                               onChange={handleDeptInputChange}
                               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             />
