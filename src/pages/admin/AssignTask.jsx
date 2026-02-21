@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { fetchUniqueDepartmentDataApi, fetchUniqueDoerNameDataApi, fetchUniqueGivenByDataApi, pushAssignTaskApi } from "../../redux/api/assignTaskApi";
 import { useDispatch, useSelector } from "react-redux";
 import { assignTaskInTable, uniqueDepartmentData, uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
+import { departmentDetails } from "../../redux/slice/settingSlice";
 import CSVImportModal from "../../components/CSVImportModal";
 // import supabase from "../../SupabaseClient";
 
@@ -183,6 +184,7 @@ export default function AssignTask() {
   const { department } = useSelector((state) => state.assignTask)
   const { doerName } = useSelector((state) => state.assignTask)
   const { givenBy } = useSelector((state) => state.assignTask)
+  const deptFullData = useSelector((state) => state.setting?.department) || [];
 
   // Add this near the top of your AssignTask component, after getting the Redux state
   const userRole = localStorage.getItem('role');
@@ -198,8 +200,7 @@ export default function AssignTask() {
   useEffect(() => {
     dispatch(uniqueDepartmentData(username));
     dispatch(uniqueGivenByData());
-
-
+    dispatch(departmentDetails());
   }, [dispatch])
 
 
@@ -237,6 +238,8 @@ export default function AssignTask() {
 
 
   const [formData, setFormData] = useState({
+    unit: "",
+    division: "",
     department: "",
     givenBy: "",
     doer: "",
@@ -245,6 +248,46 @@ export default function AssignTask() {
     enableReminders: true,
     requireAttachment: false,
   });
+
+  // Cascading dropdown data
+  const availableUnits = useMemo(() => {
+    if (!deptFullData || deptFullData.length === 0) return [];
+    const units = [...new Set(deptFullData.map(d => d.unit).filter(Boolean))];
+    return units;
+  }, [deptFullData]);
+
+  const availableDivisions = useMemo(() => {
+    if (!deptFullData || deptFullData.length === 0 || !formData.unit) return [];
+    const divisions = [...new Set(
+      deptFullData
+        .filter(d => d.unit === formData.unit)
+        .map(d => d.division)
+        .filter(Boolean)
+    )];
+    return divisions;
+  }, [deptFullData, formData.unit]);
+
+  const availableDepartments = useMemo(() => {
+    if (!deptFullData || deptFullData.length === 0 || !formData.unit) return [];
+    let filtered = deptFullData.filter(d => d.unit === formData.unit);
+    if (formData.division) {
+      filtered = filtered.filter(d => d.division === formData.division);
+    }
+    const depts = [...new Set(filtered.map(d => d.department).filter(Boolean))];
+    return depts;
+  }, [deptFullData, formData.unit, formData.division]);
+
+  const handleUnitChange = (value) => {
+    setFormData(prev => ({ ...prev, unit: value, division: '', department: '' }));
+  };
+
+  const handleDivisionChange = (value) => {
+    setFormData(prev => ({ ...prev, division: value, department: '' }));
+  };
+
+  const handleDepartmentChange = (value) => {
+    setFormData(prev => ({ ...prev, department: value }));
+  };
 
 
   // Fetch working days from Supabase on component mount
@@ -387,6 +430,8 @@ useEffect(() => {
         frequency: formData.frequency,
         enableReminders: formData.enableReminders,
         requireAttachment: formData.requireAttachment,
+        unit: formData.unit,
+        division: formData.division,
       });
     } else {
       // For recurring tasks
@@ -483,6 +528,8 @@ useEffect(() => {
           frequency: formData.frequency,
           enableReminders: formData.enableReminders,
           requireAttachment: formData.requireAttachment,
+          unit: formData.unit,
+          division: formData.division,
         });
 
         taskCount++;
@@ -539,6 +586,8 @@ useEffect(() => {
           frequency: formData.frequency,
           enableReminders: formData.enableReminders,
           requireAttachment: formData.requireAttachment,
+          unit: formData.unit,
+          division: formData.division,
         });
       } else {
         // For recurring tasks
@@ -625,6 +674,8 @@ useEffect(() => {
             frequency: formData.frequency,
             enableReminders: formData.enableReminders,
             requireAttachment: formData.requireAttachment,
+            unit: formData.unit,
+            division: formData.division,
           });
 
           taskCount++;
@@ -644,11 +695,13 @@ useEffect(() => {
 
       // Reset form
       setFormData({
+        unit: "",
+        division: "",
         department: "",
         givenBy: "",
         doer: "",
         description: "",
-        frequency: taskType === 'delegation' ? 'one-time' : 'daily', // Set based on task type
+        frequency: taskType === 'delegation' ? 'one-time' : 'daily',
         enableReminders: true,
         requireAttachment: false,
       });
@@ -788,33 +841,53 @@ useEffect(() => {
                 </p>
               </div>
               <div className="p-3 space-y-2">
-                {/* First Row: Department, Given By, Doer in 2-column grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Department Name Dropdown */}
+                {/* Row 1: Unit, Division, Department (cascading) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-2">
-                    <label
-                      htmlFor="department"
-                      className="block text-sm font-medium text-purple-700"
-                    >
-                      Department Name
-                    </label>
+                    <label className="block text-sm font-medium text-purple-700">Unit</label>
                     <select
-                      id="department"
-                      name="department"
-                      value={formData.department}
-                      onChange={handleChange}
-                      required
+                      value={formData.unit}
+                      onChange={(e) => handleUnitChange(e.target.value)}
                       className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
                     >
-                      <option value="">Select Department</option>
-                      {department.map((deptName, index) => (
-                        <option key={index} value={deptName}>
-                          {deptName}
-                        </option>
+                      <option value="">Select Unit</option>
+                      {availableUnits.map((unit, idx) => (
+                        <option key={idx} value={unit}>{unit}</option>
                       ))}
                     </select>
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-purple-700">Division</label>
+                    <select
+                      value={formData.division}
+                      onChange={(e) => handleDivisionChange(e.target.value)}
+                      className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      <option value="">Select Division</option>
+                      {availableDivisions.map((div, idx) => (
+                        <option key={idx} value={div}>{div}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-purple-700">Department</label>
+                    <select
+                      value={formData.department}
+                      onChange={(e) => handleDepartmentChange(e.target.value)}
+                      className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      <option value="">Select Department</option>
+                      {availableDepartments.map((dept, idx) => (
+                        <option key={idx} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 2: Given By and Doer's Name */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Given By Dropdown */}
                   <div className="space-y-2">
                     <label
@@ -841,31 +914,31 @@ useEffect(() => {
                         ))}
                     </select>
                   </div>
-                </div>
 
-                {/* Second Row: Doer's Name - Full Width */}
-                <div className="space-y-2">
-                  <label
-                    htmlFor="doer"
-                    className="block text-sm font-medium text-purple-700"
-                  >
-                    Doer's Name
-                  </label>
-                  <select
-                    id="doer"
-                    name="doer"
-                    value={formData.doer}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  >
-                    <option value="">Select Doer</option>
-                    {filteredDoerNames.map((doer, index) => (
-                      <option key={index} value={doer}>
-                        {doer}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Doer's Name Dropdown */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="doer"
+                      className="block text-sm font-medium text-purple-700"
+                    >
+                      Doer's Name
+                    </label>
+                    <select
+                      id="doer"
+                      name="doer"
+                      value={formData.doer}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    >
+                      <option value="">Select Doer</option>
+                      {filteredDoerNames.map((doer, index) => (
+                        <option key={index} value={doer}>
+                          {doer}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Description */}

@@ -29,6 +29,8 @@ const Setting = () => {
   const [showPasswords, setShowPasswords] = useState({}); // Track which passwords are visible
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
+  const [showGivenByModal, setShowGivenByModal] = useState(false);
+  const [givenByInput, setGivenByInput] = useState('');
   
   // Task Delegation Modal State
   const [showDelegationModal, setShowDelegationModal] = useState(false);
@@ -569,6 +571,25 @@ const handleConfirmDelegation = async () => {
 
   // Add to your handleAddButtonClick function
 
+  // Handle Add Given By submission
+  const handleAddGivenBy = async (e) => {
+    e.preventDefault();
+    if (!givenByInput.trim()) {
+      alert('Please enter a Given By value');
+      return;
+    }
+    try {
+      const newEntry = { givenBy: givenByInput.trim() };
+      await dispatch(createDepartment(newEntry)).unwrap();
+      setGivenByInput('');
+      setShowGivenByModal(false);
+      dispatch(departmentDetails());
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      console.error('Error adding given by:', error);
+    }
+  };
+
 
 
 
@@ -606,13 +627,14 @@ const handleConfirmDelegation = async () => {
   // ]);
 
   // Form states
-  // Change this in your form state initialization:
 const [userForm, setUserForm] = useState({
   username: '',
   email: '',
   password: '',
   phone: '',
-  departments: [], // Change from single department to array
+  unit: '',
+  division: '',
+  department: '',
   givenBy: '',
   role: 'user',
   status: 'active'
@@ -622,6 +644,11 @@ const [userForm, setUserForm] = useState({
     name: '',
     givenBy: ''
   });
+
+  // Multi-row department form state for Create New Department
+  const [deptRows, setDeptRows] = useState([
+    { unit: '', division: '', department: '' }
+  ]);
 
   useEffect(() => {
     dispatch(userDetails());
@@ -634,7 +661,7 @@ const handleAddUser = async (e) => {
   e.preventDefault();
   const newUser = {
     ...userForm,
-    user_access: userForm.departments.join(','), // Join array into comma-separated string
+    user_access: userForm.department, // Department name for user access
   };
 
   try {
@@ -658,7 +685,7 @@ const handleUpdateUser = async (e) => {
     number: userForm.phone,
     role: userForm.role,
     status: userForm.status,
-    user_access: userForm.departments.join(',') // Join array into comma-separated string
+    user_access: userForm.department // Department name for user access
   };
 
   // Only include password if it's not empty
@@ -676,13 +703,31 @@ const handleUpdateUser = async (e) => {
   }
 };
 
-  // Modified handleAddDepartment
+  // Modified handleAddDepartment - now handles multiple rows
   const handleAddDepartment = async (e) => {
     e.preventDefault();
-    const newDept = { ...deptForm };
+    
+    // Filter out empty rows (all 3 fields empty)
+    const validRows = deptRows.filter(row => 
+      row.unit.trim() !== '' || row.division.trim() !== '' || row.department.trim() !== ''
+    );
+
+    if (validRows.length === 0) {
+      alert('Please fill in at least one row');
+      return;
+    }
 
     try {
-      await dispatch(createDepartment(newDept)).unwrap();
+      // Submit each row as a separate department entry
+      for (const row of validRows) {
+        const newDept = {
+          name: row.department,
+          unit: row.unit,
+          division: row.division,
+          // givenBy: '' // Given By is commented out for now
+        };
+        await dispatch(createDepartment(newDept)).unwrap();
+      }
       resetDeptForm();
       setShowDeptModal(false);
       setTimeout(() => window.location.reload(), 1000);
@@ -722,29 +767,58 @@ const handleUpdateUser = async (e) => {
 
   // User form handlers
 const handleUserInputChange = (e) => {
-  const { name, value, type, options } = e.target;
-  
-  if (name === 'departments') {
-    // For multi-select dropdown
-    const selectedValues = Array.from(options)
-      .filter(option => option.selected)
-      .map(option => option.value);
-    
-    setUserForm(prev => ({ ...prev, [name]: selectedValues }));
-  } else {
-    setUserForm(prev => ({ ...prev, [name]: value }));
-  }
+  const { name, value } = e.target;
+  setUserForm(prev => ({ ...prev, [name]: value }));
 };
 
-// Get unique departments from department data
-const availableDepartments = React.useMemo(() => {
+// Cascading dropdown handlers for Unit → Division → Department
+const handleUnitChange = (value) => {
+  setUserForm(prev => ({ ...prev, unit: value, division: '', department: '' }));
+};
+
+const handleDivisionChange = (value) => {
+  setUserForm(prev => ({ ...prev, division: value, department: '' }));
+};
+
+const handleDepartmentChange = (value) => {
+  setUserForm(prev => ({ ...prev, department: value }));
+};
+
+// Get unique units from department data
+const availableUnits = React.useMemo(() => {
   if (department && department.length > 0) {
-    return [...new Set(department.map(dept => dept.department))]
-      .filter(deptName => deptName && deptName.trim() !== '')
-      .sort();
+    return [...new Set(department.map(dept => dept.unit).filter(u => u && u.trim() !== ''))].sort();
   }
   return [];
 }, [department]);
+
+// Get divisions filtered by selected unit
+const availableDivisions = React.useMemo(() => {
+  if (department && department.length > 0 && userForm.unit) {
+    return [...new Set(
+      department
+        .filter(dept => dept.unit === userForm.unit)
+        .map(dept => dept.division)
+        .filter(d => d && d.trim() !== '')
+    )].sort();
+  }
+  return [];
+}, [department, userForm.unit]);
+
+// Get departments filtered by selected unit and division
+const availableDepartments = React.useMemo(() => {
+  if (department && department.length > 0) {
+    let filtered = department;
+    if (userForm.unit) {
+      filtered = filtered.filter(dept => dept.unit === userForm.unit);
+    }
+    if (userForm.division) {
+      filtered = filtered.filter(dept => dept.division === userForm.division);
+    }
+    return [...new Set(filtered.map(dept => dept.department).filter(d => d && d.trim() !== ''))].sort();
+  }
+  return [];
+}, [department, userForm.unit, userForm.division]);
 
 useEffect(() => {
   const handleClickOutside = (event) => {
@@ -772,12 +846,16 @@ useEffect(() => {
   // };
 const handleEditUser = (userId) => {
   const user = userData.find(u => u.id === userId);
+  // Try to find the department record to pre-fill unit and division
+  const deptRecord = department?.find(d => d.department === user.user_access);
   setUserForm({
     username: user.user_name,
     email: user.email_id,
-    password: user.password || '', // Pre-fill with existing password
+    password: user.password || '',
     phone: user.number,
-    departments: user.user_access ? user.user_access.split(',').map(d => d.trim()) : [], // Split comma-separated string into array
+    unit: deptRecord?.unit || '',
+    division: deptRecord?.division || '',
+    department: user.user_access || '',
     role: user.role,
     status: user.status
   });
@@ -812,7 +890,9 @@ const resetUserForm = () => {
     email: '',
     password: '',
     phone: '',
-    departments: [], // Reset to empty array
+    unit: '',
+    division: '',
+    department: '',
     givenBy: '',
     role: 'user',
     status: 'active'
@@ -825,6 +905,24 @@ const resetUserForm = () => {
   const handleDeptInputChange = (e) => {
     const { name, value } = e.target;
     setDeptForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Multi-row department form handlers
+  const handleDeptRowChange = (index, field, value) => {
+    setDeptRows(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const addDeptRow = () => {
+    setDeptRows(prev => [...prev, { unit: '', division: '', department: '' }]);
+  };
+
+  const removeDeptRow = (index) => {
+    if (deptRows.length === 1) return; // Keep at least one row
+    setDeptRows(prev => prev.filter((_, i) => i !== index));
   };
 
   // const handleAddDepartment = (e) => {
@@ -858,6 +956,7 @@ const resetUserForm = () => {
       name: '',
       givenBy: ''
     });
+    setDeptRows([{ unit: '', division: '', department: '' }]);
     setCurrentDeptId(null);
   };
 
@@ -903,13 +1002,24 @@ const resetUserForm = () => {
               </button>
               
               {activeTab !== 'leave' && localStorage.getItem('role') === 'super_admin' && (
-                <button
-                  onClick={handleAddButtonClick}
-                  className="flex items-center gap-2 px-3 py-2 text-sm rounded-md bg-purple-600 text-white hover:bg-purple-700"
-                >
-                  <Plus size={16} />
-                  <span>{activeTab === 'users' ? 'Add User' : 'Add Department'}</span>
-                </button>
+                <>
+                  <button
+                    onClick={handleAddButtonClick}
+                    className="flex items-center gap-2 px-3 py-2 text-sm rounded-md bg-purple-600 text-white hover:bg-purple-700"
+                  >
+                    <Plus size={16} />
+                    <span>{activeTab === 'users' ? 'Add User' : 'Add Department'}</span>
+                  </button>
+                  {activeTab === 'departments' && (
+                    <button
+                      onClick={() => { setGivenByInput(''); setShowGivenByModal(true); }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-md bg-purple-600 text-white hover:bg-indigo-700"
+                    >
+                      <Plus size={16} />
+                      <span>Add Given By</span>
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1517,7 +1627,68 @@ const resetUserForm = () => {
   </div>
 )}
 
-        
+        {/* Given By Modal */}
+        {showGivenByModal && (
+          <div className="fixed z-10 inset-0 overflow-y-auto">
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full sm:p-6">
+                <div>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Add Given By
+                    </h3>
+                    <button
+                      onClick={() => { setShowGivenByModal(false); setGivenByInput(''); }}
+                      className="text-gray-400 hover:text-gray-500"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <div className="mt-6">
+                    <form onSubmit={handleAddGivenBy}>
+                      <div>
+                        <label htmlFor="givenByInput" className="block text-sm font-medium text-gray-700">
+                          Given By
+                        </label>
+                        <input
+                          type="text"
+                          id="givenByInput"
+                          value={givenByInput}
+                          onChange={(e) => setGivenByInput(e.target.value)}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          placeholder="Enter Given By name"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div className="mt-6 flex justify-end space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => { setShowGivenByModal(false); setGivenByInput(''); }}
+                          className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        >
+                          <Save size={18} className="mr-2" />
+                          Save
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Extend Task Tab */}
         {activeTab === 'extendTask' && (
           <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
@@ -1834,70 +2005,54 @@ const resetUserForm = () => {
                           </select>
                         </div>
 
-                      {/* In the User Modal form - Replace the existing department field */}
-<div className="sm:col-span-6">
-  <label htmlFor="departments" className="block text-sm font-medium text-gray-700">
-    Department 
-  </label>
-  
-  {/* Dropdown trigger button */}
-  <div className="relative mt-1">
-    <button
-      type="button"
-      onClick={() => setShowDeptDropdown(!showDeptDropdown)}
-      className="w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-    >
-      <div className="flex justify-between items-center">
-        <span className={`block truncate ${userForm.departments.length === 0 ? 'text-gray-400' : 'text-gray-900'}`}>
-          {userForm.departments.length === 0 
-            ? 'Select a department' 
-            : userForm.departments[0]}
-        </span>
-        <ChevronDown size={16} className={`text-gray-400 transition-transform ${showDeptDropdown ? 'rotate-180' : ''}`} />
-      </div>
-    </button>
-    
-    {/* Dropdown list */}
-    {showDeptDropdown && (
-      <div className="absolute z-50 mt-1 w-full bg-white shadow-lg border border-gray-300 rounded-md max-h-60 overflow-y-auto dropdown-scrollbar" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="p-1">
-          {availableDepartments.map((dept, index) => {
-            const isSelected = userForm.departments.includes(dept);
-            return (
-              <button
-                key={index}
-                type="button"
-                onClick={() => {
-                  // Single selection logic: Replace the entire array with the new selection
-                  setUserForm(prev => ({ 
-                    ...prev, 
-                    departments: [dept] 
-                  }));
-                  setShowDeptDropdown(false); // Close dropdown on selection
-                }}
-                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                  isSelected 
-                    ? 'bg-blue-50 text-blue-700 font-medium' 
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                {dept}
-                {isSelected && <span className="float-right text-blue-600">✓</span>}
-              </button>
-            );
-          })}
-          
-          {/* No departments available */}
-          {availableDepartments.length === 0 && (
-            <div className="p-3 text-center text-sm text-gray-500">
-              No departments available
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-  </div>
-</div>
+                      {/* Cascading Unit → Division → Department fields */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Unit
+                          </label>
+                          <select
+                            value={userForm.unit}
+                            onChange={(e) => handleUnitChange(e.target.value)}
+                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          >
+                            <option value="">Select Unit</option>
+                            {availableUnits.map((unit, idx) => (
+                              <option key={idx} value={unit}>{unit}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Division
+                          </label>
+                          <select
+                            value={userForm.division}
+                            onChange={(e) => handleDivisionChange(e.target.value)}
+                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          >
+                            <option value="">Select Division</option>
+                            {availableDivisions.map((div, idx) => (
+                              <option key={idx} value={div}>{div}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Department
+                          </label>
+                          <select
+                            value={userForm.department}
+                            onChange={(e) => handleDepartmentChange(e.target.value)}
+                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                          >
+                            <option value="">Select Department</option>
+                            {availableDepartments.map((dept, idx) => (
+                              <option key={idx} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                        </div>
 
                         <div className="sm:col-span-3">
                           <label htmlFor="status" className="block text-sm font-medium text-gray-700">
@@ -1948,7 +2103,7 @@ const resetUserForm = () => {
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full sm:p-6">
                 <div>
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -1961,24 +2116,159 @@ const resetUserForm = () => {
                       <X size={24} />
                     </button>
                   </div>
-                  <div className="mt-6">
-                    <form onSubmit={currentDeptId ? handleUpdateDepartment : handleAddDepartment}>
-                      <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                        <div className="sm:col-span-6">
-                          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                            Department Name
-                          </label>
-                          <input
-                            type="text"
-                            name="name"
-                            id="name"
-                            value={deptForm.name}
-                            onChange={handleDeptInputChange}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                          />
+
+                  {/* Edit mode - single row form (existing behavior) */}
+                  {currentDeptId ? (
+                    <div className="mt-6">
+                      <form onSubmit={handleUpdateDepartment}>
+                        <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                          <div className="sm:col-span-6">
+                            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                              Department Name
+                            </label>
+                            <input
+                              type="text"
+                              name="name"
+                              id="name"
+                              value={deptForm.name}
+                              onChange={handleDeptInputChange}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            />
+                          </div>
+
+                          {/* Given By - Commented out for now, will be separated into its own button later */}
+                          {/* <div className="sm:col-span-6">
+                            <label htmlFor="givenBy" className="block text-sm font-medium text-gray-700">
+                              Given By
+                            </label>
+                            <input
+                              type="text"
+                              id="givenBy"
+                              name="givenBy"
+                              value={deptForm.givenBy}
+                              onChange={handleDeptInputChange}
+                              className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                              placeholder="Enter Given By"
+                            />
+                          </div> */}
                         </div>
 
-                        <div className="sm:col-span-6">
+                        <div className="mt-6 flex justify-end space-x-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowDeptModal(false)}
+                            className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <Save size={18} className="mr-2" />
+                            Update Department
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
+                    /* Create mode - multi-row form with Unit, Division, Department */
+                    <div className="mt-6">
+                      <form onSubmit={handleAddDepartment}>
+                        {/* Column Headers */}
+                        <div className="grid grid-cols-12 gap-3 mb-2">
+                          <div className="col-span-1">
+                            <span className="block text-xs font-semibold text-gray-500 uppercase">#</span>
+                          </div>
+                          <div className="col-span-3">
+                            <span className="block text-xs font-semibold text-gray-500 uppercase">Unit</span>
+                          </div>
+                          <div className="col-span-3">
+                            <span className="block text-xs font-semibold text-gray-500 uppercase">Division</span>
+                          </div>
+                          <div className="col-span-4">
+                            <span className="block text-xs font-semibold text-gray-500 uppercase">Department</span>
+                          </div>
+                          <div className="col-span-1">
+                            <span className="block text-xs font-semibold text-gray-500 uppercase"></span>
+                          </div>
+                        </div>
+
+                        {/* Dynamic Rows */}
+                        <div className="max-h-[50vh] overflow-y-auto space-y-3">
+                          {deptRows.map((row, index) => (
+                            <div key={index} className="grid grid-cols-12 gap-3 items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                              {/* Row Number */}
+                              <div className="col-span-1 flex items-center justify-center">
+                                <span className="text-sm font-medium text-gray-500 bg-white w-7 h-7 rounded-full flex items-center justify-center border border-gray-300">
+                                  {index + 1}
+                                </span>
+                              </div>
+
+                              {/* Unit */}
+                              <div className="col-span-3">
+                                <input
+                                  type="text"
+                                  value={row.unit}
+                                  onChange={(e) => handleDeptRowChange(index, 'unit', e.target.value)}
+                                  placeholder="Enter Unit"
+                                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                />
+                              </div>
+
+                              {/* Division */}
+                              <div className="col-span-3">
+                                <input
+                                  type="text"
+                                  value={row.division}
+                                  onChange={(e) => handleDeptRowChange(index, 'division', e.target.value)}
+                                  placeholder="Enter Division"
+                                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                />
+                              </div>
+
+                              {/* Department */}
+                              <div className="col-span-4">
+                                <input
+                                  type="text"
+                                  value={row.department}
+                                  onChange={(e) => handleDeptRowChange(index, 'department', e.target.value)}
+                                  placeholder="Enter Department"
+                                  className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                />
+                              </div>
+
+                              {/* Remove Row Button */}
+                              <div className="col-span-1 flex items-center justify-center">
+                                {deptRows.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeDeptRow(index)}
+                                    className="text-red-400 hover:text-red-600 transition-colors"
+                                    title="Remove this row"
+                                  >
+                                    <X size={18} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Add Row Button */}
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={addDeptRow}
+                            className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
+                          >
+                            <Plus size={16} />
+                            Add Another Row
+                          </button>
+                        </div>
+
+                        {/* Given By - Commented out for now, will be separated into its own button later */}
+                        {/* <div className="mt-4">
                           <label htmlFor="givenBy" className="block text-sm font-medium text-gray-700">
                             Given By
                           </label>
@@ -1991,28 +2281,28 @@ const resetUserForm = () => {
                             className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             placeholder="Enter Given By"
                           />
+                        </div> */}
+
+                        {/* Submit / Cancel Buttons */}
+                        <div className="mt-6 flex justify-end space-x-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowDeptModal(false)}
+                            className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <Save size={18} className="mr-2" />
+                            Submit
+                          </button>
                         </div>
-
-                      </div>
-
-                      <div className="mt-6 flex justify-end space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => setShowDeptModal(false)}
-                          className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                          <Save size={18} className="mr-2" />
-                          {currentDeptId ? 'Update Department' : 'Save Department'}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
+                      </form>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

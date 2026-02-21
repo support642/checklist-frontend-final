@@ -246,6 +246,12 @@ useEffect(()=>{
                     DEPARTMENT
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    UNIT
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    DIVISION
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     GIVEN BY
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -294,6 +300,12 @@ useEffect(()=>{
                         {task.department || "—"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.unit || "—"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.division || "—"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {task.given_by || "—"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -330,7 +342,7 @@ useEffect(()=>{
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
                       {searchTerm || nameFilter || freqFilter 
                         ? "No tasks matching your filters" 
                         : "No pending tasks found"}

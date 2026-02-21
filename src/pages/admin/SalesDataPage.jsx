@@ -1223,6 +1223,12 @@ const submissionData = await Promise.all(
                             Department
                           </th>
                           <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                            Unit
+                          </th>
+                          <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                            Division
+                          </th>
+                          <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                             Given By
                           </th>
                           <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
@@ -1274,6 +1280,12 @@ const submissionData = await Promise.all(
                               </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-4">
                                 <div className="text-xs sm:text-sm text-gray-900 break-words">{history.department || "—"}</div>
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-4">
+                                <div className="text-xs sm:text-sm text-gray-900 break-words">{history.unit || "—"}</div>
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-4">
+                                <div className="text-xs sm:text-sm text-gray-900 break-words">{history.division || "—"}</div>
                               </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-4">
                                 <div className="text-xs sm:text-sm text-gray-900 break-words">{history.given_by || "—"}</div>
@@ -1383,7 +1395,7 @@ const submissionData = await Promise.all(
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={userRole === "admin" ? 15 : 13} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                            <td colSpan={userRole === "admin" ? 17 : 15} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
                               {searchTerm || selectedMembers.length > 0 || startDate || endDate
                                 ? "No historical records matching your filters"
                                 : "No completed records found"}
@@ -1453,6 +1465,8 @@ const submissionData = await Promise.all(
                         <div className="grid grid-cols-2 gap-2 text-xs mb-2">
                           <div><span className="text-gray-500">Name:</span> <span className="font-medium">{account.name || "—"}</span></div>
                           <div><span className="text-gray-500">Dept:</span> <span className="font-medium">{account.department || "—"}</span></div>
+                          <div><span className="text-gray-500">Unit:</span> <span className="font-medium">{account.unit || "—"}</span></div>
+                          <div><span className="text-gray-500">Division:</span> <span className="font-medium">{account.division || "—"}</span></div>
                           <div><span className="text-gray-500">Given By:</span> <span className="font-medium">{account.given_by || "—"}</span></div>
                           <div><span className="text-gray-500">Frequency:</span> <span className="font-medium">{account.frequency || "—"}</span></div>
                           <div><span className="text-gray-500">Date:</span> <span className="font-medium">{account.task_start_date || "—"}</span></div>
@@ -1590,6 +1604,12 @@ const submissionData = await Promise.all(
                     </th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                       Department
+                    </th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                      Unit
+                    </th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                      Division
                     </th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                       Given By
@@ -1742,6 +1762,12 @@ const submissionData = await Promise.all(
                           </td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4">
                             <div className="text-xs sm:text-sm text-gray-900 break-words">{account.department || "—"}</div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4">
+                            <div className="text-xs sm:text-sm text-gray-900 break-words">{account.unit || "—"}</div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4">
+                            <div className="text-xs sm:text-sm text-gray-900 break-words">{account.division || "—"}</div>
                           </td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4">
                             <div className="text-xs sm:text-sm text-gray-900 break-words">{account.given_by || "—"}</div>

@@ -91,6 +91,8 @@ useEffect(() => {
     setEditFormData({
       task_id: task.task_id,
       department: task.department || '',
+      unit: task.unit || '',
+      division: task.division || '',
       given_by: task.given_by || '',
       name: task.name || '',
       task_description: task.task_description || '',
@@ -700,6 +702,36 @@ const filteredChecklistTasks = quickTask.filter(task => {
                               <span className="font-medium">{task.department || "—"}</span>
                             )}
                           </div>
+
+                          {/* Unit */}
+                          <div>
+                            <span className="text-gray-500">Unit:</span>{' '}
+                            {editingTaskId === task.task_id ? (
+                              <input
+                                type="text"
+                                value={editFormData.unit}
+                                onChange={(e) => handleInputChange('unit', e.target.value)}
+                                className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1"
+                              />
+                            ) : (
+                              <span className="font-medium">{task.unit || "—"}</span>
+                            )}
+                          </div>
+                          
+                          {/* Division */}
+                          <div>
+                            <span className="text-gray-500">Div:</span>{' '}
+                            {editingTaskId === task.task_id ? (
+                              <input
+                                type="text"
+                                value={editFormData.division}
+                                onChange={(e) => handleInputChange('division', e.target.value)}
+                                className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1"
+                              />
+                            ) : (
+                              <span className="font-medium">{task.division || "—"}</span>
+                            )}
+                          </div>
                           
                           {/* Given By */}
                           <div>
@@ -783,6 +815,8 @@ const filteredChecklistTasks = quickTask.filter(task => {
                       </th>
                       {[
                         { key: 'department', label: 'Department' },
+                        { key: 'unit', label: 'Unit' },
+                        { key: 'division', label: 'Division' },
                         { key: 'given_by', label: 'Given By' },
                         { key: 'name', label: 'Name' },
                         { key: 'task_description', label: 'Task Description', minWidth: 'whitespace-nowrap' },
@@ -834,7 +868,35 @@ const filteredChecklistTasks = quickTask.filter(task => {
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               />
                             ) : (
-                              task.department
+                              task.department || "—"
+                            )}
+                          </td>
+                          
+                          {/* Unit */}
+                          <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                            {editingTaskId === task.task_id ? (
+                              <input
+                                type="text"
+                                value={editFormData.unit}
+                                onChange={(e) => handleInputChange('unit', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                            ) : (
+                              task.unit || "—"
+                            )}
+                          </td>
+
+                          {/* Division */}
+                          <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                            {editingTaskId === task.task_id ? (
+                              <input
+                                type="text"
+                                value={editFormData.division}
+                                onChange={(e) => handleInputChange('division', e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                            ) : (
+                              task.division || "—"
                             )}
                           </td>
 
@@ -848,7 +910,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               />
                             ) : (
-                              task.given_by
+                              task.given_by || "—"
                             )}
                           </td>
 
@@ -862,7 +924,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                               />
                             ) : (
-                              task.name
+                              task.name || "—"
                             )}
                           </td>
 
@@ -877,7 +939,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                               />
                             ) : (
                               <div className="break-words">
-                                {task.task_description}
+                                {task.task_description || "—"}
                               </div>
                             )}
                           </td>
@@ -905,7 +967,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                                 task.frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
                                   'bg-gray-100 text-gray-800'
                               }${editingTaskId === task.task_id ? ' opacity-60 cursor-not-allowed' : ''}`}>
-                              {task.frequency}
+                              {task.frequency || "—"}
                             </span>
                           </td>
 
@@ -981,7 +1043,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={11} className="px-2 sm:px-6 py-2 sm:py-4 text-center text-gray-500">
+                        <td colSpan={13} className="px-2 sm:px-6 py-2 sm:py-4 text-center text-gray-500">
                           {searchTerm || nameFilter || freqFilter
                             ? "No tasks matching your filters"
                             : "No tasks available"}

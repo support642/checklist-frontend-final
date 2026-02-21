@@ -678,6 +678,8 @@ function HistoryPage() {
                     )}
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given By</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Task Description</th>
@@ -744,6 +746,12 @@ function HistoryPage() {
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Department">
                           <div className="text-xs sm:text-sm text-gray-900">{historyItem.department || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Unit">
+                          <div className="text-xs sm:text-sm text-gray-900">{historyItem.unit || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Division">
+                          <div className="text-xs sm:text-sm text-gray-900">{historyItem.division || "—"}</div>
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Given By">
                           <div className="text-xs sm:text-sm text-gray-900">{historyItem.given_by || "—"}</div>
@@ -829,7 +837,7 @@ function HistoryPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={isSuperAdmin ? 14 : 13} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                      <td colSpan={isSuperAdmin ? 16 : 14} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
                         {searchTerm || selectedMembers.length > 0 || startDate || endDate
                           ? "No records matching your filters"
                           : "No completed records found"}
@@ -858,13 +866,13 @@ function HistoryPage() {
                       <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50">Admin Remarks</th>
                     )}
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given By</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    {/* <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th> */}
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Task Description</th>
-                    {isSuperAdmin && (
-                      <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50">Admin Remarks</th>
-                    )}
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">Created At</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Status</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Extend Date</th>
@@ -925,6 +933,15 @@ function HistoryPage() {
                         )}
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Task ID">
                           <div className="text-xs sm:text-sm font-medium text-gray-900">{item.task_id || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Department">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.department || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Unit">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.unit || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Division">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div>
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Given By">
                           <div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div>
@@ -987,7 +1004,7 @@ function HistoryPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={isSuperAdmin ? 12 : 11} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                      <td colSpan={isSuperAdmin ? 15 : 13} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
                         {searchTerm || startDate || endDate
                           ? "No records matching your filters"
                           : "No delegation records found"}

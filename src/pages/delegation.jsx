@@ -1287,6 +1287,8 @@ const handleSubmit = async () => {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Remarks</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Unit</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Division</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Target Date</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Submit Date</th>
@@ -1470,6 +1472,12 @@ const handleSubmit = async () => {
                           <td className="px-6 py-4 text-xs text-gray-700">
                             <div>{item.name}</div>
                             <div className="text-[10px] text-gray-400 capitalize">{item.department || item.given_by}</div>
+                          </td>
+                          <td className="px-6 py-4 text-xs text-gray-700">
+                            {item.unit || "—"}
+                          </td>
+                          <td className="px-6 py-4 text-xs text-gray-700">
+                            {item.division || "—"}
                           </td>
                           <td className="px-6 py-4 text-xs text-gray-800 min-w-[200px] max-w-[300px] wrap-break-word">
                             {item.task_description}
