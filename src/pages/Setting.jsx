@@ -1005,7 +1005,7 @@ const resetUserForm = () => {
                 <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
               
-              {activeTab !== 'leave' && localStorage.getItem('role') === 'super_admin' && (
+              {(activeTab === 'users' || activeTab === 'departments') && localStorage.getItem('role') === 'super_admin' && (
                 <>
                   <button
                     onClick={handleAddButtonClick}
@@ -1155,10 +1155,51 @@ const resetUserForm = () => {
             </div>
 
 
-            {/* Users List for Leave Selection - Updated with filter */}
             {/* Users List for Leave Selection */}
 <div className="h-[calc(100vh-400px)] overflow-auto">
-  <table className="min-w-full divide-y divide-gray-200">
+  {/* Mobile Card View */}
+  <div className="sm:hidden space-y-3 p-3">
+    {filteredLeaveUsers?.map((user) => (
+      <div key={user.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selectedUsers.includes(user.id)}
+              onChange={(e) => handleUserSelection(user.id, e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <p className="text-sm font-medium text-gray-900">{user.user_name}</p>
+          </div>
+          {localStorage.getItem('role') === 'super_admin' && (
+            <button
+              onClick={() => {
+                if(window.confirm(`Are you sure you want to clear leave for ${user.user_name}?`)) {
+                  dispatch(updateUser({
+                    id: user.id,
+                    updatedUser: { leave_date: null, leave_end_date: null, remark: null }
+                  })).then(() => {
+                    setTimeout(() => window.location.reload(), 500);
+                  });
+                }
+              }}
+              className="text-red-600" title="Clear Leave"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div><span className="text-gray-500">Leave Start:</span> <span className="font-medium">{user.leave_date ? new Date(user.leave_date).toLocaleDateString() : 'No leave set'}</span></div>
+          <div><span className="text-gray-500">Leave End:</span> <span className="font-medium">{user.leave_end_date ? new Date(user.leave_end_date).toLocaleDateString() : 'No end date'}</span></div>
+          <div className="col-span-2"><span className="text-gray-500">Remarks:</span> <span className="font-medium">{user.remark || 'No remarks'}</span></div>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  {/* Desktop Table View */}
+  <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
     <thead className="bg-gray-50">
       <tr>
         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1169,21 +1210,11 @@ const resetUserForm = () => {
             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
         </th>
-        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Username
-        </th>
-        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Current Leave Start Date
-        </th>
-        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Current Leave End Date
-        </th>
-        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Current Remarks
-        </th>
-        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Action
-        </th>
+        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Leave Start Date</th>
+        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Leave End Date</th>
+        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Remarks</th>
+        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
       </tr>
     </thead>
     <tbody className="bg-white divide-y divide-gray-200">
@@ -1352,6 +1383,16 @@ const resetUserForm = () => {
                 <div><span className="text-gray-500">Email:</span> <span className="font-medium">{user?.email_id || "—"}</span></div>
                 <div><span className="text-gray-500">Phone:</span> <span className="font-medium">{user?.number || "—"}</span></div>
                 <div><span className="text-gray-500">Dept:</span> <span className="font-medium">{user?.user_access || "N/A"}</span></div>
+                <div><span className="text-gray-500">Unit:</span> <span className="font-medium">{(() => {
+                  const deptName = user?.user_access?.split(',')[0]?.trim();
+                  const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
+                  return match?.unit || "—";
+                })()}</span></div>
+                <div><span className="text-gray-500">Division:</span> <span className="font-medium">{(() => {
+                  const deptName = user?.user_access?.split(',')[0]?.trim();
+                  const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
+                  return match?.division || "—";
+                })()}</span></div>
               </div>
             </div>
           ))}
@@ -1376,6 +1417,12 @@ const resetUserForm = () => {
 
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Department
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Unit
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Division
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
@@ -1435,6 +1482,24 @@ const resetUserForm = () => {
 
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{user?.user_access || 'N/A'}</div>
+                </td>
+
+                {/* Unit Cell */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">{(() => {
+                    const deptName = user?.user_access?.split(',')[0]?.trim();
+                    const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
+                    return match?.unit || '—';
+                  })()}</div>
+                </td>
+
+                {/* Division Cell */}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">{(() => {
+                    const deptName = user?.user_access?.split(',')[0]?.trim();
+                    const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
+                    return match?.division || '—';
+                  })()}</div>
                 </td>
                 
                 {/* Status Cell */}
@@ -1528,29 +1593,45 @@ const resetUserForm = () => {
     {/* Departments Sub-tab - Show only department names */}
     {activeDeptSubTab === 'departments' && !loading && (
       <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-        <table className="min-w-full divide-y divide-gray-200">
+        {/* Mobile Card View */}
+        <div className="sm:hidden space-y-3 p-3">
+          {department && department.length > 0 ? (
+            Array.from(new Map(department.map(dept => [dept.department, dept])).values())
+              .filter(dept => dept?.department && dept.department.trim() !== '')
+              .map((dept, index) => (
+                <div key={dept.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="text-sm font-medium text-gray-900">#{index + 1} {dept.department}</p>
+                    {localStorage.getItem('role') === 'super_admin' && (
+                      <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600" title="Edit">
+                        <Edit size={16} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-gray-500">Unit:</span> <span className="font-medium">{dept.unit || '—'}</span></div>
+                    <div><span className="text-gray-500">Division:</span> <span className="font-medium">{dept.division || '—'}</span></div>
+                  </div>
+                </div>
+              ))
+          ) : (
+            <div className="text-center py-6 text-gray-500 text-sm">No departments found</div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
           <thead className="bg-gray-50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Department Name
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Unit
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Division
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department Name</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {department && department.length > 0 ? (
-              // Get unique departments and show them
               Array.from(new Map(department.map(dept => [dept.department, dept])).values())
                 .filter(dept => dept?.department && dept.department.trim() !== '')
                 .map((dept, index) => (
@@ -1562,10 +1643,7 @@ const resetUserForm = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
                         {localStorage.getItem('role') === 'super_admin' && (
-                        <button
-                          onClick={() => handleEditDepartment(dept.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
+                        <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600 hover:text-blue-900">
                           <Edit size={18} />
                         </button>
                         )}
@@ -1575,9 +1653,7 @@ const resetUserForm = () => {
                 ))
             ) : (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                  No departments found
-                </td>
+                <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">No departments found</td>
               </tr>
             )}
           </tbody>
@@ -1588,23 +1664,39 @@ const resetUserForm = () => {
     {/* Given By Sub-tab - Show only given_by values */}
     {activeDeptSubTab === 'givenBy' && !loading && (
       <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-        <table className="min-w-full divide-y divide-gray-200">
+        {/* Mobile Card View */}
+        <div className="sm:hidden space-y-3 p-3">
+          {department && department.length > 0 ? (
+            Array.from(new Map(department.map(dept => [dept.given_by, dept])).values())
+              .filter(dept => dept?.given_by && dept.given_by.trim() !== '')
+              .map((dept, index) => (
+                <div key={dept.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium text-gray-900">#{index + 1} {dept.given_by}</p>
+                    {localStorage.getItem('role') === 'super_admin' && (
+                      <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600" title="Edit">
+                        <Edit size={16} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+          ) : (
+            <div className="text-center py-6 text-gray-500 text-sm">No given by data found</div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
           <thead className="bg-gray-50">
             <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Given By
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given By</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {department && department.length > 0 ? (
-              // Get unique given_by values and show them
               Array.from(new Map(department.map(dept => [dept.given_by, dept])).values())
                 .filter(dept => dept?.given_by && dept.given_by.trim() !== '')
                 .map((dept, index) => (
@@ -1614,10 +1706,7 @@ const resetUserForm = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
                         {localStorage.getItem('role') === 'super_admin' && (
-                        <button
-                          onClick={() => handleEditDepartment(dept.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
+                        <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600 hover:text-blue-900">
                           <Edit size={18} />
                         </button>
                         )}
@@ -1627,9 +1716,7 @@ const resetUserForm = () => {
                 ))
             ) : (
               <tr>
-                <td colSpan="3" className="px-6 py-4 text-center text-sm text-gray-500">
-                  No given by data found
-                </td>
+                <td colSpan="3" className="px-6 py-4 text-center text-sm text-gray-500">No given by data found</td>
               </tr>
             )}
           </tbody>
@@ -1743,18 +1830,33 @@ const resetUserForm = () => {
 
             {/* Users List for Extend Task Selection */}
             <div className="h-[calc(100vh-400px)] overflow-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              {/* Mobile Card View */}
+              <div className="sm:hidden space-y-3 p-3">
+                {filteredLeaveUsers?.map((user) => (
+                  <div key={user.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.includes(user.id)}
+                        onChange={(e) => handleExtendUserSelection(user.id, e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{user.user_name}</p>
+                        <p className="text-xs text-gray-500">Pending Tasks: -</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Select
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Username
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pending Tasks
-                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Select</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pending Tasks</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1772,9 +1874,7 @@ const resetUserForm = () => {
                         <div className="text-sm font-medium text-gray-900">{user.user_name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          -
-                        </div>
+                        <div className="text-sm text-gray-900">-</div>
                       </td>
                     </tr>
                   ))}

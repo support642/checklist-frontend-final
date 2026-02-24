@@ -1642,6 +1642,37 @@ const handleSubmit = async () => {
                               : setRemarksData(prev => ({ ...prev, [item.task_id]: e.target.value }))
                             }
                            />
+                           
+                           {/* Mobile Proof Upload Section */}
+                           {item.unifiedType === 'pending' && (
+                             <div className="mt-2 text-center border border-dashed border-gray-300 rounded p-2 bg-gray-50">
+                               <label className="cursor-pointer text-purple-600 hover:text-purple-800 flex items-center justify-center gap-1">
+                                 <Upload size={14} />
+                                 <span className="text-xs font-bold uppercase">
+                                   {uploadedImages[item.task_id] ? "Upload image" : "Upload image"}
+                                 </span>
+                                 <input
+                                   type="file"
+                                   className="hidden"
+                                   accept="image/*"
+                                   onChange={(e) => handleImageUpload(item.task_id, e)}
+                                 />
+                               </label>
+                             </div>
+                           )}
+                        </div>
+                      )}
+                      
+                      {/* Mobile View Existing Proof (When not selected or if it's just an approval) */}
+                      {!isSelected && (item.image || item.image_url) && (
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            onClick={() => window.open(item.image || item.image_url, "_blank")}
+                            className="text-purple-500 hover:text-purple-700 flex items-center gap-1 text-xs font-medium"
+                            title="View Proof"
+                          >
+                            <Upload size={14} /> View Proof
+                          </button>
                         </div>
                       )}
                     </div>
