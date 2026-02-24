@@ -14,6 +14,12 @@ export default function DashboardHeader({
   departmentFilter,
   setDepartmentFilter,
   availableDepartments,
+  unitFilter,
+  setUnitFilter,
+  availableUnits,
+  divisionFilter,
+  setDivisionFilter,
+  availableDivisions,
   isLoadingMore,
   onDateRangeChange // Add this prop to handle date range selection
 }) {
@@ -142,6 +148,38 @@ export default function DashboardHeader({
             <option value="delegation">Delegation</option>
           </select>
 
+          {/* Unit Filter - Only show for checklist */}
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
+            <select
+              value={unitFilter}
+              onChange={(e) => setUnitFilter(e.target.value)}
+              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
+            >
+              <option value="all">All Units</option>
+              {availableUnits.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Division Filter - Only show for checklist */}
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
+            <select
+              value={divisionFilter}
+              onChange={(e) => setDivisionFilter(e.target.value)}
+              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
+            >
+              <option value="all">All Divisions</option>
+              {availableDivisions.map((div) => (
+                <option key={div} value={div}>
+                  {div}
+                </option>
+              ))}
+            </select>
+          )}
+
           {/* Department Filter - Only show for checklist */}
           {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
             <select
@@ -254,6 +292,38 @@ export default function DashboardHeader({
           <option value="checklist">Checklist</option>
           <option value="delegation">Delegation</option>
         </select>
+
+        {/* Unit Filter - Only show for checklist */}
+        {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
+          <select
+            value={unitFilter}
+            onChange={(e) => setUnitFilter(e.target.value)}
+            className="w-[110px] sm:w-[140px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+          >
+            <option value="all">All Units</option>
+            {availableUnits.map((unit) => (
+              <option key={unit} value={unit}>
+                {unit}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Division Filter - Only show for checklist */}
+        {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
+          <select
+            value={divisionFilter}
+            onChange={(e) => setDivisionFilter(e.target.value)}
+            className="w-[110px] sm:w-[140px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+          >
+            <option value="all">All Divisions</option>
+            {availableDivisions.map((div) => (
+              <option key={div} value={div}>
+                {div}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Department Filter - Only show for checklist */}
         {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (

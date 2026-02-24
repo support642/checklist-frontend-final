@@ -25,6 +25,7 @@ import {
   fetchChecklistDataByDateRangeApi,
   getChecklistDateRangeStatsApi
 } from "../../redux/api/dashboardApi.js"
+import { fetchDepartmentDataApi } from "../../redux/api/settingApi.js"
 
 export default function AdminDashboard() {
   const [dashboardType, setDashboardType] = useState("checklist")
@@ -46,6 +47,15 @@ export default function AdminDashboard() {
   const [batchSize] = useState(1000)
   const [departmentFilter, setDepartmentFilter] = useState("all")
   const [availableDepartments, setAvailableDepartments] = useState([])
+
+  const [unitFilter, setUnitFilter] = useState("all")
+  const [availableUnits, setAvailableUnits] = useState([])
+
+  const [divisionFilter, setDivisionFilter] = useState("all")
+  const [availableDivisions, setAvailableDivisions] = useState([])
+
+  // Raw list containing the full department objects with unit and division info
+  const [rawDepartmentList, setRawDepartmentList] = useState([])
 
   // State for department data
   const [departmentData, setDepartmentData] = useState({
@@ -90,6 +100,8 @@ useEffect(() => {
     setDashboardStaffFilter(username);
     setFilterStaff(username);
     setDepartmentFilter("all");        // user cannot filter department
+    setUnitFilter("all");
+    setDivisionFilter("all");
   }
 }, []);
 
@@ -116,9 +128,8 @@ useEffect(() => {
             endDate,
             dashboardStaffFilter,
             departmentFilter,
-            1,
-            batchSize,
-            'all'
+            unitFilter,
+            divisionFilter
           );
 
           // Also get statistics for the date range
@@ -126,7 +137,9 @@ useEffect(() => {
             startDate,
             endDate,
             dashboardStaffFilter,
-            departmentFilter
+            departmentFilter,
+            unitFilter,
+            divisionFilter
           );
 
           // Process the filtered data
@@ -306,7 +319,7 @@ useEffect(() => {
 
   const fetchDepartmentDataWithDateRange = async (startDate, endDate, page = 1, append = false) => {
     try {
-      const data = await fetchDashboardDataApi(dashboardType, dashboardStaffFilter, page, batchSize, 'all', departmentFilter);
+      const data = await fetchDashboardDataApi(dashboardType, dashboardStaffFilter, page, batchSize, 'all', departmentFilter, unitFilter, divisionFilter);
 
       // Filter data by date range on client side
       const start = new Date(startDate);
@@ -490,7 +503,7 @@ useEffect(() => {
       }
 
       // Use the updated API function with department filter
-      const data = await fetchDashboardDataApi(dashboardType, dashboardStaffFilter, page, batchSize, 'all', departmentFilter)
+      const data = await fetchDashboardDataApi(dashboardType, dashboardStaffFilter, page, batchSize, 'all', departmentFilter, unitFilter, divisionFilter)
 
       if (!data || data.length === 0) {
         if (page === 1) {
@@ -721,17 +734,23 @@ useEffect(() => {
   const fetchDepartments = async () => {
     if (dashboardType === 'checklist') {
       try {
-        const departments = await getUniqueDepartmentsApi();
-        console.log('All departments from API:', departments);
+        const fullDepts = await fetchDepartmentDataApi();
+        setRawDepartmentList(fullDepts);
+        
+        // Extract unique units for initial load
+        const allUnits = [...new Set(fullDepts.map(d => d.unit).filter(u => u && u.trim() !== ''))].sort();
+        setAvailableUnits(allUnits);
+
+        // Get unique departments purely for filtering initial UI
+        // We'll update availableDepartments dynamically in another effect
+        const departments = [...new Set(fullDepts.map(d => d.department).filter(u => u && u.trim() !== ''))].sort();
 
         // Get user's department access
         const userAccess = localStorage.getItem("user_access") || "";
-        console.log('User access from localStorage:', userAccess);
 
         const userDepartments = userAccess
           ? userAccess.split(',').map(dept => dept.trim().toLowerCase())
           : [];
-        console.log('Parsed user departments:', userDepartments);
 
         // Filter departments based on user access for admin users
         let filteredDepartments = departments;
@@ -741,20 +760,64 @@ useEffect(() => {
           );
         }
 
-        console.log('Filtered departments:', filteredDepartments);
         setAvailableDepartments(filteredDepartments);
       } catch (error) {
         console.error('Error fetching departments:', error);
         setAvailableDepartments([]);
+        setAvailableUnits([]);
+        setAvailableDivisions([]);
       }
     } else {
       setAvailableDepartments([]);
+      setAvailableUnits([]);
+      setAvailableDivisions([]);
     }
   }
 
   useEffect(() => {
     fetchDepartments();
   }, [dashboardType, userRole]);
+
+  // Dynamically update available Divisions and Departments based on Unit and Division selection
+  useEffect(() => {
+    if (!rawDepartmentList || rawDepartmentList.length === 0) return;
+
+    let filtered = [...rawDepartmentList];
+    
+    // Filter by unit if selected
+    if (unitFilter !== "all") {
+      filtered = filtered.filter(d => d.unit && d.unit.toLowerCase() === unitFilter.toLowerCase());
+    }
+    
+    // Filter by division if selected
+    if (divisionFilter !== "all") {
+      filtered = filtered.filter(d => d.division && d.division.toLowerCase() === divisionFilter.toLowerCase());
+    }
+
+    // Rebuild available Divisions based on the current full list (or just unit filtered list)
+    if (unitFilter !== "all") {
+      const unitFilteredList = rawDepartmentList.filter(d => d.unit && d.unit.toLowerCase() === unitFilter.toLowerCase());
+      const divs = [...new Set(unitFilteredList.map(d => d.division).filter(v => v && v.trim() !== ''))].sort();
+      setAvailableDivisions(divs);
+    } else {
+      setAvailableDivisions([...new Set(rawDepartmentList.map(d => d.division).filter(v => v && v.trim() !== ''))].sort());
+    }
+
+    // Rebuild available Departments based on Unit/Division filters
+    const depts = [...new Set(filtered.map(d => d.department).filter(v => v && v.trim() !== ''))].sort();
+
+    // Check against user permissions
+    const userAccess = localStorage.getItem("user_access") || "";
+    const userDepartments = userAccess ? userAccess.split(',').map(dept => dept.trim().toLowerCase()) : [];
+    
+    let finalDepartments = depts;
+    if ((userRole === "admin" || userRole === "super_admin") && userDepartments.length > 0) {
+      finalDepartments = depts.filter(dept => userDepartments.includes(dept.toLowerCase()));
+    }
+    setAvailableDepartments(finalDepartments);
+
+  }, [unitFilter, divisionFilter, rawDepartmentList, userRole]);
+
 
   // Reset staff filter when department filter changes
   useEffect(() => {
@@ -814,6 +877,8 @@ useEffect(() => {
         dashboardType,
         staffFilter: dashboardStaffFilter,
         departmentFilter,
+        unitFilter,
+        divisionFilter
       }),
     )
     dispatch(
@@ -821,6 +886,8 @@ useEffect(() => {
         dashboardType,
         staffFilter: dashboardStaffFilter,
         departmentFilter,
+        unitFilter,
+        divisionFilter
       }),
     )
     dispatch(
@@ -828,6 +895,8 @@ useEffect(() => {
         dashboardType,
         staffFilter: dashboardStaffFilter,
         departmentFilter,
+        unitFilter,
+        divisionFilter
       }),
     )
     dispatch(
@@ -835,16 +904,20 @@ useEffect(() => {
         dashboardType,
         staffFilter: dashboardStaffFilter,
         departmentFilter,
+        unitFilter,
+        divisionFilter
       }),
     )
     dispatch(
-  notDoneTaskInTable({
-    dashboardType,
-    staffFilter: dashboardStaffFilter,
-    departmentFilter,
-  })
-)
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, dispatch])
+      notDoneTaskInTable({
+        dashboardType,
+        staffFilter: dashboardStaffFilter,
+        departmentFilter,
+        unitFilter,
+        divisionFilter
+      })
+    )
+  }, [dashboardType, dashboardStaffFilter, departmentFilter, unitFilter, divisionFilter, dispatch])
 
   // Filter tasks based on criteria
   const filteredTasks = departmentData.allTasks.filter((task) => {
@@ -867,6 +940,8 @@ useEffect(() => {
   useEffect(() => {
     setDashboardStaffFilter("all")
     setDepartmentFilter("all")
+    setUnitFilter("all")
+    setDivisionFilter("all")
     setCurrentPage(1)
     setHasMoreData(true)
     // Clear date range when dashboard type changes
@@ -1023,6 +1098,12 @@ useEffect(() => {
           departmentFilter={departmentFilter}
           setDepartmentFilter={setDepartmentFilter}
           availableDepartments={availableDepartments}
+          unitFilter={unitFilter}
+          setUnitFilter={setUnitFilter}
+          availableUnits={availableUnits}
+          divisionFilter={divisionFilter}
+          setDivisionFilter={setDivisionFilter}
+          availableDivisions={availableDivisions}
           isLoadingMore={isLoadingMore}
           onDateRangeChange={handleDateRangeChange} // Add this prop
         />

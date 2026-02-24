@@ -27,7 +27,9 @@ export const fetchDashboardDataApi = async (
   page = 1,
   limit = 50,
   taskView = "recent",
-  departmentFilter = "all"
+  departmentFilter = "all",
+  unitFilter = "all",
+  divisionFilter = "all"
 ) => {
 
   const role = localStorage.getItem("role");
@@ -43,6 +45,8 @@ export const fetchDashboardDataApi = async (
     limit,
     taskView,
     departmentFilter,
+    unitFilter,
+    divisionFilter,
     role,
     username
   });
@@ -54,7 +58,7 @@ export const fetchDashboardDataApi = async (
 // ---------------------------------------------------------------------
 // 2️⃣ SUPABASE COUNT USING ROLE-BASED FILTERING
 // ---------------------------------------------------------------------
-export const getDashboardDataCount = async (dashboardType, staffFilter = "all", taskView = 'recent', departmentFilter = "all") => {
+export const getDashboardDataCount = async (dashboardType, staffFilter = "all", taskView = 'recent', departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
   try {
     const role = localStorage.getItem("role");
     const username = localStorage.getItem("user-name");
@@ -66,17 +70,19 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = "all", 
       staffFilter,
       taskView,
       departmentFilter,
+      unitFilter,
+      divisionFilter,
       role,
       username
     });
 
     const url = `${BASE_URL}/count?${params.toString()}`;
     const res = await fetch(url);
-    
+
     if (!res.ok) {
       throw new Error(`HTTP error! status: ${res.status}`);
     }
-    
+
     return await res.json();
 
   } catch (err) {
@@ -88,49 +94,49 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = "all", 
 // ---------------------------------------------------------------------
 // 3️⃣ SUMMARY COUNT APIs (Admin + User both)
 // ---------------------------------------------------------------------
-export const countTotalTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all") => {
+export const countTotalTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
 
-  const url = `${BASE_URL}/total?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/total?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
 
   const res = await fetch(url);
   return res.json();
 };
 
-export const countCompleteTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all") => {
+export const countCompleteTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
 
-  const url = `${BASE_URL}/completed?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/completed?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
 
   const res = await fetch(url);
   return res.json();
 };
 
-export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all") => {
+export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
 
-  const url = `${BASE_URL}/pending?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/pending?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
 
   const res = await fetch(url);
   return res.json();
 };
 
-export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all") => {
+export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
 
-  const url = `${BASE_URL}/overdue?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/overdue?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
 
   const res = await fetch(url);
   return res.json();
@@ -139,14 +145,14 @@ export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter =
 // ---------------------------------------------------------------------
 // 4️⃣ SUMMARY COMBINED API
 // ---------------------------------------------------------------------
-export const getDashboardSummaryApi = async (dashboardType, staffFilter = "all") => {
+export const getDashboardSummaryApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
   const [totalTasks, completedTasks, pendingTasks, overdueTasks] = await Promise.all([
-    countTotalTaskApi(dashboardType, staffFilter),
-    countCompleteTaskApi(dashboardType, staffFilter),
-    countPendingOrDelayTaskApi(dashboardType, staffFilter),
-    countOverDueORExtendedTaskApi(dashboardType, staffFilter)
+    countTotalTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter),
+    countCompleteTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter),
+    countPendingOrDelayTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter),
+    countOverDueORExtendedTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter)
   ]);
 
   const completionRate =
@@ -181,7 +187,7 @@ export const fetchStaffTasksDataApi = async (
     page,
     limit
   });
-  
+
   // Add monthYear if provided
   if (monthYear) {
     params.append('monthYear', monthYear);
@@ -213,11 +219,11 @@ export const getStaffTaskSummaryApi = async (dashboardType, departmentFilter = "
 
     const url = `${BASE_URL}/staff-summary?${params.toString()}`;
     const res = await fetch(url);
-    
+
     if (!res.ok) {
       throw new Error(`HTTP error! status: ${res.status}`);
     }
-    
+
     return await res.json();
 
   } catch (err) {
@@ -249,11 +255,13 @@ export const fetchChecklistDataByDateRangeApi = async (
   startDate,
   endDate,
   staffFilter = "all",
-  departmentFilter = "all"
+  departmentFilter = "all",
+  unitFilter = "all",
+  divisionFilter = "all"
 ) => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
-  const url = `${BASE_URL}/checklist/date-range?startDate=${startDate}&endDate=${endDate}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}`;
+  const url = `${BASE_URL}/checklist/date-range?startDate=${startDate}&endDate=${endDate}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}`;
 
   const res = await fetch(url);
   return res.json();
@@ -264,6 +272,8 @@ export const getChecklistDateRangeCountApi = async (
   endDate,
   staffFilter = "all",
   departmentFilter = "all",
+  unitFilter = "all",
+  divisionFilter = "all",
   statusFilter = "all"
 ) => {
   try {
@@ -277,6 +287,8 @@ export const getChecklistDateRangeCountApi = async (
       endDate,
       staffFilter,
       departmentFilter,
+      unitFilter,
+      divisionFilter,
       statusFilter,
       role,
       username
@@ -284,11 +296,11 @@ export const getChecklistDateRangeCountApi = async (
 
     const url = `${BASE_URL}/checklist/date-range/count?${params.toString()}`;
     const res = await fetch(url);
-    
+
     if (!res.ok) {
       throw new Error(`HTTP error! status: ${res.status}`);
     }
-    
+
     return await res.json();
 
   } catch (err) {
@@ -301,24 +313,26 @@ export const getChecklistDateRangeStatsApi = async (
   startDate,
   endDate,
   staffFilter = "all",
-  departmentFilter = "all"
+  departmentFilter = "all",
+  unitFilter = "all",
+  divisionFilter = "all"
 ) => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
-  const url = `${BASE_URL}/checklist/date-range/stats?startDate=${startDate}&endDate=${endDate}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}`;
+  const url = `${BASE_URL}/checklist/date-range/stats?startDate=${startDate}&endDate=${endDate}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}`;
 
   const res = await fetch(url);
   return res.json();
 };
 
 
-export const countNotDoneTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all") => {
+export const countNotDoneTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
 
-  const url = `${BASE_URL}/not-done?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/not-done?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
 
   const res = await fetch(url);
   return res.json();
