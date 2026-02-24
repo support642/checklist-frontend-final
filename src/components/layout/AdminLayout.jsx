@@ -145,13 +145,13 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       // Show for all admins
       showFor: ["admin", "super_admin"],
     },
-    {
-      href: "/dashboard/training-video",
-      label: "Training Video",
-      icon: Video,
-      active: location.pathname === "/dashboard/training-video",
-      showFor: ["admin", "user", "super_admin"],
-    },
+    // {
+    //   href: "/dashboard/training-video",
+    //   label: "Training Video",
+    //   icon: Video,
+    //   active: location.pathname === "/dashboard/training-video",
+    //   showFor: ["admin", "user", "super_admin"],
+    // },
   ];
 
   const getAccessibleDepartments = () => {
