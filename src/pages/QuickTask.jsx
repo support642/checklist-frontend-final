@@ -381,7 +381,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto flex-wrap">
             <div className="flex border border-purple-200 rounded-md overflow-hidden self-start">
              <button
   className={`px-4 py-2 text-sm font-medium ${activeTab === 'checklist' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
@@ -417,7 +417,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <div className="relative">
                 <div className="flex items-center gap-2">
                   {/* Input with datalist for autocomplete */}
@@ -459,7 +459,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
         }
       }
     }}
-    className="w-48 pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+    className="w-full sm:w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
   />
   <datalist id="nameOptions">
     {allNames.map(name => (
@@ -522,9 +522,9 @@ const filteredChecklistTasks = quickTask.filter(task => {
                   onClick={() => toggleDropdown('frequency')}
                   className="flex items-center gap-2 px-3 py-2 border border-purple-200 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  <Filter className="h-4 w-4" />
-                  {freqFilter || 'Filter by Frequency'}
-                  <ChevronDown size={16} className={`transition-transform ${dropdownOpen.frequency ? 'rotate-180' : ''}`} />
+                  <Filter className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate max-w-[120px] sm:max-w-none">{freqFilter || 'Frequency'}</span>
+                  <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${dropdownOpen.frequency ? 'rotate-180' : ''}`} />
                 </button>
                 {dropdownOpen.frequency && (
                   <div className="absolute z-50 mt-1 w-56 rounded-md bg-white shadow-lg border border-gray-200 max-h-60 overflow-auto">
