@@ -296,7 +296,7 @@ export default function DashboardHeader({
           </select>
 
           {/* Unit Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") ? (
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
             <select
               value={unitFilter}
               onChange={(e) => setUnitFilter(e.target.value)}
@@ -309,13 +309,11 @@ export default function DashboardHeader({
                 </option>
               ))}
             </select>
-          ) : (
-            <div /> /* empty placeholder to maintain grid */
           )}
 
           {/* Row 2 */}
           {/* Division Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") ? (
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
             <select
               value={divisionFilter}
               onChange={(e) => setDivisionFilter(e.target.value)}
@@ -328,12 +326,10 @@ export default function DashboardHeader({
                 </option>
               ))}
             </select>
-          ) : (
-            <div /> /* empty placeholder to maintain grid */
           )}
 
           {/* Department Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") ? (
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
@@ -346,8 +342,6 @@ export default function DashboardHeader({
                 </option>
               ))}
             </select>
-          ) : (
-            <div /> /* empty placeholder to maintain grid */
           )}
 
           {/* Dashboard Staff Filter */}
