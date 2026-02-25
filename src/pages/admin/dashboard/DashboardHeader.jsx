@@ -222,9 +222,9 @@ export default function DashboardHeader({
         </div>
       </div>
 
-      {/* Desktop View - 3-column grid layout */}
+      {/* Desktop View - 3-column grid for admin, single row for users */}
       <div className="hidden md:block">
-        <div className="grid grid-cols-3 gap-2">
+        <div className={(userRole === "admin" || userRole === "super_admin") ? "grid grid-cols-3 gap-2" : "flex items-center gap-2 justify-end"}>
           {/* Row 1 */}
           {/* Date Range Filter */}
           {(userRole === "admin" || userRole === "super_admin") && (
