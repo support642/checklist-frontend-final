@@ -222,148 +222,158 @@ export default function DashboardHeader({
         </div>
       </div>
 
-      {/* Desktop View - Original layout */}
-      <div className="hidden md:flex items-center gap-2 flex-wrap">
-        {/* Date Range Filter */}
-        {(userRole === "admin" || userRole === "super_admin") && (
-          <div className="relative">
-            <button
-              onClick={() => setShowDateRangePicker(!showDateRangePicker)}
-              className="w-[140px] sm:w-[180px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-left bg-white hover:bg-gray-50"
-            >
-              {startDate && endDate ? `${startDate} to ${endDate}` : "Date Range"}
-            </button>
+      {/* Desktop View - 3-column grid layout */}
+      <div className="hidden md:block">
+        <div className="grid grid-cols-3 gap-2">
+          {/* Row 1 */}
+          {/* Date Range Filter */}
+          {(userRole === "admin" || userRole === "super_admin") && (
+            <div className="relative">
+              <button
+                onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+                className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-left bg-white hover:bg-gray-50"
+              >
+                {startDate && endDate ? `${startDate} to ${endDate}` : "Date Range"}
+              </button>
 
-            {showDateRangePicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-purple-200 rounded-md shadow-lg z-10 p-4 w-80">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-gray-700">Select Date Range</h3>
-                    {startDate && endDate && (
-                      <button
-                        onClick={clearDateRange}
-                        className="text-xs text-red-500 hover:text-red-700"
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">From Date</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        max={endDate || getTodayDate()}
-                        className="w-full rounded border border-gray-300 p-2 text-sm"
-                      />
+              {showDateRangePicker && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-purple-200 rounded-md shadow-lg z-10 p-4 w-80">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-gray-700">Select Date Range</h3>
+                      {startDate && endDate && (
+                        <button
+                          onClick={clearDateRange}
+                          className="text-xs text-red-500 hover:text-red-700"
+                        >
+                          Clear
+                        </button>
+                      )}
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">To Date</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        min={startDate}
-                        max={getTodayDate()}
-                        className="w-full rounded border border-gray-300 p-2 text-sm"
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">From Date</label>
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          max={endDate || getTodayDate()}
+                          className="w-full rounded border border-gray-300 p-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">To Date</label>
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          min={startDate}
+                          max={getTodayDate()}
+                          className="w-full rounded border border-gray-300 p-2 text-sm"
+                        />
+                      </div>
                     </div>
+                    <button
+                      onClick={applyDateRange}
+                      disabled={!startDate || !endDate}
+                      className="w-full bg-purple-500 text-white py-2 px-4 rounded text-sm hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Apply Date Range
+                    </button>
                   </div>
-                  <button
-                    onClick={applyDateRange}
-                    disabled={!startDate || !endDate}
-                    className="w-full bg-purple-500 text-white py-2 px-4 rounded text-sm hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Apply Date Range
-                  </button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
-        <select
-          value={dashboardType}
-          onChange={(e) => setDashboardType(e.target.value)}
-          className="w-[110px] sm:w-[140px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-        >
-          <option value="checklist">Checklist</option>
-          <option value="delegation">Delegation</option>
-        </select>
+          <select
+            value={dashboardType}
+            onChange={(e) => setDashboardType(e.target.value)}
+            className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+          >
+            <option value="checklist">Checklist</option>
+            <option value="delegation">Delegation</option>
+          </select>
 
-        {/* Unit Filter - Only show for checklist */}
-        {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
-          <select
-            value={unitFilter}
-            onChange={(e) => setUnitFilter(e.target.value)}
-            className="w-[110px] sm:w-[140px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-          >
-            <option value="all">All Units</option>
-            {availableUnits.map((unit) => (
-              <option key={unit} value={unit}>
-                {unit}
-              </option>
-            ))}
-          </select>
-        )}
+          {/* Unit Filter - Only show for checklist */}
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") ? (
+            <select
+              value={unitFilter}
+              onChange={(e) => setUnitFilter(e.target.value)}
+              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            >
+              <option value="all">All Units</option>
+              {availableUnits.map((unit) => (
+                <option key={unit} value={unit}>
+                  {unit}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div /> /* empty placeholder to maintain grid */
+          )}
 
-        {/* Division Filter - Only show for checklist */}
-        {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
-          <select
-            value={divisionFilter}
-            onChange={(e) => setDivisionFilter(e.target.value)}
-            className="w-[110px] sm:w-[140px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-          >
-            <option value="all">All Divisions</option>
-            {availableDivisions.map((div) => (
-              <option key={div} value={div}>
-                {div}
-              </option>
-            ))}
-          </select>
-        )}
+          {/* Row 2 */}
+          {/* Division Filter - Only show for checklist */}
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") ? (
+            <select
+              value={divisionFilter}
+              onChange={(e) => setDivisionFilter(e.target.value)}
+              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            >
+              <option value="all">All Divisions</option>
+              {availableDivisions.map((div) => (
+                <option key={div} value={div}>
+                  {div}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div /> /* empty placeholder to maintain grid */
+          )}
 
-        {/* Department Filter - Only show for checklist */}
-        {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") && (
-          <select
-            value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="w-[110px] sm:w-[160px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-          >
-            <option value="all">All Departments</option>
-            {availableDepartments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept}
-              </option>
-            ))}
-          </select>
-        )}
+          {/* Department Filter - Only show for checklist */}
+          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin") ? (
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            >
+              <option value="all">All Departments</option>
+              {availableDepartments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div /> /* empty placeholder to maintain grid */
+          )}
 
-        {/* Dashboard Staff Filter */}
-        {(userRole === "admin" || userRole === "super_admin") ? (
-          <select
-            value={dashboardStaffFilter}
-            onChange={(e) => setDashboardStaffFilter(e.target.value)}
-            className="w-[140px] sm:w-[180px] rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-          >
-            <option value="all">All Staff Members</option>
-            {availableStaff.map((staffName) => (
-              <option key={staffName} value={staffName}>
-                {staffName}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <select
-            value={username || ""}
-            disabled={true}
-            className="w-[180px] rounded-md border border-gray-300 p-2 bg-gray-100 text-gray-600 cursor-not-allowed"
-          >
-            <option value={username || ""}>{username || "Current User"}</option>
-          </select>
-        )}
+          {/* Dashboard Staff Filter */}
+          {(userRole === "admin" || userRole === "super_admin") ? (
+            <select
+              value={dashboardStaffFilter}
+              onChange={(e) => setDashboardStaffFilter(e.target.value)}
+              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            >
+              <option value="all">All Staff Members</option>
+              {availableStaff.map((staffName) => (
+                <option key={staffName} value={staffName}>
+                  {staffName}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={username || ""}
+              disabled={true}
+              className="w-full rounded-md border border-gray-300 p-2 bg-gray-100 text-gray-600 cursor-not-allowed"
+            >
+              <option value={username || ""}>{username || "Current User"}</option>
+            </select>
+          )}
+        </div>
       </div>
 
       {/* Close date picker when clicking outside */}

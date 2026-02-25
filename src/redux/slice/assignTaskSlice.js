@@ -1,9 +1,9 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import { 
-  fetchUniqueDepartmentDataApi, 
-  fetchUniqueDoerNameDataApi, 
-  fetchUniqueGivenByDataApi, 
-  pushAssignTaskApi 
+import {
+  fetchUniqueDepartmentDataApi,
+  fetchUniqueDoerNameDataApi,
+  fetchUniqueGivenByDataApi,
+  pushAssignTaskApi
 } from '../api/assignTaskApi';
 
 // 1️⃣ Fetch Departments
@@ -25,8 +25,8 @@ export const uniqueGivenByData = createAsyncThunk(
 // 3️⃣ Fetch Doer Names
 export const uniqueDoerNameData = createAsyncThunk(
   'assignTask/fetchDoerNames',
-  async (department) => {
-    return await fetchUniqueDoerNameDataApi(department);
+  async (args = {}) => {
+    return await fetchUniqueDoerNameDataApi(args);
   }
 );
 

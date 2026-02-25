@@ -441,6 +441,7 @@ function HistoryPage() {
         </div>
 
         {/* Tabs - Compact */}
+        {/* Only Checklist tab shown for now — Delegation tab hidden */}
         <div className="bg-white rounded-md shadow-sm">
           <div className="flex">
             <button
@@ -450,7 +451,7 @@ function HistoryPage() {
                 setSelectedHistoryItems([])
                 setSelectedDelegationItems([])
               }}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-l-md transition-colors ${
+              className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
                 activeTab === "checklist"
                   ? "bg-purple-600 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -458,7 +459,7 @@ function HistoryPage() {
             >
               Checklist
             </button>
-            <button
+            {/* <button
               onClick={() => {
                 setActiveTab("delegation")
                 setSearchTerm("")
@@ -472,7 +473,7 @@ function HistoryPage() {
               }`}
             >
               Delegation
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -558,15 +559,13 @@ function HistoryPage() {
             {/* Stats - Inline */}
             <div className="flex gap-3 ml-auto text-xs">
               <span className="text-purple-600 font-medium">
-                {activeTab === "checklist" ? filteredHistoryData.length : filteredDelegationData.length} Total
+                {filteredHistoryData.length} Total
               </span>
               <span className="text-orange-600 font-medium">
-                {activeTab === "checklist" ? pendingApprovalCount : pendingDelegationApprovalCount} Pending
+                {pendingApprovalCount} Pending
               </span>
               <span className="text-green-600 font-medium">
-                {activeTab === "checklist" 
-                  ? filteredHistoryData.length - pendingApprovalCount 
-                  : filteredDelegationData.length - pendingDelegationApprovalCount} Approved
+                {filteredHistoryData.length - pendingApprovalCount} Approved
               </span>
             </div>
 
@@ -582,7 +581,8 @@ function HistoryPage() {
               </button>
             )}
 
-            {isSuperAdmin && activeTab === "delegation" && selectedDelegationItems.length > 0 && (
+            {/* Delegation Approval Button - Hidden for now */}
+            {/* {isSuperAdmin && activeTab === "delegation" && selectedDelegationItems.length > 0 && (
               <button
                 onClick={() => handleMarkDone("delegation")}
                 disabled={markingAsDone}
@@ -591,7 +591,7 @@ function HistoryPage() {
                 <CheckCircle2 className="h-3 w-3" />
                 {markingAsDone ? "..." : `Approve (${selectedDelegationItems.length})`}
               </button>
-            )}
+            )} */}
           </div>
         </div>
 

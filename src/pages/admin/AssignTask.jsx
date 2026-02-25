@@ -287,15 +287,15 @@ export default function AssignTask() {
   }, [availableUnits, formData.unit]);
 
   const handleUnitChange = (value) => {
-    setFormData(prev => ({ ...prev, unit: value, division: '', department: '' }));
+    setFormData(prev => ({ ...prev, unit: value, division: '', department: '', doer: '' }));
   };
 
   const handleDivisionChange = (value) => {
-    setFormData(prev => ({ ...prev, division: value, department: '' }));
+    setFormData(prev => ({ ...prev, division: value, department: '', doer: '' }));
   };
 
   const handleDepartmentChange = (value) => {
-    setFormData(prev => ({ ...prev, department: value }));
+    setFormData(prev => ({ ...prev, department: value, doer: '' }));
   };
 
 
@@ -766,9 +766,13 @@ useEffect(() => {
 
   useEffect(() => {
     if (formData.department) {
-      dispatch(uniqueDoerNameData(formData.department));
+      dispatch(uniqueDoerNameData({
+        department: formData.department,
+        unit: formData.unit,
+        division: formData.division,
+      }));
     }
-  }, [dispatch, formData.department]);
+  }, [dispatch, formData.department, formData.unit, formData.division]);
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto px-4">
@@ -1250,6 +1254,8 @@ useEffect(() => {
                   type="button"
                   onClick={() => {
                     setFormData({
+                      unit: "",
+                      division: "",
                       department: "",
                       givenBy: "",
                       doer: "",

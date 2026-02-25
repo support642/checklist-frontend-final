@@ -13,8 +13,16 @@ export const fetchUniqueGivenByDataApi = async () => {
   return (await API.get(`/given-by`)).data;
 };
 
-export const fetchUniqueDoerNameDataApi = async (department) => {
-  return (await API.get(`/doer/${department}`)).data;
+export const fetchUniqueDoerNameDataApi = async (args = {}) => {
+  const { department, unit, division } = args;
+  if (!department) {
+    // No department specified — return all active doer names
+    return (await API.get(`/doer-all`)).data;
+  }
+  const params = {};
+  if (unit) params.unit = unit;
+  if (division) params.division = division;
+  return (await API.get(`/doer/${department}`, { params })).data;
 };
 
 export const pushAssignTaskApi = async (tasks) => {

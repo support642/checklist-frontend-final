@@ -213,9 +213,13 @@ export default function AssignTaskUser() {
   // ── Fetch doer names when department is known ──
   useEffect(() => {
     if (userDepartment) {
-      dispatch(uniqueDoerNameData(userDepartment));
+      dispatch(uniqueDoerNameData({
+        department: userDepartment,
+        unit: userUnit,
+        division: userDivision,
+      }));
     }
-  }, [dispatch, userDepartment]);
+  }, [dispatch, userDepartment, userUnit, userDivision]);
 
   // ── Utility ──
   const getCurrentTime = () => {
@@ -758,9 +762,13 @@ useEffect(() => {
 
   useEffect(() => {
     if (formData.department) {
-      dispatch(uniqueDoerNameData(formData.department));
+      dispatch(uniqueDoerNameData({
+        department: formData.department,
+        unit: formData.unit,
+        division: formData.division,
+      }));
     }
-  }, [dispatch, formData.department]);
+  }, [dispatch, formData.department, formData.unit, formData.division]);
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto px-4">
