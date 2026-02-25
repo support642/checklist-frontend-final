@@ -5,6 +5,7 @@ import { useState } from "react"
 import LoginPage from "./pages/LoginPage"
 import AdminDashboard from "./pages/admin/Dashboard"
 import AdminAssignTask from "./pages/admin/AssignTask"
+import UserAssignTask from "./pages/user/AssignTaskUser"
 import DataPage from "./pages/admin/DataPage"
 import AdminDataPage from "./pages/admin/admin-data-page"
 import AccountDataPage from "./pages/delegation"
@@ -73,12 +74,12 @@ function App() {
           }
         />
 
-        {/* Assign Task route - only for admin */}
+        {/* Assign Task route - accessible by both admin and user, but serving different components */}
         <Route
           path="/dashboard/assign-task"
           element={
             <ProtectedRoute>
-              <AdminAssignTask />
+              {localStorage.getItem("role") === "user" ? <UserAssignTask /> : <AdminAssignTask />}
             </ProtectedRoute>
           }
         />

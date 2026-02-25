@@ -92,7 +92,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       label: "Assign Task",
       icon: CheckSquare,
       active: location.pathname === "/dashboard/assign-task",
-      showFor: ["admin", "super_admin"],
+      showFor: ["admin", "super_admin", "user"],
     },
     {
       href: "/dashboard/delegation",

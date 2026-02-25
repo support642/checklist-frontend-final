@@ -180,20 +180,18 @@ const formatDateToDDMMYYYY = (date) => {
   return `${day}/${month}/${year}`;
 };
 
-export default function AssignTask() {
+export default function AssignTaskUser() {
   const { department } = useSelector((state) => state.assignTask)
   const { doerName } = useSelector((state) => state.assignTask)
   const { givenBy } = useSelector((state) => state.assignTask)
   const deptFullData = useSelector((state) => state.setting?.department) || [];
 
-  // Add this near the top of your AssignTask component, after getting the Redux state
   const userRole = localStorage.getItem('role');
   const username = localStorage.getItem('user-name');
+  const userAccessStr = localStorage.getItem('user_access') || '';
 
-  // Filter doer names based on role
-  const filteredDoerNames = (userRole === 'admin' || userRole === 'super_admin')
-    ? doerName
-    : doerName.filter(doer => doer?.toLowerCase() === username?.toLowerCase());
+  // Filter doer names based on role (strictly username since this is a user component)
+  const filteredDoerNames = doerName.filter(doer => doer?.toLowerCase() === username?.toLowerCase());
 
   const dispatch = useDispatch();
 
@@ -244,47 +242,87 @@ export default function AssignTask() {
     division: "",
     department: "",
     givenBy: "",
-    doer: "",
+    doer: username || "",
     description: "",
     frequency: "daily",
     enableReminders: true,
     requireAttachment: false,
   });
 
+  // Filter dept data based on user access
+  const filteredDeptData = useMemo(() => {
+    if (!deptFullData || deptFullData.length === 0) return [];
+    
+    const userDepartments = userAccessStr.split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
+    
+    return deptFullData.filter(d => {
+      const dbDept = d.department?.toLowerCase();
+      // Keep rows where the department matches one of the user's allowed departments
+      return dbDept && userDepartments.includes(dbDept);
+    });
+  }, [deptFullData, userAccessStr]);
+
   // Cascading dropdown data
   const availableUnits = useMemo(() => {
-    if (!deptFullData || deptFullData.length === 0) return [];
-    const units = [...new Set(deptFullData.map(d => d.unit).filter(Boolean))];
+    if (!filteredDeptData || filteredDeptData.length === 0) return [];
+    const units = [...new Set(filteredDeptData.map(d => d.unit).filter(Boolean))];
     return units;
-  }, [deptFullData]);
+  }, [filteredDeptData]);
 
   const availableDivisions = useMemo(() => {
-    if (!deptFullData || deptFullData.length === 0 || !formData.unit) return [];
+    if (!filteredDeptData || filteredDeptData.length === 0 || !formData.unit) return [];
     const divisions = [...new Set(
-      deptFullData
+      filteredDeptData
         .filter(d => d.unit === formData.unit)
         .map(d => d.division)
         .filter(Boolean)
     )];
     return divisions;
-  }, [deptFullData, formData.unit]);
+  }, [filteredDeptData, formData.unit]);
 
   const availableDepartments = useMemo(() => {
-    if (!deptFullData || deptFullData.length === 0 || !formData.unit) return [];
-    let filtered = deptFullData.filter(d => d.unit === formData.unit);
+    if (!filteredDeptData || filteredDeptData.length === 0 || !formData.unit) return [];
+    let filtered = filteredDeptData.filter(d => d.unit === formData.unit);
     if (formData.division) {
       filtered = filtered.filter(d => d.division === formData.division);
     }
     const depts = [...new Set(filtered.map(d => d.department).filter(Boolean))];
     return depts;
-  }, [deptFullData, formData.unit, formData.division]);
+  }, [filteredDeptData, formData.unit, formData.division]);
 
-  // Auto-fill Unit if there's only one option
+  // Auto-fill Logic
   useEffect(() => {
-    if (availableUnits.length === 1 && formData.unit !== availableUnits[0]) {
-      setFormData(prev => ({ ...prev, unit: availableUnits[0] }));
-    }
-  }, [availableUnits, formData.unit]);
+    setFormData(prev => {
+      let nextState = { ...prev };
+      let changed = false;
+
+      // 1. Maintain doer name lock
+      if (nextState.doer !== username) {
+        nextState.doer = username || '';
+        changed = true;
+      }
+
+      // 2. Pre-fill Unit if there's only one option
+      if (availableUnits.length === 1 && nextState.unit !== availableUnits[0]) {
+        nextState.unit = availableUnits[0];
+        changed = true;
+      }
+
+      // 3. Pre-fill Division if there's only one option
+      if (nextState.unit && availableDivisions.length === 1 && nextState.division !== availableDivisions[0]) {
+        nextState.division = availableDivisions[0];
+        changed = true;
+      }
+
+      // 4. Pre-fill Department if there's only one option
+      if (nextState.unit && availableDepartments.length === 1 && nextState.department !== availableDepartments[0]) {
+        nextState.department = availableDepartments[0];
+        changed = true;
+      }
+
+      return changed ? nextState : prev;
+    });
+  }, [username, availableUnits, availableDivisions, availableDepartments]);
 
   const handleUnitChange = (value) => {
     setFormData(prev => ({ ...prev, unit: value, division: '', department: '' }));
@@ -716,11 +754,11 @@ useEffect(() => {
 
       // Reset form
       setFormData({
-        unit: "",
-        division: "",
-        department: "",
+        unit: formData.unit,
+        division: formData.division,
+        department: formData.department,
         givenBy: "",
-        doer: "",
+        doer: username || "",
         description: "",
         frequency: taskType === 'delegation' ? 'one-time' : 'daily',
         enableReminders: true,
