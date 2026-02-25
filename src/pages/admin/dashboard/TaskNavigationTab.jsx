@@ -415,10 +415,10 @@ export default function TaskNavigationTabs({
           </div>
         ) : (
           <div
-            className="task-table-container overflow-x-auto"
-            style={{ maxHeight: "400px", overflowY: "auto" }}
+            className="task-table-container overflow-y-auto"
+            style={{ maxHeight: "400px" }}
           >
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 hidden md:table">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -497,6 +497,63 @@ export default function TaskNavigationTabs({
                 })}
               </tbody>
             </table>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3 p-3">
+              {displayedTasks.map((task, index) => {
+                const sequenceNumber = index + 1;
+                
+                return (
+                  <div key={`mobile-${task.id}-${task.taskStartDate}`} className="p-3 border rounded-lg shadow-sm bg-white border-gray-200">
+                    <div className="flex justify-between items-center mb-2">
+                       <div className="flex items-center gap-2">
+                         <span className="text-xs font-bold text-gray-400">#{sequenceNumber}</span>
+                       </div>
+                       <div>
+                         {task.status === "completed" ? (
+                            <span className="flex items-center text-green-600 gap-1 text-[10px] font-bold uppercase shadow-sm bg-green-100 px-2 py-1 rounded-full border border-green-200">
+                              <CheckCircle2 size={12} /> Done
+                            </span>
+                         ) : (
+                            (userRole === 'admin' || userRole === 'super_admin') && 
+                            task.assignedTo?.toLowerCase() === username?.toLowerCase() ? (
+                              <button 
+                                onClick={() => handleTaskCompletion(task)}
+                                className="flex items-center text-purple-600 hover:text-purple-800 gap-1 transition-colors text-[10px] font-bold uppercase shadow-sm bg-purple-50 px-2 py-1 rounded-full border border-purple-200"
+                                title="Mark as Done"
+                              >
+                                <Circle size={12} /> Mark Done
+                              </button>
+                            ) : (
+                              <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase shadow-sm bg-yellow-100 text-yellow-700 border border-yellow-200">Pending</span>
+                            )
+                         )}
+                       </div>
+                    </div>
+                    
+                    <div className="text-sm font-medium mb-1 text-gray-800">{task.title}</div>
+                    
+                    <div className="flex justify-between text-[10px] text-gray-500 mb-1 mt-2">
+                       <span>ID: {task.id}</span>
+                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getFrequencyColor(task.frequency)} text-white`}>
+                         {task.frequency.charAt(0).toUpperCase() + task.frequency.slice(1)}
+                       </span>
+                    </div>
+                    
+                    <div className="flex justify-between text-[10px] mb-1">
+                       <span className="text-gray-600">Start Date: {task.taskStartDate}</span>
+                       <span className="text-gray-600 font-medium truncate max-w-[120px]">Assignee: {task.assignedTo}</span>
+                    </div>
+                    
+                    {dashboardType === "checklist" && task.department && task.department !== "N/A" && (
+                      <div className="text-[10px] text-gray-500 mt-1 flex gap-1">
+                        <span className="font-semibold">Dept:</span> {task.department}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             {isLoadingMore && (
               <div className="text-center py-4">

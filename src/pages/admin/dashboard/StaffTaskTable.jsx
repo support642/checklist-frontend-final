@@ -252,7 +252,7 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
           className="staff-table-container rounded-md border border-gray-200 overflow-auto"
           style={{ maxHeight: "400px" }}
         >
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 hidden md:table">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -308,6 +308,55 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
               ))}
             </tbody>
           </table>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3 p-3">
+            {staffMembers.map((staff, index) => (
+              <div key={`mobile-${staff.name}-${index}`} className="p-3 border rounded-lg shadow-sm bg-white border-gray-200">
+                <div className="flex justify-between items-center mb-2">
+                   <div className="flex items-center gap-2">
+                     <span className="text-xs font-bold text-gray-400">#{index + 1}</span>
+                   </div>
+                   <div>
+                     {renderOnTimeScore(staff.onTimeScore || 0)}
+                   </div>
+                </div>
+                
+                <div className="text-sm font-medium mb-1 text-gray-800">{staff.name}</div>
+                
+                {staff.email && !staff.email.includes('example.com') && (
+                  <div className="text-[10px] text-gray-500 mb-2 truncate">{staff.email}</div>
+                )}
+
+                <div className="flex justify-between text-[10px] text-gray-600 mt-2 bg-gray-50 p-2 rounded">
+                   <div className="text-center">
+                      <div className="font-semibold text-gray-800">{staff.totalTasks}</div>
+                      <div>Total</div>
+                   </div>
+                   <div className="text-center">
+                      <div className="font-semibold text-green-600">{staff.completedTasks}</div>
+                      <div>Completed</div>
+                   </div>
+                   <div className="text-center">
+                      <div className="font-semibold text-yellow-600">{staff.pendingTasks}</div>
+                      <div>Pending</div>
+                   </div>
+                </div>
+                
+                <div className="flex justify-between text-[10px] mt-2 px-1">
+                   <span className="text-gray-600">Done on Time:</span>
+                   <span className="font-medium text-gray-800">
+                      {staff.doneOnTime || 0}
+                      {staff.completedTasks > 0 && (
+                        <span className="text-gray-500 ml-1 whitespace-nowrap">
+                          ({Math.round((staff.doneOnTime / staff.completedTasks) * 100)}%)
+                        </span>
+                      )}
+                   </span>
+                </div>
+              </div>
+            ))}
+          </div>
 
           {isLoadingMore && (
             <div className="text-center py-4">

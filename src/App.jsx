@@ -2,6 +2,7 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
 import { useState } from "react"
+import { useSelector } from "react-redux"
 import LoginPage from "./pages/LoginPage"
 import AdminDashboard from "./pages/admin/Dashboard"
 import AdminAssignTask from "./pages/admin/AssignTask"
@@ -39,6 +40,15 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   return children
 }
 
+// Reactive role-based component selector for Assign Task
+const AssignTaskRouter = () => {
+  const reduxUserData = useSelector((state) => state.login.userData);
+  const role = (reduxUserData && !Array.isArray(reduxUserData))
+    ? reduxUserData.role
+    : localStorage.getItem('role');
+  return role === 'user' ? <UserAssignTask /> : <AdminAssignTask />;
+}
+
 function App() {
   return (
     <Router>
@@ -74,12 +84,12 @@ function App() {
           }
         />
 
-        {/* Assign Task route - accessible by both admin and user, but serving different components */}
+        {/* Assign Task route - reactive role check via Redux */}
         <Route
           path="/dashboard/assign-task"
           element={
             <ProtectedRoute>
-              {localStorage.getItem("role") === "user" ? <UserAssignTask /> : <AdminAssignTask />}
+              <AssignTaskRouter />
             </ProtectedRoute>
           }
         />

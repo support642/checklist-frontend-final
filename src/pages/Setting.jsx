@@ -662,6 +662,9 @@ const handleAddUser = async (e) => {
   const newUser = {
     ...userForm,
     user_access: userForm.department, // Department name for user access
+    department: userForm.department,
+    unit: userForm.unit,
+    division: userForm.division
   };
 
   try {
@@ -685,7 +688,10 @@ const handleUpdateUser = async (e) => {
     number: userForm.phone,
     role: userForm.role,
     status: userForm.status,
-    user_access: userForm.department // Department name for user access
+    user_access: userForm.department, // Department name for user access
+    department: userForm.department,
+    unit: userForm.unit,
+    division: userForm.division
   };
 
   // Only include password if it's not empty

@@ -38,6 +38,10 @@ const LoginPage = () => {
       localStorage.setItem('user-name', userData.user_name || userData.username || "");
       localStorage.setItem('role', userData.role || "");
       localStorage.setItem('email_id', userData.email_id || userData.email || "");
+      localStorage.setItem('user_access', userData.user_access || "");
+      localStorage.setItem('unit', userData.unit || "");
+      localStorage.setItem('division', userData.division || "");
+      localStorage.setItem('department', userData.department || "");
 
       console.log("Stored email:", userData.email_id || userData.email);
 
@@ -48,45 +52,41 @@ const LoginPage = () => {
     }
   }, [isLoggedIn, userData, error, navigate]);
 
-  useEffect(() => {
-    let subscription;
-
-    const checkUserStatus = async () => {
-      const username = localStorage.getItem('user-name');
-
-      if (!username) return;
-
-      // Subscribe to Supabase for real-time user status updates
-      subscription = supabase
-        .channel('user-status-watch')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'users',
-            filter: `user_name=eq.${username}`,
-          },
-          (payload) => {
-            const updatedUser = payload.new;
-            if (updatedUser.status !== 'active') {
-              localStorage.clear();
-              setToast({ show: true, message: "Your account has been deactivated.", type: "error" });
-              setTimeout(() => {
-                navigate("/login");
-              }, 2000);
-            }
-          }
-        )
-        .subscribe();
-    };
-
-    checkUserStatus();
-
-    return () => {
-      if (subscription) supabase.removeChannel(subscription);
-    };
-  }, []);
+  // NOTE: Supabase realtime listener disabled — app uses direct PostgreSQL backend
+  // Uncomment and import supabase if you need real-time user status checks
+  // useEffect(() => {
+  //   let subscription;
+  //   const checkUserStatus = async () => {
+  //     const username = localStorage.getItem('user-name');
+  //     if (!username) return;
+  //     subscription = supabase
+  //       .channel('user-status-watch')
+  //       .on(
+  //         'postgres_changes',
+  //         {
+  //           event: 'UPDATE',
+  //           schema: 'public',
+  //           table: 'users',
+  //           filter: `user_name=eq.${username}`,
+  //         },
+  //         (payload) => {
+  //           const updatedUser = payload.new;
+  //           if (updatedUser.status !== 'active') {
+  //             localStorage.clear();
+  //             setToast({ show: true, message: "Your account has been deactivated.", type: "error" });
+  //             setTimeout(() => {
+  //               navigate("/login");
+  //             }, 2000);
+  //           }
+  //         }
+  //       )
+  //       .subscribe();
+  //   };
+  //   checkUserStatus();
+  //   return () => {
+  //     if (subscription) supabase.removeChannel(subscription);
+  //   };
+  // }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target

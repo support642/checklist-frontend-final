@@ -1,12 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { fetchUniqueDepartmentDataApi, fetchUniqueDoerNameDataApi, fetchUniqueGivenByDataApi, pushAssignTaskApi } from "../../redux/api/assignTaskApi";
+import { pushAssignTaskApi } from "../../redux/api/assignTaskApi";
 import { useDispatch, useSelector } from "react-redux";
-import { assignTaskInTable, uniqueDepartmentData, uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
-import { departmentDetails } from "../../redux/slice/settingSlice";
+import { uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
+import { fetchUserProfile } from "../../redux/slice/userProfileSlice";
 import CSVImportModal from "../../components/CSVImportModal";
-// import supabase from "../../SupabaseClient";
 
 // Calendar Component (defined outside)
 const CalendarComponent = ({ date, onChange, onClose }) => {
@@ -181,33 +180,50 @@ const formatDateToDDMMYYYY = (date) => {
 };
 
 export default function AssignTaskUser() {
-  const { department } = useSelector((state) => state.assignTask)
-  const { doerName } = useSelector((state) => state.assignTask)
-  const { givenBy } = useSelector((state) => state.assignTask)
-  const deptFullData = useSelector((state) => state.setting?.department) || [];
+  // ── Redux selectors ──
+  const { doerName, givenBy } = useSelector((state) => state.assignTask);
+  const { profile, loading: profileLoading } = useSelector((state) => state.userProfile);
+  const reduxUserData = useSelector((state) => state.login.userData);
 
-  const userRole = localStorage.getItem('role');
-  const username = localStorage.getItem('user-name');
-  const userAccessStr = localStorage.getItem('user_access') || '';
+  // Username: derive from Redux (reactive) with localStorage fallback
+  const username = (reduxUserData && !Array.isArray(reduxUserData))
+    ? (reduxUserData.user_name || reduxUserData.username || '')
+    : (localStorage.getItem('user-name') || '');
 
-  // Filter doer names based on role (strictly username since this is a user component)
-  const filteredDoerNames = doerName.filter(doer => doer?.toLowerCase() === username?.toLowerCase());
+  // Derive fields from profile (fetched from DB)
+  const userUnit = profile?.unit || '';
+  const userDivision = profile?.division || '';
+  const userDepartment = profile?.department || '';
+
+  // Filter doer names to only this user
+  const filteredDoerNames = doerName.filter(
+    (doer) => doer?.toLowerCase() === username?.toLowerCase()
+  );
 
   const dispatch = useDispatch();
 
+  // ── Fetch user profile from DB on mount ──
   useEffect(() => {
-    dispatch(uniqueDepartmentData(username));
-    dispatch(uniqueGivenByData());
-    dispatch(departmentDetails());
-  }, [dispatch])
+    if (username) {
+      dispatch(fetchUserProfile(username));
+      dispatch(uniqueGivenByData());
+    }
+  }, [dispatch, username]);
 
+  // ── Fetch doer names when department is known ──
+  useEffect(() => {
+    if (userDepartment) {
+      dispatch(uniqueDoerNameData(userDepartment));
+    }
+  }, [dispatch, userDepartment]);
 
+  // ── Utility ──
   const getCurrentTime = () => {
     const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    return `${hours}:00`;
+    return now.getHours().toString().padStart(2, '0') + ':00';
   };
 
+  // ── Local states ──
   const [date, setSelectedDate] = useState(new Date());
   const [startDate, setStartDate] = useState(new Date());
   const [time, setTime] = useState(getCurrentTime());
@@ -218,7 +234,7 @@ export default function AssignTaskUser() {
   const [accordionOpen, setAccordionOpen] = useState(false);
   const [workingDays, setWorkingDays] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [taskType, setTaskType] = useState(null); // 'checklist' or 'delegation'
+  const [taskType, setTaskType] = useState(null);
 
   const frequencies = [
     { value: "one-time", label: "One Time (No Recurrence)" },
@@ -236,104 +252,42 @@ export default function AssignTaskUser() {
     { value: "end-of-last-week", label: "End of Last Week" },
   ];
 
-
+  // ── Form state ──
   const [formData, setFormData] = useState({
     unit: "",
     division: "",
     department: "",
     givenBy: "",
-    doer: username || "",
+    doer: "",
     description: "",
     frequency: "daily",
     enableReminders: true,
     requireAttachment: false,
   });
 
-  // Filter dept data based on user access
-  const filteredDeptData = useMemo(() => {
-    if (!deptFullData || deptFullData.length === 0) return [];
-    
-    const userDepartments = userAccessStr.split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
-    
-    return deptFullData.filter(d => {
-      const dbDept = d.department?.toLowerCase();
-      // Keep rows where the department matches one of the user's allowed departments
-      return dbDept && userDepartments.includes(dbDept);
-    });
-  }, [deptFullData, userAccessStr]);
-
-  // Cascading dropdown data
-  const availableUnits = useMemo(() => {
-    if (!filteredDeptData || filteredDeptData.length === 0) return [];
-    const units = [...new Set(filteredDeptData.map(d => d.unit).filter(Boolean))];
-    return units;
-  }, [filteredDeptData]);
-
-  const availableDivisions = useMemo(() => {
-    if (!filteredDeptData || filteredDeptData.length === 0 || !formData.unit) return [];
-    const divisions = [...new Set(
-      filteredDeptData
-        .filter(d => d.unit === formData.unit)
-        .map(d => d.division)
-        .filter(Boolean)
-    )];
-    return divisions;
-  }, [filteredDeptData, formData.unit]);
-
-  const availableDepartments = useMemo(() => {
-    if (!filteredDeptData || filteredDeptData.length === 0 || !formData.unit) return [];
-    let filtered = filteredDeptData.filter(d => d.unit === formData.unit);
-    if (formData.division) {
-      filtered = filtered.filter(d => d.division === formData.division);
-    }
-    const depts = [...new Set(filtered.map(d => d.department).filter(Boolean))];
-    return depts;
-  }, [filteredDeptData, formData.unit, formData.division]);
-
-  // Auto-fill Logic
+  // ── Populate form when profile arrives from DB ──
   useEffect(() => {
-    setFormData(prev => {
-      let nextState = { ...prev };
-      let changed = false;
-
-      // 1. Maintain doer name lock
-      if (nextState.doer !== username) {
-        nextState.doer = username || '';
-        changed = true;
-      }
-
-      // 2. Pre-fill Unit if there's only one option
-      if (availableUnits.length === 1 && nextState.unit !== availableUnits[0]) {
-        nextState.unit = availableUnits[0];
-        changed = true;
-      }
-
-      // 3. Pre-fill Division if there's only one option
-      if (nextState.unit && availableDivisions.length === 1 && nextState.division !== availableDivisions[0]) {
-        nextState.division = availableDivisions[0];
-        changed = true;
-      }
-
-      // 4. Pre-fill Department if there's only one option
-      if (nextState.unit && availableDepartments.length === 1 && nextState.department !== availableDepartments[0]) {
-        nextState.department = availableDepartments[0];
-        changed = true;
-      }
-
-      return changed ? nextState : prev;
-    });
-  }, [username, availableUnits, availableDivisions, availableDepartments]);
+    if (profile) {
+      setFormData((prev) => ({
+        ...prev,
+        unit: profile.unit || prev.unit,
+        division: profile.division || prev.division,
+        department: profile.department || prev.department,
+        doer: profile.user_name || username || prev.doer,
+      }));
+    }
+  }, [profile, username]);
 
   const handleUnitChange = (value) => {
-    setFormData(prev => ({ ...prev, unit: value, division: '', department: '' }));
+    // Read-only, do not allow change
   };
 
   const handleDivisionChange = (value) => {
-    setFormData(prev => ({ ...prev, division: value, department: '' }));
+    // Read-only, do not allow change
   };
 
   const handleDepartmentChange = (value) => {
-    setFormData(prev => ({ ...prev, department: value }));
+    // Read-only, do not allow change
   };
 
 
@@ -901,48 +855,27 @@ useEffect(() => {
                 </p>
               </div>
               <div className="p-3 space-y-2">
-                {/* Row 1: Unit, Division, Department (cascading) */}
+                {/* Row 1: Unit, Division, Department (Read-only) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-purple-700">Unit</label>
-                    <select
-                      value={formData.unit}
-                      onChange={(e) => handleUnitChange(e.target.value)}
-                      className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                    >
-                      <option value="">Select Unit</option>
-                      {availableUnits.map((unit, idx) => (
-                        <option key={idx} value={unit}>{unit}</option>
-                      ))}
-                    </select>
+                    <div className="w-full rounded-md border border-purple-200 bg-gray-50 p-2 text-gray-700">
+                      {formData.unit || "N/A"}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-purple-700">Division</label>
-                    <select
-                      value={formData.division}
-                      onChange={(e) => handleDivisionChange(e.target.value)}
-                      className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                    >
-                      <option value="">Select Division</option>
-                      {availableDivisions.map((div, idx) => (
-                        <option key={idx} value={div}>{div}</option>
-                      ))}
-                    </select>
+                    <div className="w-full rounded-md border border-purple-200 bg-gray-50 p-2 text-gray-700">
+                      {formData.division || "N/A"}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-purple-700">Department</label>
-                    <select
-                      value={formData.department}
-                      onChange={(e) => handleDepartmentChange(e.target.value)}
-                      className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                    >
-                      <option value="">Select Department</option>
-                      {availableDepartments.map((dept, idx) => (
-                        <option key={idx} value={dept}>{dept}</option>
-                      ))}
-                    </select>
+                    <div className="w-full rounded-md border border-purple-200 bg-gray-50 p-2 text-gray-700">
+                      {formData.department || "N/A"}
+                    </div>
                   </div>
                 </div>
 
@@ -1288,9 +1221,11 @@ useEffect(() => {
                   type="button"
                   onClick={() => {
                     setFormData({
-                      department: "",
+                      unit: userUnit,
+                      division: userDivision,
+                      department: userDepartment,
                       givenBy: "",
-                      doer: "",
+                      doer: username || "",
                       description: "",
                       frequency: "daily",
                       enableReminders: true,
