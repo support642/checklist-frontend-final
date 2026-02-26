@@ -190,10 +190,7 @@ export default function AssignTask() {
   const userRole = localStorage.getItem('role');
   const username = localStorage.getItem('user-name');
 
-  // Filter doer names based on role
-  const filteredDoerNames = (userRole === 'admin' || userRole === 'super_admin')
-    ? doerName
-    : doerName.filter(doer => doer?.toLowerCase() === username?.toLowerCase());
+
 
   const dispatch = useDispatch();
 
@@ -250,6 +247,15 @@ export default function AssignTask() {
     enableReminders: true,
     requireAttachment: false,
   });
+
+  // Filter doer names based on role and selected department
+  // Returns [] when no department is selected, fixing stale doer names on cascading resets
+  const filteredDoerNames = useMemo(() => {
+    if (!formData.department) return [];
+    return (userRole === 'admin' || userRole === 'super_admin')
+      ? doerName
+      : doerName.filter(doer => doer?.toLowerCase() === username?.toLowerCase());
+  }, [doerName, userRole, username, formData.department]);
 
   // Cascading dropdown data
   const availableUnits = useMemo(() => {
