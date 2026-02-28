@@ -1391,7 +1391,7 @@ const handleSubmit = async () => {
                                     className="border border-gray-300 rounded px-2 py-1 w-full text-xs"
                                   >
                                     <option value="Done">Done</option>
-                                    <option value="Partial Done">Partial Done</option>
+                                    {/* <option value="Partial Done">Partial Done</option> */}
                                     <option value="Extend date">Extend</option>
                                   </select>
                                 )}
