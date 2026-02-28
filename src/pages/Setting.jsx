@@ -1487,13 +1487,14 @@ const resetUserForm = () => {
                 </td>
 
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{user?.user_access || 'N/A'}</div>
+                  <div className="text-sm text-gray-900">{user?.user_access || user?.department || 'N/A'}</div>
                 </td>
 
                 {/* Unit Cell */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{(() => {
-                    const deptName = user?.user_access?.split(',')[0]?.trim();
+                    if (user?.unit) return user.unit;
+                    const deptName = (user?.user_access || user?.department)?.split(',')[0]?.trim();
                     const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
                     return match?.unit || '—';
                   })()}</div>
@@ -1502,7 +1503,8 @@ const resetUserForm = () => {
                 {/* Division Cell */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">{(() => {
-                    const deptName = user?.user_access?.split(',')[0]?.trim();
+                    if (user?.division) return user.division;
+                    const deptName = (user?.user_access || user?.department)?.split(',')[0]?.trim();
                     const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
                     return match?.division || '—';
                   })()}</div>
@@ -1511,10 +1513,10 @@ const resetUserForm = () => {
                 {/* Status Cell */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(user?.status)}`}>
-                      {user?.status}
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(user?.status || 'active')}`}>
+                      {user?.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Active'}
                     </span>
-                    {user?.status === 'active' && (
+                    {(user?.status === 'active' || !user?.status) && (
                       <span className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live Status"></span>
                     )}
                   </div>
