@@ -197,7 +197,7 @@ export default function AssignTaskUser() {
 
   // Filter doer names to only this user
   const filteredDoerNames = doerName.filter(
-    (doer) => doer?.toLowerCase() === username?.toLowerCase()
+    (doer) => doer?.trim().toLowerCase() === username?.trim().toLowerCase()
   );
 
   const dispatch = useDispatch();

@@ -254,7 +254,7 @@ export default function AssignTask() {
     if (!formData.department) return [];
     return (userRole === 'admin' || userRole === 'super_admin')
       ? doerName
-      : doerName.filter(doer => doer?.toLowerCase() === username?.toLowerCase());
+      : doerName.filter(doer => doer?.trim().toLowerCase() === username?.trim().toLowerCase());
   }, [doerName, userRole, username, formData.department]);
 
   // Cascading dropdown data
