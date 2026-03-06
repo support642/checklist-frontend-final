@@ -42,6 +42,15 @@ export default function DashboardHeader({
     fetchTotalUsers()
   }, [])
 
+  // Auto-select unit if there is exactly 1 available
+  useEffect(() => {
+    if (availableUnits && availableUnits.length === 1) {
+      if (unitFilter !== availableUnits[0]) {
+        setUnitFilter(availableUnits[0])
+      }
+    }
+  }, [availableUnits, unitFilter, setUnitFilter])
+
   // Apply date range filter
   const applyDateRange = () => {
     if (startDate && endDate && onDateRangeChange) {
@@ -155,8 +164,10 @@ export default function DashboardHeader({
               onChange={(e) => setUnitFilter(e.target.value)}
               className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
             >
-              <option value="all">All Units</option>
-              {availableUnits.map((unit) => (
+              {(!availableUnits || availableUnits.length !== 1) && (
+                <option value="all">All Units</option>
+              )}
+              {availableUnits && availableUnits.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}
                 </option>
@@ -302,8 +313,10 @@ export default function DashboardHeader({
               onChange={(e) => setUnitFilter(e.target.value)}
               className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
             >
-              <option value="all">All Units</option>
-              {availableUnits.map((unit) => (
+              {(!availableUnits || availableUnits.length !== 1) && (
+                <option value="all">All Units</option>
+              )}
+              {availableUnits && availableUnits.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}
                 </option>

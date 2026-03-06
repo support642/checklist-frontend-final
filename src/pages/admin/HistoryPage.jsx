@@ -1,6 +1,6 @@
 "use client"
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { Search, CheckCircle2 } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { Search, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 import { useDispatch, useSelector } from "react-redux"
 import { checklistHistoryData } from "../../redux/slice/checklistSlice"
@@ -12,17 +12,16 @@ import { delegationDoneData } from "../../redux/slice/delegationSlice"
 function HistoryPage() {
   const [activeTab, setActiveTab] = useState("checklist") // 'checklist' or 'delegation'
   const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [selectedMembers, setSelectedMembers] = useState([])
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [userRole, setUserRole] = useState("")
   const [username, setUsername] = useState("")
-  const [currentPageHistory, setCurrentPageHistory] = useState(1)
-  const [isLoadingMoreHistory, setIsLoadingMoreHistory] = useState(false)
-  const [hasMoreHistory, setHasMoreHistory] = useState(true)
-  const [initialHistoryLoading, setInitialHistoryLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [approvalStatusFilter, setApprovalStatusFilter] = useState("pending") // 'all', 'pending', 'completed'
+  const ITEMS_PER_PAGE = 50
 
   // Admin approval states
   const [selectedHistoryItems, setSelectedHistoryItems] = useState([])
@@ -36,20 +35,23 @@ function HistoryPage() {
   })
   const [adminRemarks, setAdminRemarks] = useState({}) // New state for admin remarks
 
-  const { history } = useSelector((state) => state.checkList)
+  const { history, historyTotalCount, historyApprovedCount, loading } = useSelector((state) => state.checkList)
   const { delegation_done } = useSelector((state) => state.delegation)
   const { doerName } = useSelector((state) => state.assignTask)
   const dispatch = useDispatch()
 
-  const historyTableContainerRef = useRef(null)
-  const scrollTimeout = useRef(null)
-  const lastScrollTop = useRef(0)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   useEffect(() => {
-    dispatch(checklistHistoryData(1))
-    dispatch(delegationDoneData())
+    dispatch(checklistHistoryData(debouncedSearch))
+    dispatch(delegationDoneData(debouncedSearch))
     dispatch(uniqueDoerNameData())
-  }, [dispatch])
+  }, [dispatch, debouncedSearch])
 
   useEffect(() => {
     const role = localStorage.getItem("role")
@@ -58,59 +60,6 @@ function HistoryPage() {
     setUsername(user || "")
     setIsSuperAdmin(role === "super_admin" || role === "admin")
   }, [])
-
-  // Handle scroll for history
-  const handleScrollHistory = useCallback(() => {
-    if (!historyTableContainerRef.current || isLoadingMoreHistory || !hasMoreHistory || history.length === 0) return
-
-    if (scrollTimeout.current) return
-
-    scrollTimeout.current = setTimeout(() => {
-      if (!historyTableContainerRef.current) return
-      const { scrollTop, scrollHeight, clientHeight } = historyTableContainerRef.current
-      
-      // If scrollTop hasn't changed (or is 0 due to initial render), it might be horizontal scroll
-      if (scrollTop === lastScrollTop.current) return
-      lastScrollTop.current = scrollTop
-
-      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 50
-
-      if (isNearBottom) {
-        setIsLoadingMoreHistory(true)
-        dispatch(checklistHistoryData(currentPageHistory + 1))
-          .then((result) => {
-            if (result.payload && result.payload.length < 50) {
-              setHasMoreHistory(false)
-            }
-            setCurrentPageHistory(prev => prev + 1)
-          })
-          .finally(() => setIsLoadingMoreHistory(false))
-      }
-      scrollTimeout.current = null
-    }, 200)
-  }, [isLoadingMoreHistory, hasMoreHistory, currentPageHistory, dispatch, history.length])
-
-  useEffect(() => {
-    const historyTableElement = historyTableContainerRef.current
-    if (historyTableElement) {
-      historyTableElement.addEventListener('scroll', handleScrollHistory)
-      return () => historyTableElement.removeEventListener('scroll', handleScrollHistory)
-    }
-  }, [handleScrollHistory])
-
-  // Load initial history data
-  useEffect(() => {
-    if (history.length === 0) {
-      setInitialHistoryLoading(true)
-      dispatch(checklistHistoryData(1))
-        .then((result) => {
-          if (result.payload && result.payload.length < 50) {
-            setHasMoreHistory(false)
-          }
-        })
-        .finally(() => setInitialHistoryLoading(false))
-    }
-  }, [history.length, dispatch])
 
   const parseSupabaseDate = (dateStr) => {
     if (!dateStr) return null
@@ -129,6 +78,7 @@ function HistoryPage() {
     setStartDate("")
     setEndDate("")
     setApprovalStatusFilter("pending") // Reset to pending
+    setCurrentPage(1)
   }
 
   // Handle checkbox selection for checklist admin approval
@@ -214,7 +164,7 @@ function HistoryPage() {
 
       if (type === "checklist") {
         setSelectedHistoryItems([])
-        dispatch(checklistHistoryData(1))
+        dispatch(checklistHistoryData())
       } else {
         setSelectedDelegationItems([])
         dispatch(delegationDoneData())
@@ -236,7 +186,7 @@ function HistoryPage() {
   const filteredHistoryData = useMemo(() => {
     if (!Array.isArray(history)) return []
 
-    const filtered = history
+    return history
       .filter((item) => {
         const matchesSearch = searchTerm
           ? Object.entries(item).some(([key, value]) => {
@@ -288,9 +238,23 @@ function HistoryPage() {
         if (!dateB) return -1
         return dateB - dateA
       })
+  }, [history, searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
 
-    return filtered.slice(0, currentPageHistory * 50)
-  }, [history, searchTerm, selectedMembers, startDate, endDate, currentPageHistory, approvalStatusFilter])
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
+
+  // Pagination helpers (based on filtered data, not raw DB total)
+  const totalPages = Math.ceil(filteredHistoryData.length / ITEMS_PER_PAGE) || 1
+  const startRecord = filteredHistoryData.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0
+  const endRecord = Math.min(currentPage * ITEMS_PER_PAGE, filteredHistoryData.length)
+
+  // Paginated slice of filtered data for display
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredHistoryData.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredHistoryData, currentPage])
 
   // Filtered delegation data
   const filteredDelegationData = useMemo(() => {
@@ -450,6 +414,7 @@ function HistoryPage() {
                 setSearchTerm("")
                 setSelectedHistoryItems([])
                 setSelectedDelegationItems([])
+                setCurrentPage(1)
               }}
               className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
                 activeTab === "checklist"
@@ -559,13 +524,13 @@ function HistoryPage() {
             {/* Stats - Inline */}
             <div className="flex gap-3 ml-auto text-xs">
               <span className="text-purple-600 font-medium">
-                {filteredHistoryData.length} Total
+                {historyTotalCount} Total
               </span>
               <span className="text-orange-600 font-medium">
-                {pendingApprovalCount} Pending
+                {historyTotalCount - historyApprovedCount} Pending
               </span>
               <span className="text-green-600 font-medium">
-                {filteredHistoryData.length - pendingApprovalCount} Approved
+                {historyApprovedCount} Approved
               </span>
             </div>
 
@@ -651,8 +616,8 @@ function HistoryPage() {
               }
             }
           `}</style>
-          <div ref={historyTableContainerRef} className="overflow-x-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-            {initialHistoryLoading ? (
+          <div className="overflow-x-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+            {loading ? (
               <div className="text-center py-10">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-4"></div>
                 <p className="text-purple-600 text-sm sm:text-base">Loading data...</p>
@@ -694,8 +659,8 @@ function HistoryPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredHistoryData.length > 0 ? (
-                    filteredHistoryData.map((historyItem, index) => (
+                  {paginatedData.length > 0 ? (
+                    paginatedData.map((historyItem, index) => (
                       <tr key={index} className="hover:bg-gray-50">
                         {isSuperAdmin && (
                           <td className="px-2 sm:px-3 py-2 sm:py-4 mobile-checkbox-cell" data-label="Select">
@@ -1014,15 +979,34 @@ function HistoryPage() {
                 </tbody>
               </table>
             )}
+          </div>
 
-            {isLoadingMoreHistory && (
-              <div className="sticky bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200 py-3">
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-500 mr-2"></div>
-                  <span className="text-purple-600 text-sm">Loading more...</span>
-                </div>
-              </div>
-            )}
+          {/* Pagination Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-gray-50 border-t border-gray-200">
+            <span className="text-xs text-gray-600">
+              {filteredHistoryData.length > 0
+                ? `Showing ${startRecord}–${endRecord} of ${filteredHistoryData.length} records (${historyTotalCount} in database)`
+                : "No records"}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1 || loading}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="h-3 w-3" /> Previous
+              </button>
+              <span className="text-xs font-medium text-gray-700">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage >= totalPages || loading}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
           </div>
         </div>
 

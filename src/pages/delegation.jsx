@@ -1249,7 +1249,7 @@ const handleSubmit = async () => {
             <div className="mt-4 flex justify-between items-center">
               <h2 className="text-purple-700 font-bold text-sm sm:text-lg flex items-center gap-2">
                 <LayoutDashboard size={18} className="text-purple-500" />
-                {unifiedTypeFilter === 'pending' ? 'My Tasks' : unifiedTypeFilter === 'approval' ? 'Approvals Queue' : 'Unified Task List'}
+                {unifiedTypeFilter === 'pending' ? 'My Tasks' : unifiedTypeFilter === 'approval' ? 'Approvals Queue' : 'Delegation Task List'}
               </h2>
             </div>
           </div>

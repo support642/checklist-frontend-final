@@ -2,6 +2,8 @@ import Papa from 'papaparse';
 
 // Database column definitions
 export const CHECKLIST_COLUMNS = [
+  { key: 'unit', label: 'Unit', type: 'text' },
+  { key: 'division', label: 'Division', type: 'text' },
   { key: 'department', label: 'Department', type: 'text' },
   { key: 'given_by', label: 'Given By', type: 'text' },
   { key: 'name', label: 'Name (Doer)', type: 'text', required: true },
@@ -56,28 +58,28 @@ export const parseCSVFile = (file) => {
  */
 export const mapColumns = (csvHeaders, dbColumns) => {
   const mapping = {};
-  
+
   csvHeaders.forEach(csvHeader => {
     const normalizedCsvHeader = csvHeader.toLowerCase().trim().replace(/[_\s-]/g, '');
-    
+
     // Try to find exact or similar match
     const match = dbColumns.find(dbCol => {
       const normalizedDbKey = dbCol.key.toLowerCase().replace(/[_\s-]/g, '');
       const normalizedDbLabel = dbCol.label.toLowerCase().replace(/[_\s-]/g, '');
-      
-      return normalizedCsvHeader === normalizedDbKey || 
-             normalizedCsvHeader === normalizedDbLabel ||
-             normalizedCsvHeader.includes(normalizedDbKey) ||
-             normalizedDbKey.includes(normalizedCsvHeader);
+
+      return normalizedCsvHeader === normalizedDbKey ||
+        normalizedCsvHeader === normalizedDbLabel ||
+        normalizedCsvHeader.includes(normalizedDbKey) ||
+        normalizedDbKey.includes(normalizedCsvHeader);
     });
-    
+
     if (match) {
       mapping[csvHeader] = match.key;
     } else {
       mapping[csvHeader] = null; // Unmapped column
     }
   });
-  
+
   return mapping;
 };
 
@@ -91,7 +93,7 @@ export const mapColumns = (csvHeaders, dbColumns) => {
  */
 export const validateRowData = (row, columnMapping, selectedColumns, dbColumns) => {
   const errors = [];
-  
+
   // Check required fields
   dbColumns.forEach(dbCol => {
     if (dbCol.required && selectedColumns.includes(dbCol.key)) {
@@ -99,13 +101,13 @@ export const validateRowData = (row, columnMapping, selectedColumns, dbColumns) 
       const csvHeader = Object.keys(columnMapping).find(
         header => columnMapping[header] === dbCol.key
       );
-      
+
       if (!csvHeader || !row[csvHeader] || row[csvHeader].trim() === '') {
         errors.push(`Missing required field: ${dbCol.label}`);
       }
     }
   });
-  
+
   return errors;
 };
 
@@ -119,14 +121,14 @@ export const validateRowData = (row, columnMapping, selectedColumns, dbColumns) 
 export const prepareImportData = (parsedData, columnMapping, selectedColumns) => {
   return parsedData.map(row => {
     const preparedRow = {};
-    
+
     // Map only selected columns
     Object.entries(columnMapping).forEach(([csvHeader, dbColumn]) => {
       if (dbColumn && selectedColumns.includes(dbColumn)) {
         preparedRow[dbColumn] = row[csvHeader] || null;
       }
     });
-    
+
     return preparedRow;
   });
 };

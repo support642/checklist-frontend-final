@@ -91,13 +91,13 @@ export const fetchDelegationDataSortByDate = async () => {
 };
 
 // FETCH DONE
-export const fetchDelegation_DoneDataSortByDate = async () => {
+export const fetchDelegation_DoneDataSortByDate = async (search = "") => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access");
 
   const { data } = await axios.get(`${API}/delegation-done`, {
-    params: { role, username, user_access: userAccess },
+    params: { role, username, user_access: userAccess, search },
   });
 
   return data;

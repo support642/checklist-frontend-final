@@ -1,9 +1,9 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import { 
-  fetchChechListDataForHistory, 
-  fetchChechListDataSortByDate, 
-  postChecklistAdminDoneAPI, 
-  updateChecklistData 
+import {
+  fetchChechListDataForHistory,
+  fetchChechListDataSortByDate,
+  postChecklistAdminDoneAPI,
+  updateChecklistData
 } from "../api/checkListApi";
 
 
@@ -24,9 +24,9 @@ export const checklistData = createAsyncThunk(
 // ============================================================
 export const checklistHistoryData = createAsyncThunk(
   "fetch/history",
-  async (page = 1) => {
-    const historyData = await fetchChechListDataForHistory(page);
-    return { data: historyData, page };
+  async (search = "") => {
+    const { data, totalCount, approvedCount } = await fetchChechListDataForHistory(search);
+    return { data, totalCount, approvedCount };
   }
 );
 
@@ -67,6 +67,8 @@ const checkListSlice = createSlice({
     error: null,
     hasMore: true,
     currentPage: 1,
+    historyTotalCount: 0,
+    historyApprovedCount: 0,
   },
 
   reducers: {},
@@ -112,12 +114,9 @@ const checkListSlice = createSlice({
 
       .addCase(checklistHistoryData.fulfilled, (state, action) => {
         state.loading = false;
-
-        if (action.payload.page === 1) {
-          state.history = action.payload.data;
-        } else {
-          state.history = [...state.history, ...action.payload.data];
-        }
+        state.history = action.payload.data;
+        state.historyTotalCount = parseInt(action.payload.totalCount) || 0;
+        state.historyApprovedCount = parseInt(action.payload.approvedCount) || 0;
       })
 
       .addCase(checklistHistoryData.rejected, (state, action) => {

@@ -707,6 +707,10 @@ function AccountDataPage() {
       console.log(`Updated selection: ${Array.from(newSelected)}`)
       return newSelected
     })
+    // Auto-set status to "Yes" when checkbox is checked
+    if (isChecked) {
+      setAdditionalData((prev) => ({ ...prev, [id]: "Yes" }))
+    }
   }, [])
 
   const handleCheckboxClick = useCallback(
@@ -727,6 +731,12 @@ function AccountDataPage() {
       if (checked) {
         const allIds = filteredAccountData.map((item) => item.task_id)
         setSelectedItems(new Set(allIds))
+        // Auto-set status to "Yes" for all items
+        setAdditionalData((prev) => {
+          const updated = { ...prev }
+          allIds.forEach((id) => { updated[id] = "Yes" })
+          return updated
+        })
         console.log(`Selected all items: ${allIds}`)
       } else {
         setSelectedItems(new Set())

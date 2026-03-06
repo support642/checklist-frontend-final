@@ -1,5 +1,7 @@
 import { ListTodo, CheckCircle2, Clock, AlertTriangle, BarChart3, XCircle, Calendar } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useState } from "react"
+import { createPortal } from "react-dom"
 
 export default function StatisticsCards({
   dashboardType,
@@ -8,8 +10,13 @@ export default function StatisticsCards({
   pendingTask,
   overdueTask,
   notDoneTask,     // <-- take from props (REAL backend value)
-  dateRange = null
+  dateRange = null,
+  dashboardStaffFilter = "all", // New Props
+  allStaffTasks = []            // New Props
 }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalTasks, setModalTasks] = useState([]);
 
   const navigate = useNavigate();
 
@@ -39,7 +46,56 @@ export default function StatisticsCards({
     });
   };
 
+  const handleCardClick = (type, path) => {
+    if (dashboardStaffFilter !== "all" && dashboardStaffFilter !== "") {
+      let filtered = [];
+      let title = "";
+      const typeLabel = dashboardType === "delegation" ? "Delegation" : "Checklist";
+
+      switch (type) {
+        case "total":
+          filtered = allStaffTasks;
+          title = `Total ${typeLabel} Tasks for ${dashboardStaffFilter}`;
+          break;
+        case "completed":
+          filtered = allStaffTasks.filter((t) => t.status === "completed");
+          title = dashboardType === "delegation"
+            ? `Completed Once (Delegation) for ${dashboardStaffFilter}`
+            : `Completed Tasks (Checklist) for ${dashboardStaffFilter}`;
+          break;
+        case "pending":
+          filtered = allStaffTasks.filter((t) => t.status === "pending" || t.status === "not_done");
+          title = dashboardType === "delegation"
+            ? `Completed Twice (Delegation) for ${dashboardStaffFilter}`
+            : `Pending Tasks (Checklist) for ${dashboardStaffFilter}`;
+          break;
+        case "not_done":
+          filtered = allStaffTasks.filter(
+            (t) => t.status !== "completed" && t.status !== "overdue"
+          );
+          title = dashboardType === "delegation"
+            ? `Not Done (Delegation) for ${dashboardStaffFilter}`
+            : `Not Done (Checklist) for ${dashboardStaffFilter}`;
+          break;
+        case "overdue":
+          filtered = allStaffTasks.filter((t) => t.status === "overdue");
+          title = dashboardType === "delegation"
+            ? `Completed 3+ Times (Delegation) for ${dashboardStaffFilter}`
+            : `Overdue Tasks (Checklist) for ${dashboardStaffFilter}`;
+          break;
+        default:
+          break;
+      }
+      setModalTasks(filtered);
+      setModalTitle(title);
+      setModalOpen(true);
+    } else {
+      navigate(path);
+    }
+  };
+
   return (
+    <>
     <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
       {/* Left side - Statistics Cards */}
       <div className="lg:w-1/2">
@@ -47,7 +103,7 @@ export default function StatisticsCards({
 
           {/* Total Tasks - Updated description for date range */}
           <div 
-            onClick={() => navigate('/dashboard/data/sales')}
+            onClick={() => handleCardClick("total", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/data/sales')}
             className="rounded-lg border border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded-tr-lg p-3 sm:p-4">
@@ -77,7 +133,7 @@ export default function StatisticsCards({
 
           {/* Completed Tasks */}
           <div 
-            onClick={() => navigate('/dashboard/history')}
+            onClick={() => handleCardClick("completed", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/history')}
             className="rounded-lg border border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 rounded-tr-lg p-3 sm:p-4">
@@ -102,7 +158,7 @@ export default function StatisticsCards({
 
           {/* Pending Tasks / Completed Twice */}
           <div 
-            onClick={() => navigate('/dashboard/data/sales')}
+            onClick={() => handleCardClick("pending", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/data/sales')}
             className="rounded-lg border border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-amber-50 to-amber-100 rounded-tr-lg p-3 sm:p-4">
@@ -130,7 +186,10 @@ export default function StatisticsCards({
           </div>
 
           {/* Not Done Tasks */}
-          <div className="rounded-lg border border-l-4 border-l-gray-500 shadow-md hover:shadow-lg transition-all bg-white">
+          <div
+            onClick={() => handleCardClick("not_done", "/dashboard/data/sales")}
+            className="rounded-lg border border-l-4 border-l-gray-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
+          >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-tr-lg p-3 sm:p-4">
               <h3 className="text-xs sm:text-sm font-medium text-gray-700">Not Done</h3>
               <XCircle className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
@@ -151,7 +210,7 @@ export default function StatisticsCards({
 
           {/* Overdue Tasks / Completed 3+ Times */}
           <div 
-            onClick={() => navigate('/dashboard/data/sales')}
+            onClick={() => handleCardClick("overdue", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/data/sales')}
             className="rounded-lg border border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all bg-white sm:col-span-2 lg:col-span-1 col-span-2 cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-red-100 rounded-tr-lg p-3 sm:p-4">
@@ -303,5 +362,88 @@ export default function StatisticsCards({
         </div>
       </div>
     </div>
+
+    {/* Details Popup Modal - rendered via Portal to escape parent stacking contexts */}
+    {modalOpen && createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 px-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between bg-purple-600 text-white px-6 py-4">
+            <h2 className="text-xl font-bold">{modalTitle}</h2>
+            <button
+              onClick={() => setModalOpen(false)}
+              className="text-white hover:text-purple-200 transition-colors"
+            >
+              <XCircle className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 overflow-y-auto max-h-[65vh]">
+            {modalTasks.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No tasks found for this category.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-300">
+                    <tr>
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">Task Description</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Start Date</th>
+                      <th className="px-4 py-3">Frequency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalTasks.map((task, idx) => (
+                      <tr
+                        key={task.id || idx}
+                        className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-medium text-purple-700">{task.id || "-"}</td>
+                        <td className="px-4 py-3 text-gray-800">{task.title || "-"}</td>
+                        <td className="px-4 py-3 capitalize">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full font-medium border ${
+                              task.status === "completed"
+                                ? "bg-green-100 text-green-700 border-green-200"
+                                : task.status === "overdue"
+                                ? "bg-red-100 text-red-700 border-red-200"
+                                : "bg-yellow-100 text-yellow-700 border-yellow-200"
+                            }`}
+                          >
+                            {task.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-600">
+                          {task.taskStartDate || "-"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-600 capitalize">
+                          {task.frequency || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="bg-gray-50 px-6 py-4 flex justify-end border-t border-gray-200">
+            <button
+              onClick={() => setModalOpen(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors font-medium"
+            >
+              Close
+            </button>
+          </div>
+
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   )
 }

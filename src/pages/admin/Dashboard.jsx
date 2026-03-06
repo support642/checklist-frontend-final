@@ -1116,6 +1116,8 @@ useEffect(() => {
           notDoneTask={notDoneTask}
           dashboardType={dashboardType}
           dateRange={dateRange.filtered ? dateRange : null}
+          dashboardStaffFilter={dashboardStaffFilter}
+          allStaffTasks={departmentData.allTasks}
         />
 
         <TaskNavigationTabs

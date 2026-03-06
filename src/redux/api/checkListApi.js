@@ -20,15 +20,36 @@ export const fetchChechListDataSortByDate = async (page = 1, search = '') => {
 // =======================================================
 // 2️⃣ Fetch Checklist History (AWS Backend)
 // =======================================================
-export const fetchChechListDataForHistory = async (page = 1) => {
+export const fetchChechListDataForHistory = async (search = "") => {
   const username = localStorage.getItem("user-name");
   const role = localStorage.getItem("role");
+  const PAGE_SIZE = 50;
 
-  const response = await fetch(
-    `${BASE_URL}/history?page=${page}&username=${username}&role=${role}`
+  const encodedSearch = encodeURIComponent(search);
+
+  // Fetch page 1 to get totalCount
+  const firstRes = await fetch(
+    `${BASE_URL}/history?page=1&username=${username}&role=${role}&search=${encodedSearch}`
   );
+  const firstJson = await firstRes.json();
+  const totalCount = firstJson.totalCount || 0;
+  const approvedCount = firstJson.approvedCount || 0;
+  let allData = firstJson.data || [];
 
-  return (await response.json()).data || [];
+  // Fetch remaining pages in parallel
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  if (totalPages > 1) {
+    const remaining = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        fetch(`${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&search=${encodedSearch}`)
+          .then(r => r.json())
+          .then(j => j.data || [])
+      )
+    );
+    allData = [...allData, ...remaining.flat()];
+  }
+
+  return { data: allData, totalCount, approvedCount };
 };
 
 
