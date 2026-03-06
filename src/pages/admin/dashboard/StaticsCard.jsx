@@ -60,16 +60,17 @@ export default function StatisticsCards({
         case "completed":
           filtered = allStaffTasks.filter((t) => t.status === "completed");
           title = dashboardType === "delegation"
-            ? `Completed Once (Delegation) for ${dashboardStaffFilter}`
+            ? `Completed Tasks (Delegation) for ${dashboardStaffFilter}`
             : `Completed Tasks (Checklist) for ${dashboardStaffFilter}`;
           break;
         case "pending":
           filtered = allStaffTasks.filter((t) => t.status === "pending" || t.status === "not_done");
           title = dashboardType === "delegation"
-            ? `Completed Twice (Delegation) for ${dashboardStaffFilter}`
+            ? `Pending Tasks (Delegation) for ${dashboardStaffFilter}`
             : `Pending Tasks (Checklist) for ${dashboardStaffFilter}`;
           break;
         case "not_done":
+          // In delegation, not_done is typically the same as pending minus overdue, or just pending
           filtered = allStaffTasks.filter(
             (t) => t.status !== "completed" && t.status !== "overdue"
           );
@@ -80,7 +81,7 @@ export default function StatisticsCards({
         case "overdue":
           filtered = allStaffTasks.filter((t) => t.status === "overdue");
           title = dashboardType === "delegation"
-            ? `Completed 3+ Times (Delegation) for ${dashboardStaffFilter}`
+            ? `Overdue Tasks (Delegation) for ${dashboardStaffFilter}`
             : `Overdue Tasks (Checklist) for ${dashboardStaffFilter}`;
           break;
         default:
@@ -138,7 +139,7 @@ export default function StatisticsCards({
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 rounded-tr-lg p-3 sm:p-4">
               <h3 className="text-xs sm:text-sm font-medium text-green-700">
-                {dashboardType === "delegation" ? "Completed Once" : "Completed Tasks"}
+                {dashboardType === "delegation" ? "Completed Tasks" : "Completed Tasks"}
               </h3>
               <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
             </div>
@@ -148,7 +149,7 @@ export default function StatisticsCards({
                 {dateRange ? (
                   <>Completed in period</>
                 ) : dashboardType === "delegation" ? (
-                  "Tasks completed once"
+                  "Completed tasks"
                 ) : (
                   "Total completed"
                 )}
@@ -163,7 +164,7 @@ export default function StatisticsCards({
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-amber-50 to-amber-100 rounded-tr-lg p-3 sm:p-4">
               <h3 className="text-xs sm:text-sm font-medium text-amber-700">
-                {dashboardType === "delegation" ? "Completed Twice" : "Pending Tasks"}
+                {dashboardType === "delegation" ? "Pending Tasks" : "Pending Tasks"}
               </h3>
               {dashboardType === "delegation" ? (
                 <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
@@ -177,7 +178,7 @@ export default function StatisticsCards({
                 {dateRange ? (
                   <>Pending in period</>
                 ) : dashboardType === "delegation" ? (
-                  "Tasks completed twice"
+                  "Pending tasks"
                 ) : (
                   "Including today"
                 )}
@@ -215,7 +216,7 @@ export default function StatisticsCards({
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-red-100 rounded-tr-lg p-3 sm:p-4">
               <h3 className="text-xs sm:text-sm font-medium text-red-700">
-                {dashboardType === "delegation" ? "Completed 3+ Times" : "Overdue Tasks"}
+                {dashboardType === "delegation" ? "Overdue Tasks" : "Overdue Tasks"}
               </h3>
               {dashboardType === "delegation" ? (
                 <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
@@ -229,7 +230,7 @@ export default function StatisticsCards({
                 {dateRange ? (
                   <>Overdue in period</>
                 ) : dashboardType === "delegation" ? (
-                  "Tasks completed 3+ times"
+                  "Overdue tasks"
                 ) : (
                   "Past due"
                 )}
