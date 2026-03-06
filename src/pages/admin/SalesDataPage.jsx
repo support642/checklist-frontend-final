@@ -1593,8 +1593,16 @@ const submissionData = await Promise.all(
                               // Only select items with enabled checkboxes (today and overdue)
                               const enabledItems = filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date));
                               setSelectedItems(new Set(enabledItems.map(item => item.task_id)));
+                              // Auto-set status to "Yes" for all selected items
+                              setAdditionalData((prev) => {
+                                const updated = { ...prev };
+                                enabledItems.forEach((item) => { updated[item.task_id] = "Yes" });
+                                return updated;
+                              });
                             } else {
                               setSelectedItems(new Set());
+                              setAdditionalData({});
+                              setRemarksData({});
                             }
                           }}
                         />
@@ -1602,6 +1610,9 @@ const submissionData = await Promise.all(
                     )}
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                       Status
+                    </th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
+                      Task Description
                     </th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                       Remarks
@@ -1626,9 +1637,6 @@ const submissionData = await Promise.all(
                     </th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                       Name
-                    </th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
-                      Task Description
                     </th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 whitespace-nowrap">
                       Task End Date
@@ -1703,6 +1711,11 @@ const submissionData = await Promise.all(
                               <option value="Yes">Yes</option>
                               <option value="No">No</option>
                             </select>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[150px]">
+                            <div className="text-xs sm:text-sm text-gray-900 break-words" title={account.task_description}>
+                              {account.task_description || "—"}
+                            </div>
                           </td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 bg-orange-50 min-w-[120px]">
                             <input
@@ -1785,11 +1798,7 @@ const submissionData = await Promise.all(
                           <td className="px-2 sm:px-3 py-2 sm:py-4">
                             <div className="text-xs sm:text-sm text-gray-900 break-words">{account.name || "—"}</div>
                           </td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[150px]">
-                            <div className="text-xs sm:text-sm text-gray-900 break-words" title={account.task_description}>
-                              {account.task_description || "—"}
-                            </div>
-                          </td>
+
                           <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50">
                             <div className="text-xs sm:text-sm text-gray-900 break-words">
                               {account.task_start_date || "—"}

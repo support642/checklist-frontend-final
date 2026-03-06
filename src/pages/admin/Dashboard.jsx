@@ -26,6 +26,7 @@ import {
   getChecklistDateRangeStatsApi
 } from "../../redux/api/dashboardApi.js"
 import { fetchDepartmentDataApi } from "../../redux/api/settingApi.js"
+import { fetchDelegationDataSortByDate } from "../../redux/api/delegationApi.js"
 
 export default function AdminDashboard() {
   const [dashboardType, setDashboardType] = useState("checklist")
@@ -564,6 +565,15 @@ useEffect(() => {
           uniqueStaff = await getStaffNamesByDepartmentApi(departmentFilter);
         } catch (error) {
           console.error('Error fetching staff by department:', error);
+          uniqueStaff = [...new Set(data.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+        }
+      } else if (dashboardType === 'delegation') {
+        // For delegation, fetch all delegation tasks from existing API and extract staff names
+        try {
+          const delegationData = await fetchDelegationDataSortByDate();
+          uniqueStaff = [...new Set(delegationData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+        } catch (error) {
+          console.error('Error fetching staff from delegation:', error);
           uniqueStaff = [...new Set(data.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
         }
       } else {
