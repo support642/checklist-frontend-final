@@ -131,7 +131,7 @@ useEffect(() => {
       setEditFormData({});
 
       // Refresh the data to show all updated rows
-      dispatch(uniqueChecklistTaskData());
+      dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, append: false }));
 
     } catch (error) {
       console.error("Failed to update task:", error);
@@ -568,7 +568,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
           {error}{" "}
           <button
             onClick={() => {
-              dispatch(uniqueChecklistTaskData())
+              dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
             }}
             className="underline ml-2 hover:text-red-600"
           >

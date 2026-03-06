@@ -29,7 +29,7 @@ function DelegationPage({ searchTerm, nameFilter, freqFilter, setNameFilter, set
   const { delegationTasks, loading } = useSelector((state) => state.quickTask)
   const dispatch = useDispatch()
 useEffect(()=>{
-  dispatch(uniqueDelegationTaskData())
+  dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
 },[dispatch])
 
  // Handle checkbox selection
@@ -62,7 +62,7 @@ useEffect(()=>{
       setSelectedTasks([])
       setSuccessMessage("Tasks deleted successfully")
       // Refresh the task list
-      dispatch(uniqueDelegationTaskData())
+      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -138,7 +138,7 @@ useEffect(()=>{
   useEffect(() => {
     if (isInitialized) {
      // fetchData()
-     dispatch(uniqueDelegationTaskData())
+     dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
     }
   }, [dispatch, isInitialized])
 
