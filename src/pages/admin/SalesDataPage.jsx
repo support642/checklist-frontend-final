@@ -4,6 +4,7 @@ import { CheckCircle2, Upload, X, Search, History, ArrowLeft } from "lucide-reac
 import AdminLayout from "../../components/layout/AdminLayout"
 import { useDispatch, useSelector } from "react-redux"
 import { checklistData, checklistHistoryData, updateChecklist } from "../../redux/slice/checklistSlice"
+import { maintenanceData, updateMaintenance } from "../../redux/slice/maintenanceSlice"
 import { postChecklistAdminDoneAPI, sendChecklistWhatsAppAPI } from "../../redux/api/checkListApi"
 import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice";
 import { useNavigate } from "react-router-dom"
@@ -45,14 +46,25 @@ function AccountDataPage() {
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [initialHistoryLoading, setInitialHistoryLoading] = useState(false)
   const [isMobile, setIsMobile] = useState(false);
+  const [activeView, setActiveView] = useState('checklist');
 
   const { checklist, loading, history, hasMore, currentPage } = useSelector((state) => state.checkList);
+  const { maintenance, loading: maintLoading, hasMore: maintHasMore, currentPage: maintCurrentPage } = useSelector((state) => state.maintenance);
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const tableContainerRef = useRef(null);
   const historyTableContainerRef = useRef(null);
+
+  // Maintenance specific
+  const [maintSelectedItems, setMaintSelectedItems] = useState(new Set());
+  const [maintAdditionalData, setMaintAdditionalData] = useState({});
+  const [maintRemarksData, setMaintRemarksData] = useState({});
+  const [maintUploadedImages, setMaintUploadedImages] = useState({});
+  const [maintIsFetchingMore, setMaintIsFetchingMore] = useState(false);
+  const maintTableContainerRef = useRef(null);
 
   const { doerName } = useSelector((state) => state.assignTask)
 
@@ -78,8 +90,18 @@ function AccountDataPage() {
 
   // Re-fetch data when debounced search changes
   useEffect(() => {
-    dispatch(checklistData({ page: 1, search: debouncedSearch }));
-  }, [debouncedSearch, dispatch]);
+    if (activeView === 'checklist') {
+      dispatch(checklistData({ page: 1, search: debouncedSearch }));
+    } else {
+      dispatch(maintenanceData({ page: 1, search: debouncedSearch }));
+    }
+  }, [debouncedSearch, activeView, dispatch]);
+
+  useEffect(() => {
+    if (activeView === 'maintenance' && maintenance?.length === 0) {
+      dispatch(maintenanceData({ page: 1, search: debouncedSearch }));
+    }
+  }, [activeView, dispatch, maintenance?.length, debouncedSearch]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -141,6 +163,27 @@ function AccountDataPage() {
       return () => historyTableElement.removeEventListener('scroll', handleScrollHistory)
     }
   }, [handleScrollHistory, showHistory])
+
+  const handleMaintScroll = useCallback(() => {
+    if (!maintTableContainerRef.current || maintLoading || maintIsFetchingMore || !maintHasMore || maintenance?.length === 0) return
+
+    const { scrollTop, scrollHeight, clientHeight } = maintTableContainerRef.current
+    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100
+
+    if (isNearBottom) {
+      setMaintIsFetchingMore(true)
+      dispatch(maintenanceData({ page: maintCurrentPage + 1, search: debouncedSearch }))
+        .finally(() => setMaintIsFetchingMore(false))
+    }
+  }, [maintLoading, maintIsFetchingMore, maintHasMore, maintCurrentPage, dispatch, maintenance?.length, debouncedSearch])
+
+  useEffect(() => {
+    const tableElement = maintTableContainerRef.current
+    if (tableElement && activeView === 'maintenance' && !showHistory) {
+      tableElement.addEventListener('scroll', handleMaintScroll)
+      return () => tableElement.removeEventListener('scroll', handleMaintScroll)
+    }
+  }, [handleMaintScroll, activeView, showHistory])
 
 
   const ITEMS_PER_PAGE = 100;
@@ -526,12 +569,48 @@ function AccountDataPage() {
       const dateA = new Date(a.task_start_date || "");
       const dateB = new Date(b.task_start_date || "");
 
-      if (!dateA || isNaN(dateA.getTime())) return 1;
-      if (!dateB || isNaN(dateB.getTime())) return -1;
-
       return dateA.getTime() - dateB.getTime();
     });
   }, [checklist, searchTerm, statusFilter, frequencyFilter]);
+
+  const filteredMaintenanceData = useMemo(() => {
+    if (!Array.isArray(maintenance)) return [];
+    
+    let filtered = searchTerm
+      ? maintenance.filter((item) =>
+        Object.entries(item).some(([key, value]) => {
+          if (['image', 'admin_done'].includes(key)) return false;
+          return value && value.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        })
+      )
+      : maintenance;
+      
+    // Apply status and frequency filters for Maintenance
+    if (statusFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((item) => {
+        const taskDate = new Date(item.task_start_date || item.planned_date || "");
+        taskDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = taskDate.getTime() - today.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (statusFilter === 'today') return diffDays === 0;
+        if (statusFilter === 'overdue') return diffDays < 0;
+        if (statusFilter === 'upcoming') return diffDays > 0;
+        return true;
+      });
+    }
+
+    if (frequencyFilter !== 'all') {
+      filtered = filtered.filter((item) => {
+        return item.frequency?.toLowerCase() === frequencyFilter.toLowerCase();
+      });
+    }
+
+    return filtered;
+  }, [maintenance, searchTerm, statusFilter, frequencyFilter]);
 
   // Helper function to determine task status (Today, Upcoming, Overdue)
   const getTaskStatus = (taskStartDate) => {
@@ -777,6 +856,83 @@ function AccountDataPage() {
     );
   };
 
+  // Maintenance Handlers
+  const handleMaintCheckboxClick = (e, id) => {
+    e.stopPropagation()
+    const isChecked = e.target.checked
+    setMaintSelectedItems((prev) => {
+      const newSelected = new Set(prev)
+      if (isChecked) {
+        newSelected.add(id)
+      } else {
+        newSelected.delete(id)
+        setMaintAdditionalData(prev => { const d = {...prev}; delete d[id]; return d; })
+        setMaintRemarksData(prev => { const d = {...prev}; delete d[id]; return d; })
+      }
+      return newSelected
+    })
+    if (isChecked) {
+      setMaintAdditionalData(prev => ({ ...prev, [id]: "Yes" }))
+    }
+  }
+
+  const handleMaintImageUpload = (id, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setMaintUploadedImages(prev => ({
+      ...prev,
+      [id]: { file, previewUrl }
+    }));
+  };
+
+  const handleMaintSubmit = async () => {
+    const selected = Array.from(maintSelectedItems);
+    if (selected.length === 0) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const submissionData = await Promise.all(
+        selected.map(async (id) => {
+          const item = maintenance.find((m) => m.task_id === id);
+          const imageData = maintUploadedImages[id];
+          let finalBase64Image = null;
+
+          if (imageData?.file) {
+            finalBase64Image = await fileToBase64(imageData.file);
+          }
+
+          return {
+            taskId: item.task_id,
+            status: maintAdditionalData[id] || "",
+            remarks: maintRemarksData[id] || "",
+            image: finalBase64Image || item.image || null,
+          };
+        })
+      );
+
+      await dispatch(updateMaintenance(submissionData));
+      
+      setSuccessMessage(`Successfully logged ${selected.length} maintenance task records!`);
+      setMaintSelectedItems(new Set());
+      setMaintAdditionalData({});
+      setMaintRemarksData({});
+      setMaintUploadedImages({});
+      
+      // Refresh maintenance list
+      setTimeout(() => {
+        dispatch(maintenanceData({ page: 1, search: debouncedSearch }));
+      }, 1000);
+
+    } catch (e) {
+      console.error(e);
+      alert('Failed to submit maintenance tasks');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 const fileToBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -966,9 +1122,35 @@ const submissionData = await Promise.all(
     <AdminLayout>
       <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
         <div className="flex flex-col gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700">
-            {showHistory ? CONFIG.PAGE_CONFIG.historyTitle : CONFIG.PAGE_CONFIG.title}
-          </h1>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700">
+              {showHistory ? CONFIG.PAGE_CONFIG.historyTitle : CONFIG.PAGE_CONFIG.title}
+            </h1>
+            
+            {/* Checklist / Maintenance Toggle */}
+            <div className="flex bg-gray-200 rounded-lg p-1">
+              <button
+                onClick={() => setActiveView('checklist')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeView === 'checklist' 
+                    ? 'bg-white text-purple-700 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Checklist
+              </button>
+              <button
+                onClick={() => setActiveView('maintenance')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeView === 'maintenance' 
+                    ? 'bg-white text-purple-700 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Maintenance
+              </button>
+            </div>
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -1021,14 +1203,14 @@ const submissionData = await Promise.all(
               {/* Submit Selected Button - Only for Users */}
               {!showHistory && (userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
                 <button
-                  onClick={handleSubmit}
-                  disabled={selectedItemsCount === 0 || isSubmitting}
+                  onClick={activeView === 'checklist' ? handleSubmit : handleMaintSubmit}
+                  disabled={(activeView === 'checklist' ? selectedItemsCount === 0 : maintSelectedItems.size === 0) || isSubmitting}
                   className="flex-1 sm:flex-none rounded-md gradient-bg py-2 px-3 sm:px-4 text-white hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {isSubmitting ? "Processing..." : (
                     <>
-                      <span className="hidden sm:inline">Submit Selected ({selectedItemsCount})</span>
-                      <span className="sm:hidden">Submit ({selectedItemsCount})</span>
+                      <span className="hidden sm:inline">Submit Selected ({activeView === 'checklist' ? selectedItemsCount : maintSelectedItems.size})</span>
+                      <span className="sm:hidden">Submit ({activeView === 'checklist' ? selectedItemsCount : maintSelectedItems.size})</span>
                     </>
                   )}
                 </button>
@@ -1085,7 +1267,7 @@ const submissionData = await Promise.all(
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-3 sm:p-4">
             <h2 className="text-purple-700 font-medium text-sm sm:text-base">
-              {showHistory ? `Completed ${CONFIG.SHEET_NAME} Tasks` : `Pending Checklist Tasks`}
+              {showHistory ? `Completed ${CONFIG.SHEET_NAME} Tasks` : activeView === 'maintenance' ? `Pending Maintenance Tasks` : `Pending Checklist Tasks`}
             </h2>
             <p className="text-purple-600 text-xs sm:text-sm mt-1">
               {showHistory
@@ -1433,6 +1615,300 @@ const submissionData = await Promise.all(
                 )}
               </div>
             </>
+          ) : activeView === 'maintenance' ? (
+            <div
+              ref={maintTableContainerRef}
+              className="overflow-x-auto overflow-y-auto"
+              style={{ maxHeight: 'calc(100vh - 280px)' }}
+            >
+              {/* Mobile Card View for Maintenance */}
+              <div className="sm:hidden space-y-3 p-3">
+                {filteredMaintenanceData.length > 0 ? (
+                  filteredMaintenanceData.map((item, index) => {
+                    const isSelected = maintSelectedItems.has(item.task_id);
+                    return (
+                      <div key={index} className={`bg-white border rounded-lg p-3 shadow-sm border-gray-200`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                              <input
+                                type="checkbox"
+                                className={`h-4 w-4 rounded border-gray-300 text-purple-600`}
+                                checked={isSelected}
+                                onChange={(e) => handleMaintCheckboxClick(e, item.task_id)}
+                              />
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">#{item.task_id}</span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900 mb-2">{item.task_description || "—"}</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                          <div><span className="text-gray-500">Name:</span> <span className="font-medium">{item.name || "—"}</span></div>
+                          <div><span className="text-gray-500">Dept:</span> <span className="font-medium">{item.department || "—"}</span></div>
+                          <div><span className="text-gray-500">Unit:</span> <span className="font-medium">{item.unit || "—"}</span></div>
+                          <div><span className="text-gray-500">Division:</span> <span className="font-medium">{item.division || "—"}</span></div>
+                          <div><span className="text-gray-500">Machine:</span> <span className="font-medium">{item.machine_name || "—"}</span></div>
+                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{item.part_name || "—"}</span></div>
+                          <div><span className="text-gray-500">Area:</span> <span className="font-medium">{item.part_area || "—"}</span></div>
+                          <div><span className="text-gray-500">Given By:</span> <span className="font-medium">{item.given_by || "—"}</span></div>
+                          <div><span className="text-gray-500">Planned Date:</span> <span className="font-medium">{item.planned_date || "—"}</span></div>
+                          <div><span className="text-gray-500">Frequency:</span> <span className="font-medium">{item.frequency || "—"}</span></div>
+                        </div>
+                        {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && isSelected && (
+                          <div className="border-t pt-2 mt-2 space-y-2">
+                            <select
+                              value={maintAdditionalData[item.task_id] || ""}
+                              onChange={(e) => {
+                                setMaintAdditionalData((prev) => ({ ...prev, [item.task_id]: e.target.value }));
+                                if (e.target.value !== "No") {
+                                  setMaintRemarksData(prev => { const d = {...prev}; delete d[item.task_id]; return d; });
+                                }
+                              }}
+                              className="border border-gray-300 rounded-md px-2 py-1 w-full text-xs"
+                            >
+                              <option value="">Status...</option>
+                              <option value="Yes">Yes</option>
+                              <option value="No">No</option>
+                            </select>
+                            <input
+                              type="text"
+                              placeholder="Remarks"
+                              value={maintRemarksData[item.task_id] || ""}
+                              onChange={(e) => setMaintRemarksData((prev) => ({ ...prev, [item.task_id]: e.target.value }))}
+                              className="border border-gray-300 rounded-md px-2 py-1 w-full text-xs box-border"
+                            />
+                            {/* Image Upload for Mobile Maintenance */}
+                            <div className="space-y-1">
+                              {maintUploadedImages[item.task_id] || item.image ? (
+                                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                                  <img
+                                    src={
+                                      maintUploadedImages[item.task_id]?.previewUrl ||
+                                      (typeof item.image === 'string' ? item.image : '')
+                                    }
+                                    alt="Receipt"
+                                    className="h-10 w-10 object-cover rounded-md flex-shrink-0"
+                                  />
+                                  <div className="flex flex-col flex-1 min-w-0">
+                                    {maintUploadedImages[item.task_id] ? (
+                                      <span className="text-xs text-green-600">Ready to upload</span>
+                                    ) : (
+                                      <button
+                                        className="text-xs text-purple-600 hover:text-purple-800 text-left"
+                                        onClick={() => window.open(item.image, "_blank")}
+                                      >
+                                        View Image
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <label
+                                  className={`flex items-center justify-center gap-2 cursor-pointer ${
+                                    item.require_attachment?.toUpperCase() === "YES" &&
+                                    maintAdditionalData[item.task_id] !== "No"
+                                      ? "text-red-600 font-medium bg-red-50"
+                                      : "text-purple-600 bg-purple-50"
+                                  } hover:bg-opacity-80 px-3 py-2 rounded-md border ${
+                                    item.require_attachment?.toUpperCase() === "YES" &&
+                                    maintAdditionalData[item.task_id] !== "No"
+                                      ? "border-red-300"
+                                      : "border-purple-300"
+                                  }`}
+                                >
+                                  <Upload className="h-4 w-4 flex-shrink-0" />
+                                  <span className="text-xs">
+                                    {item.require_attachment?.toUpperCase() === "YES" &&
+                                    maintAdditionalData[item.task_id] !== "No"
+                                      ? "Upload Image (Required)"
+                                      : "Upload Image"}
+                                  </span>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => handleMaintImageUpload(item.task_id, e)}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    {searchTerm ? "No maintenance tasks matching your search" : "No pending maintenance tasks found"}
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop view for Maintenance */}
+              <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
+                <thead className="bg-gray-50 sticky top-0 z-10">
+                  <tr>
+                    {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                      <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 border-b">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          checked={filteredMaintenanceData.length > 0 && maintSelectedItems.size === filteredMaintenanceData.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setMaintSelectedItems(new Set(filteredMaintenanceData.map(item => item.task_id)));
+                              setMaintAdditionalData(prev => {
+                                const updated = { ...prev };
+                                filteredMaintenanceData.forEach(item => { updated[item.task_id] = "Yes" });
+                                return updated;
+                              });
+                            } else {
+                              setMaintSelectedItems(new Set());
+                              setMaintAdditionalData({});
+                              setMaintRemarksData({});
+                            }
+                          }}
+                        />
+                      </th>
+                    )}
+                    {/* <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Time</th> */}
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">ID</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] border-b">Description</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Unit</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Division</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Dept</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Machine</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Part</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Area</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Given By</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Name</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Planned</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Freq</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Remind</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Attach</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Status</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-b">Remarks</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Image</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredMaintenanceData.length > 0 ? (
+                    filteredMaintenanceData.map((item, index) => {
+                      const isSelected = maintSelectedItems.has(item.task_id);
+                      return (
+                        <tr key={index} className={`${isSelected ? "bg-purple-50" : ""} hover:bg-gray-50`}>
+                          {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                            <td className="px-2 sm:px-3 py-2 sm:py-4 w-12 border-b">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                checked={isSelected}
+                                onChange={(e) => handleMaintCheckboxClick(e, item.task_id)}
+                              />
+                            </td>
+                          )}
+                          {/* <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.time || "—"}</div></td> */}
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.task_id || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[150px] border-b"><div className="text-xs sm:text-sm text-gray-900" title={item.task_description}>{item.task_description || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.unit || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.department || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_name || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.part_name || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.part_area || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.planned_date || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.frequency || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.enable_reminders || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.require_attachment || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50 border-b">
+                            <select
+                              disabled={!isSelected}
+                              value={maintAdditionalData[item.task_id] || ""}
+                              onChange={(e) => {
+                                setMaintAdditionalData((prev) => ({ ...prev, [item.task_id]: e.target.value }));
+                                if (e.target.value !== "No") {
+                                  setMaintRemarksData(prev => { const d = {...prev}; delete d[item.task_id]; return d; });
+                                }
+                              }}
+                              className="border border-gray-300 rounded-md px-2 py-1 flex w-full min-w-24 disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm"
+                            >
+                              <option value="">Select...</option>
+                              <option value="Yes">Yes</option>
+                              <option value="No">No</option>
+                            </select>
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 bg-orange-50 min-w-[120px] border-b">
+                            <input
+                              type="text"
+                              placeholder="Enter remarks"
+                              disabled={!isSelected || !maintAdditionalData[item.task_id]}
+                              value={maintRemarksData[item.task_id] || ""}
+                              onChange={(e) => setMaintRemarksData((prev) => ({ ...prev, [item.task_id]: e.target.value }))}
+                              className="border rounded-md px-2 py-1 w-full min-w-32 border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm"
+                            />
+                          </td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 bg-green-50 border-b">
+                            {maintUploadedImages[item.task_id] || item.image ? (
+                              <div className="flex items-center">
+                                <img
+                                  src={maintUploadedImages[item.task_id]?.previewUrl || (typeof item.image === 'string' ? item.image : '')}
+                                  alt="Preview"
+                                  className="h-8 w-8 sm:h-10 sm:w-10 object-cover rounded-md mr-2 flex-shrink-0"
+                                />
+                                <div className="flex flex-col min-w-0">
+                                  {maintUploadedImages[item.task_id] ? (
+                                    <span className="text-xs text-green-600">Ready</span>
+                                  ) : (
+                                    <button
+                                      className="text-xs text-purple-600 hover:text-purple-800 whitespace-nowrap"
+                                      onClick={() => window.open(item.image, "_blank")}
+                                    >
+                                      View
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <label
+                                className={`flex items-center cursor-pointer whitespace-nowrap ${item.require_attachment?.toUpperCase() === "YES" && maintAdditionalData[item.task_id] !== "No" ? "text-red-600 font-medium" : "text-purple-600"} hover:text-purple-800`}
+                              >
+                                <Upload className="h-4 w-4 mr-1 flex-shrink-0" />
+                                <span className="text-xs">
+                                  {item.require_attachment?.toUpperCase() === "YES" && maintAdditionalData[item.task_id] !== "No" ? "Required*" : "Upload"}
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={(e) => handleMaintImageUpload(item.task_id, e)}
+                                  disabled={!isSelected}
+                                />
+                              </label>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={19} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                        {searchTerm ? "No maintenance tasks matching your search" : "No pending maintenance tasks found"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              {maintIsFetchingMore && (
+                <div className="sticky bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200">
+                  <div className="flex justify-center items-center py-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-500 mr-2"></div>
+                    <span className="text-purple-600 text-xs sm:text-sm">Loading more tasks...</span>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             /* Regular Tasks Table - Mobile Responsive */
             <div

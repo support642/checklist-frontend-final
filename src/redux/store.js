@@ -7,6 +7,7 @@ import checkListReducer from "./slice/checklistSlice";
 import dashboardReducer from "./slice/dashboardSlice";
 import settingReducer from './slice/settingSlice'
 import userProfileReducer from './slice/userProfileSlice'
+import maintenanceReducer from './slice/maintenanceSlice'
 
 const store = configureStore({
     reducer: {
@@ -17,7 +18,8 @@ const store = configureStore({
         checkList: checkListReducer,
         dashBoard: dashboardReducer,
         setting: settingReducer,
-        userProfile: userProfileReducer
+        userProfile: userProfileReducer,
+        maintenance: maintenanceReducer
     }
 })
 

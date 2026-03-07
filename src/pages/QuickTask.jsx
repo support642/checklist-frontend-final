@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Search, ChevronDown, Filter, Trash2, Edit, Save, X } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
 import DelegationPage from "./delegation-data";
+import MaintenanceQuickTaskPage from "./maintenance-quick-task";
 import { useDispatch, useSelector } from "react-redux";
 import { deleteChecklistTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, fetchUsers, resetChecklistPagination, resetDelegationPagination  } from "../redux/slice/quickTaskSlice";
 
@@ -377,7 +378,9 @@ const filteredChecklistTasks = quickTask.filter(task => {
             <p className="text-purple-600 text-sm">
               {activeTab === 'checklist'
                 ? `Showing ${quickTask.length} checklist tasks`
-                : `Showing delegation tasks`}
+                : activeTab === 'delegation' 
+                  ? `Showing delegation tasks` 
+                  : `Showing maintenance tasks`}
             </p>
           </div>
 
@@ -402,6 +405,14 @@ const filteredChecklistTasks = quickTask.filter(task => {
   }}
 >
                 Delegation
+              </button>
+              <button
+  className={`px-4 py-2 text-sm font-medium ${activeTab === 'maintenance' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+  onClick={() => {
+    setActiveTab('maintenance');
+  }}
+>
+                Maintenance
               </button>
             </div>
 
@@ -1060,8 +1071,16 @@ const filteredChecklistTasks = quickTask.filter(task => {
               )}
               </div>
             </div>
-          ) : (
+          ) : activeTab === 'delegation' ? (
             <DelegationPage
+              searchTerm={searchTerm}
+              nameFilter={nameFilter}
+              freqFilter={freqFilter}
+              setNameFilter={setNameFilter}
+              setFreqFilter={setFreqFilter}
+            />
+          ) : (
+            <MaintenanceQuickTaskPage
               searchTerm={searchTerm}
               nameFilter={nameFilter}
               freqFilter={freqFilter}

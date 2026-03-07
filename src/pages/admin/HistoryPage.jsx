@@ -8,9 +8,11 @@ import { postChecklistAdminDoneAPI } from "../../redux/api/checkListApi"
 import { postDelegationAdminDoneAPI } from "../../redux/api/delegationApi"
 import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice"
 import { delegationDoneData } from "../../redux/slice/delegationSlice"
+import { maintenanceHistoryData, maintenanceAdminDone } from "../../redux/slice/maintenanceSlice"
+import { postMaintenanceAdminDoneAPI } from "../../redux/api/maintenanceApi"
 
 function HistoryPage() {
-  const [activeTab, setActiveTab] = useState("checklist") // 'checklist' or 'delegation'
+  const [activeTab, setActiveTab] = useState("checklist") // 'checklist', 'delegation', or 'maintenance'
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [selectedMembers, setSelectedMembers] = useState([])
@@ -26,7 +28,10 @@ function HistoryPage() {
   // Admin approval states
   const [selectedHistoryItems, setSelectedHistoryItems] = useState([])
   const [selectedDelegationItems, setSelectedDelegationItems] = useState([])
+  const [selectedMaintenanceItems, setSelectedMaintenanceItems] = useState([])
   const [markingAsDone, setMarkingAsDone] = useState(false)
+  const [maintAdminRemarks, setMaintAdminRemarks] = useState({})
+  const [maintCurrentPage, setMaintCurrentPage] = useState(1)
   const [successMessage, setSuccessMessage] = useState("")
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
@@ -38,6 +43,7 @@ function HistoryPage() {
   const { history, historyTotalCount, historyApprovedCount, loading } = useSelector((state) => state.checkList)
   const { delegation_done } = useSelector((state) => state.delegation)
   const { doerName } = useSelector((state) => state.assignTask)
+  const { history: maintHistory, historyTotalCount: maintTotalCount, historyApprovedCount: maintApprovedCount, loading: maintLoading } = useSelector((state) => state.maintenance)
   const dispatch = useDispatch()
 
   useEffect(() => {
@@ -51,6 +57,7 @@ function HistoryPage() {
     dispatch(checklistHistoryData(debouncedSearch))
     dispatch(delegationDoneData(debouncedSearch))
     dispatch(uniqueDoerNameData())
+    dispatch(maintenanceHistoryData(debouncedSearch))
   }, [dispatch, debouncedSearch])
 
   useEffect(() => {
@@ -79,6 +86,7 @@ function HistoryPage() {
     setEndDate("")
     setApprovalStatusFilter("pending") // Reset to pending
     setCurrentPage(1)
+    setMaintCurrentPage(1)
   }
 
   // Handle checkbox selection for checklist admin approval
@@ -123,9 +131,36 @@ function HistoryPage() {
     }
   }
 
+  // Maintenance checkbox handlers
+  const handleMaintenanceItemSelect = (taskId, isChecked) => {
+    if (isChecked) {
+      setSelectedMaintenanceItems(prev => [...prev, { task_id: taskId }])
+    } else {
+      setSelectedMaintenanceItems(prev => prev.filter(item => item.task_id !== taskId))
+    }
+  }
+
+  const handleSelectAllMaintenance = (isChecked) => {
+    if (isChecked) {
+      const pendingItems = filteredMaintenanceData
+        .filter(item => item.admin_done !== 'Done' && item.admin_done !== 'true' && item.admin_done !== true)
+        .map(item => ({ task_id: item.task_id }))
+      setSelectedMaintenanceItems(pendingItems)
+    } else {
+      setSelectedMaintenanceItems([])
+    }
+  }
+
+  const isMaintenanceItemSelected = (taskId) => {
+    return selectedMaintenanceItems.some(item => item.task_id === taskId)
+  }
+
   // Mark selected items as done
   const handleMarkDone = async (type) => {
-    const items = type === "checklist" ? selectedHistoryItems : selectedDelegationItems
+    let items
+    if (type === "checklist") items = selectedHistoryItems
+    else if (type === "maintenance") items = selectedMaintenanceItems
+    else items = selectedDelegationItems
     if (items.length === 0) return
     setConfirmationModal({
       isOpen: true,
@@ -148,6 +183,14 @@ function HistoryPage() {
         const result = await postChecklistAdminDoneAPI(payload)
         data = result.data
         error = result.error
+      } else if (type === "maintenance") {
+        const payload = selectedMaintenanceItems.map(item => ({
+          task_id: item.task_id,
+          remarks: maintAdminRemarks[item.task_id] || ""
+        }))
+        const result = await postMaintenanceAdminDoneAPI(payload)
+        data = result.data
+        error = result.error
       } else {
         const payload = selectedDelegationItems.map(item => ({
           id: item.id,
@@ -165,12 +208,18 @@ function HistoryPage() {
       if (type === "checklist") {
         setSelectedHistoryItems([])
         dispatch(checklistHistoryData())
+      } else if (type === "maintenance") {
+        setSelectedMaintenanceItems([])
+        dispatch(maintenanceHistoryData())
       } else {
         setSelectedDelegationItems([])
         dispatch(delegationDoneData())
       }
       
-      const count = type === "checklist" ? selectedHistoryItems.length : selectedDelegationItems.length
+      let count
+      if (type === "checklist") count = selectedHistoryItems.length
+      else if (type === "maintenance") count = selectedMaintenanceItems.length
+      else count = selectedDelegationItems.length
       setSuccessMessage(`Successfully marked ${count} items as approved!`)
       
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -240,9 +289,86 @@ function HistoryPage() {
       })
   }, [history, searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
 
+  // Filtered maintenance history data
+  const filteredMaintenanceData = useMemo(() => {
+    if (!Array.isArray(maintHistory)) return []
+
+    return maintHistory
+      .filter((item) => {
+        const matchesSearch = searchTerm
+          ? Object.entries(item).some(([key, value]) => {
+            if (['image', 'admin_done'].includes(key)) return false
+            return value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+          })
+          : true
+
+        const matchesMember = selectedMembers.length > 0
+          ? selectedMembers.includes(item.name)
+          : true
+
+        let matchesDateRange = true
+        if (startDate || endDate) {
+          const itemDate = parseSupabaseDate(item.submission_date)
+          if (!itemDate || isNaN(itemDate.getTime())) return false
+
+          const itemDateOnly = new Date(
+            itemDate.getFullYear(),
+            itemDate.getMonth(),
+            itemDate.getDate()
+          )
+
+          const start = startDate ? new Date(startDate) : null
+          if (start) start.setHours(0, 0, 0, 0)
+
+          const end = endDate ? new Date(endDate) : null
+          if (end) end.setHours(23, 59, 59, 999)
+
+          if (start && itemDateOnly < start) matchesDateRange = false
+          if (end && itemDateOnly > end) matchesDateRange = false
+        }
+
+        return matchesSearch && matchesMember && matchesDateRange
+      })
+      .filter((item) => {
+        const isDone = item.admin_done === 'Done' || item.admin_done === 'true' || item.admin_done === true
+        if (approvalStatusFilter === "pending") {
+          return !isDone
+        } else if (approvalStatusFilter === "completed") {
+          return isDone
+        }
+        return true
+      })
+      .sort((a, b) => {
+        const dateA = parseSupabaseDate(a.submission_date)
+        const dateB = parseSupabaseDate(b.submission_date)
+        if (!dateA) return 1
+        if (!dateB) return -1
+        return dateB - dateA
+      })
+  }, [maintHistory, searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
+
+  // Maintenance pagination
+  const maintTotalPages = Math.ceil(filteredMaintenanceData.length / ITEMS_PER_PAGE) || 1
+  const maintStartRecord = filteredMaintenanceData.length > 0 ? (maintCurrentPage - 1) * ITEMS_PER_PAGE + 1 : 0
+  const maintEndRecord = Math.min(maintCurrentPage * ITEMS_PER_PAGE, filteredMaintenanceData.length)
+  const paginatedMaintenanceData = useMemo(() => {
+    const start = (maintCurrentPage - 1) * ITEMS_PER_PAGE
+    return filteredMaintenanceData.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredMaintenanceData, maintCurrentPage])
+
+  const pendingMaintenanceApprovalCount = filteredMaintenanceData.filter(item => {
+    const isDone = item.admin_done === 'Done' || item.admin_done === 'true' || item.admin_done === true
+    return !isDone
+  }).length
+
+  const isMaintItemDone = (item) => {
+    return item.admin_done === 'Done' || item.admin_done === 'true' || item.admin_done === true
+  }
+
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
+    setMaintCurrentPage(1)
   }, [searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
 
   // Pagination helpers (based on filtered data, not raw DB total)
@@ -344,6 +470,7 @@ function HistoryPage() {
   // Count pending approval items
   const pendingApprovalCount = filteredHistoryData.filter(item => item.admin_done !== 'Done').length
   const pendingDelegationApprovalCount = filteredDelegationData.filter(item => item.admin_done !== 'Done' && item.status === 'completed').length
+  
 
   // Confirmation Modal Component
   const ConfirmationModal = ({ isOpen, itemCount, onConfirm, onCancel }) => {
@@ -407,13 +534,14 @@ function HistoryPage() {
         {/* Tabs - Compact */}
         {/* Only Checklist tab shown for now — Delegation tab hidden */}
         <div className="bg-white rounded-md shadow-sm">
-          <div className="flex">
+          <div className="flex gap-1">
             <button
               onClick={() => {
                 setActiveTab("checklist")
                 setSearchTerm("")
                 setSelectedHistoryItems([])
                 setSelectedDelegationItems([])
+                setSelectedMaintenanceItems([])
                 setCurrentPage(1)
               }}
               className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
@@ -423,6 +551,23 @@ function HistoryPage() {
               }`}
             >
               Checklist
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("maintenance")
+                setSearchTerm("")
+                setSelectedHistoryItems([])
+                setSelectedDelegationItems([])
+                setSelectedMaintenanceItems([])
+                setMaintCurrentPage(1)
+              }}
+              className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                activeTab === "maintenance"
+                  ? "bg-purple-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Maintenance
             </button>
             {/* <button
               onClick={() => {
@@ -523,15 +668,19 @@ function HistoryPage() {
 
             {/* Stats - Inline */}
             <div className="flex gap-3 ml-auto text-xs">
-              <span className="text-purple-600 font-medium">
-                {historyTotalCount} Total
-              </span>
-              <span className="text-orange-600 font-medium">
-                {historyTotalCount - historyApprovedCount} Pending
-              </span>
-              <span className="text-green-600 font-medium">
-                {historyApprovedCount} Approved
-              </span>
+              {activeTab === "maintenance" ? (
+                <>
+                  <span className="text-purple-600 font-medium">{maintTotalCount} Total</span>
+                  <span className="text-orange-600 font-medium">{maintTotalCount - maintApprovedCount} Pending</span>
+                  <span className="text-green-600 font-medium">{maintApprovedCount} Approved</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-purple-600 font-medium">{historyTotalCount} Total</span>
+                  <span className="text-orange-600 font-medium">{historyTotalCount - historyApprovedCount} Pending</span>
+                  <span className="text-green-600 font-medium">{historyApprovedCount} Approved</span>
+                </>
+              )}
             </div>
 
             {/* Admin Approval Button */}
@@ -543,6 +692,18 @@ function HistoryPage() {
               >
                 <CheckCircle2 className="h-3 w-3" />
                 {markingAsDone ? "..." : `Approve (${selectedHistoryItems.length})`}
+              </button>
+            )}
+
+            {/* Maintenance Approval Button */}
+            {isSuperAdmin && activeTab === "maintenance" && selectedMaintenanceItems.length > 0 && (
+              <button
+                onClick={() => handleMarkDone("maintenance")}
+                disabled={markingAsDone}
+                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                {markingAsDone ? "..." : `Approve (${selectedMaintenanceItems.length})`}
               </button>
             )}
 
@@ -617,11 +778,181 @@ function HistoryPage() {
             }
           `}</style>
           <div className="overflow-x-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 260px)' }}>
-            {loading ? (
+            {(loading || maintLoading) ? (
               <div className="text-center py-10">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-4"></div>
                 <p className="text-purple-600 text-sm sm:text-base">Loading data...</p>
               </div>
+            ) : activeTab === "maintenance" ? (
+              /* Maintenance Table */
+              <table className="min-w-full divide-y divide-gray-200 mobile-card-table">
+                <thead className="bg-gray-50 sticky top-0 z-10">
+                  <tr>
+                    {isSuperAdmin && (
+                      <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => handleSelectAllMaintenance(e.target.checked)}
+                          checked={selectedMaintenanceItems.length > 0 && selectedMaintenanceItems.length === pendingMaintenanceApprovalCount}
+                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        />
+                      </th>
+                    )}
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Status</th>
+                    {isSuperAdmin && (
+                      <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50">Admin Remarks</th>
+                    )}
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Task/Machine</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">Submission Time</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proof</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedMaintenanceData.length > 0 ? (
+                    paginatedMaintenanceData.map((item, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        {isSuperAdmin && (
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 mobile-checkbox-cell" data-label="Select">
+                            {!isMaintItemDone(item) ? (
+                              <input
+                                type="checkbox"
+                                checked={isMaintenanceItemSelected(item.task_id)}
+                                onChange={(e) => handleMaintenanceItemSelect(item.task_id, e.target.checked)}
+                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                              />
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        )}
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Admin Status">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            isMaintItemDone(item)
+                              ? "bg-green-100 text-green-800"
+                              : "bg-orange-100 text-orange-800"
+                          }`}>
+                            {isMaintItemDone(item) ? "Approved" : "Pending"}
+                          </span>
+                        </td>
+                        {isSuperAdmin && (
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 bg-purple-50" data-label="Admin Remarks">
+                            {!isMaintItemDone(item) ? (
+                              <input
+                                type="text"
+                                placeholder="Remark..."
+                                value={maintAdminRemarks[item.task_id] || ""}
+                                onChange={(e) => setMaintAdminRemarks(prev => ({
+                                  ...prev,
+                                  [item.task_id]: e.target.value
+                                }))}
+                                disabled={!isMaintenanceItemSelected(item.task_id)}
+                                className={`w-full text-xs p-1 border-2 border-purple-300 rounded font-bold focus:border-purple-500 focus:bg-white bg-purple-50 ${
+                                  !isMaintenanceItemSelected(item.task_id) ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                              />
+                            ) : (
+                              <div className="text-xs text-gray-600 font-medium">{item.admin_done_remarks || "—"}</div>
+                            )}
+                          </td>
+                        )}
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Task ID">
+                          <div className="text-xs sm:text-sm font-medium text-gray-900">{item.task_id || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="User">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[150px]" data-label="Task/Machine">
+                          <div className="text-xs sm:text-sm text-gray-900" title={item.task_description}>
+                            {item.task_description || "—"}
+                          </div>
+                          {(item.machine_name || item.part_name) && (
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {item.machine_name}{item.part_name ? ` / ${item.part_name}` : ''}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Department">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.department || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Unit">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.unit || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Division">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-green-50" data-label="Submission Time">
+                          <div className="text-xs sm:text-sm text-gray-900">
+                            {item.submission_date ? (() => {
+                              const dateObj = new Date(item.submission_date)
+                              const day = ("0" + dateObj.getDate()).slice(-2)
+                              const month = ("0" + (dateObj.getMonth() + 1)).slice(-2)
+                              const year = dateObj.getFullYear()
+                              const hours = ("0" + dateObj.getHours()).slice(-2)
+                              const minutes = ("0" + dateObj.getMinutes()).slice(-2)
+                              return (
+                                <div>
+                                  <div className="font-medium">{`${day}/${month}/${year}`}</div>
+                                  <div className="text-xs text-gray-500">{`${hours}:${minutes}`}</div>
+                                </div>
+                              )
+                            })() : "—"}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Frequency">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.frequency || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Proof">
+                          {item.image ? (
+                            <a
+                              href={item.image}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 underline flex items-center text-xs sm:text-sm"
+                            >
+                              <img
+                                src={item.image}
+                                alt="Proof"
+                                className="h-6 w-6 sm:h-8 sm:w-8 object-cover rounded-md mr-2"
+                              />
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 text-xs sm:text-sm">No file</span>
+                          )}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Actions">
+                          <div className="text-xs sm:text-sm">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              item.status === "yes" || item.status === "done"
+                                ? "bg-green-100 text-green-800"
+                                : item.status === "no"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                            }`}>
+                              {item.status || "—"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={isSuperAdmin ? 13 : 11} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                        {searchTerm || selectedMembers.length > 0 || startDate || endDate
+                          ? "No records matching your filters"
+                          : "No maintenance records found"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             ) : activeTab === "checklist" ? (
               /* Checklist Table */
               <table className="min-w-full divide-y divide-gray-200 mobile-card-table">
@@ -983,30 +1314,61 @@ function HistoryPage() {
 
           {/* Pagination Controls */}
           <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-gray-50 border-t border-gray-200">
-            <span className="text-xs text-gray-600">
-              {filteredHistoryData.length > 0
-                ? `Showing ${startRecord}–${endRecord} of ${filteredHistoryData.length} records (${historyTotalCount} in database)`
-                : "No records"}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1 || loading}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="h-3 w-3" /> Previous
-              </button>
-              <span className="text-xs font-medium text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage >= totalPages || loading}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next <ChevronRight className="h-3 w-3" />
-              </button>
-            </div>
+            {activeTab === "maintenance" ? (
+              <>
+                <span className="text-xs text-gray-600">
+                  {filteredMaintenanceData.length > 0
+                    ? `Showing ${maintStartRecord}–${maintEndRecord} of ${filteredMaintenanceData.length} records (${maintTotalCount} in database)`
+                    : "No records"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setMaintCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={maintCurrentPage === 1 || maintLoading}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> Previous
+                  </button>
+                  <span className="text-xs font-medium text-gray-700">
+                    Page {maintCurrentPage} of {maintTotalPages}
+                  </span>
+                  <button
+                    onClick={() => setMaintCurrentPage(prev => Math.min(prev + 1, maintTotalPages))}
+                    disabled={maintCurrentPage >= maintTotalPages || maintLoading}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-xs text-gray-600">
+                  {filteredHistoryData.length > 0
+                    ? `Showing ${startRecord}–${endRecord} of ${filteredHistoryData.length} records (${historyTotalCount} in database)`
+                    : "No records"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1 || loading}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> Previous
+                  </button>
+                  <span className="text-xs font-medium text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage >= totalPages || loading}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

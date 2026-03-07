@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { assignTaskInTable, uniqueDepartmentData, uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
 import { departmentDetails } from "../../redux/slice/settingSlice";
 import CSVImportModal from "../../components/CSVImportModal";
+import { fetchMachinePartsData } from "../../redux/slice/maintenanceSlice";
 // import supabase from "../../SupabaseClient";
 
 // Calendar Component (defined outside)
@@ -23,7 +24,7 @@ const CalendarComponent = ({ date, onChange, onClose }) => {
   };
   // console.log(fetchUniqueDepartmentDataApi())
   // console.log(fetchUniqueGivenByDataApi())
-  // console.log(fetchUniqueDoerNameDataApi())
+  // console.log(fetchUniqueNameDataApi())
 
 
   const handleDateClick = (day) => {
@@ -198,6 +199,9 @@ export default function AssignTask() {
     dispatch(uniqueDepartmentData(username));
     dispatch(uniqueGivenByData());
     dispatch(departmentDetails());
+
+    // Fetch machine parts from master table
+    dispatch(fetchMachinePartsData());
   }, [dispatch])
 
 
@@ -217,7 +221,10 @@ export default function AssignTask() {
   const [accordionOpen, setAccordionOpen] = useState(false);
   const [workingDays, setWorkingDays] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [taskType, setTaskType] = useState(null); // 'checklist' or 'delegation'
+  const [taskType, setTaskType] = useState(null); // 'checklist', 'delegation', or 'maintenance'
+
+  // Machine parts from Redux
+  const machineParts = useSelector((state) => state.maintenance?.machineParts) || [];
 
   const frequencies = [
     { value: "one-time", label: "One Time (No Recurrence)" },
@@ -246,6 +253,11 @@ export default function AssignTask() {
     frequency: "daily",
     enableReminders: true,
     requireAttachment: false,
+    machineName: "",
+    partName: "",
+    partArea: "",
+    duration: "",
+    machinePartId: null,
   });
 
   // Filter doer names based on role and selected department
@@ -453,6 +465,13 @@ useEffect(() => {
         requireAttachment: formData.requireAttachment,
         unit: formData.unit,
         division: formData.division,
+        taskType: taskType,
+        ...(taskType === 'maintenance' && {
+          machineName: formData.machineName,
+          partName: formData.partName,
+          partArea: formData.partArea,
+          duration: formData.duration
+        })
       });
     } else {
       // For recurring tasks
@@ -551,6 +570,13 @@ useEffect(() => {
           requireAttachment: formData.requireAttachment,
           unit: formData.unit,
           division: formData.division,
+          taskType: taskType,
+          ...(taskType === 'maintenance' && {
+            machineName: formData.machineName,
+            partName: formData.partName,
+            partArea: formData.partArea,
+            duration: formData.duration
+          })
         });
 
         taskCount++;
@@ -615,6 +641,15 @@ useEffect(() => {
           requireAttachment: formData.requireAttachment,
           unit: formData.unit,
           division: formData.division,
+          taskType: taskType,
+          ...(taskType === 'maintenance' && {
+            machinePartId: formData.machinePartId,
+            machineName: formData.machineName,
+            partName: formData.partName,
+            partArea: formData.partArea,
+            duration: formData.duration,
+            time: time
+          })
         });
       } else {
         // For recurring tasks
@@ -703,6 +738,15 @@ useEffect(() => {
             requireAttachment: formData.requireAttachment,
             unit: formData.unit,
             division: formData.division,
+            taskType: taskType,
+            ...(taskType === 'maintenance' && {
+              machinePartId: formData.machinePartId,
+              machineName: formData.machineName,
+              partName: formData.partName,
+              partArea: formData.partArea,
+              duration: formData.duration,
+              time: time
+            })
           });
 
           taskCount++;
@@ -731,6 +775,11 @@ useEffect(() => {
         frequency: taskType === 'delegation' ? 'one-time' : 'daily',
         enableReminders: true,
         requireAttachment: false,
+        machineName: "",
+        partName: "",
+        partArea: "",
+        duration: "",
+        machinePartId: null,
       });
       setSelectedDate(new Date()); // Reset to today's date instead of null
       setStartDate(new Date());
@@ -793,7 +842,7 @@ useEffect(() => {
                 <ArrowLeft className="h-6 w-6 text-purple-500" />
               </button>
             )}
-            Assign New Task {taskType ? `(${taskType === 'checklist' ? 'Checklist' : 'Delegation'})` : ''}
+            Assign New Task {taskType ? `(${taskType === 'checklist' ? 'Checklist' : taskType === 'maintenance' ? 'Maintenance' : 'Delegation'})` : ''}
           </h1>
           <button
             onClick={() => setShowImportModal(true)}
@@ -826,7 +875,7 @@ useEffect(() => {
           </button>
         </div>
         {!taskType ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-8">
             {/* Checklist Card */}
             <div 
               onClick={() => {
@@ -860,13 +909,33 @@ useEffect(() => {
                 <p className="text-gray-500 mt-2">Assign one-time tasks to staff members with specific deadlines.</p>
               </div>
             </div>
+
+            {/* Maintenance Card */}
+            <div 
+              onClick={() => {
+                setTaskType('maintenance');
+                setFormData(prev => ({ ...prev, frequency: 'daily' }));
+              }}
+              className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
+            >
+              <div className="p-4 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors">
+                <svg className="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">Maintenance</h3>
+                <p className="text-gray-500 mt-2">Schedule recurring machine and equipment maintenance tasks.</p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="rounded-lg border border-purple-200 bg-white shadow-md overflow-hidden">
             <form onSubmit={handleSubmit}>
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-3 border-b border-purple-100">
                 <h2 className="text-base font-semibold text-purple-700">
-                  {taskType === 'checklist' ? 'Checklist Task Details' : 'Delegation Task Details'}
+                  {taskType === 'checklist' ? 'Checklist Task Details' : taskType === 'maintenance' ? 'Maintenance Task Details' : 'Delegation Task Details'}
                 </h2>
                 <p className="text-xs text-purple-600">
                   Fill in the details to assign a new {taskType} task.
@@ -993,8 +1062,104 @@ useEffect(() => {
                   />
                 </div>
 
+                {/* Maintenance Fields (Only visible if taskType is maintenance) */}
+                {taskType === 'maintenance' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border border-blue-100 bg-blue-50/30 p-3 rounded-md">
+                    <div className="space-y-2">
+                      <label htmlFor="machineName" className="block text-sm font-medium text-purple-700">
+                        Machine Name
+                      </label>
+                      <select
+                        id="machineName"
+                        name="machineName"
+                        value={formData.machineName}
+                        onChange={(e) => {
+                          const selectedMachine = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            machineName: selectedMachine,
+                            partName: "",
+                            partArea: "",
+                            machinePartId: null,
+                          }));
+                        }}
+                        required
+                        className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        <option value="">Select Machine</option>
+                        {[...new Set(machineParts.map(mp => mp.machine_name).filter(Boolean))].map((name, idx) => (
+                          <option key={idx} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="partName" className="block text-sm font-medium text-purple-700">
+                        Part Name
+                      </label>
+                      <select
+                        id="partName"
+                        name="partName"
+                        value={formData.partName}
+                        onChange={(e) => {
+                          const selectedPart = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            partName: selectedPart,
+                            partArea: "",
+                            machinePartId: null,
+                          }));
+                        }}
+                        className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        <option value="">Select Part</option>
+                        {[...new Set(
+                          machineParts
+                            .filter(mp => mp.machine_name === formData.machineName)
+                            .map(mp => mp.part_name)
+                            .filter(Boolean)
+                        )].map((name, idx) => (
+                          <option key={idx} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="partArea" className="block text-sm font-medium text-purple-700">
+                        Part Area
+                      </label>
+                      <select
+                        id="partArea"
+                        name="partArea"
+                        value={formData.partArea}
+                        onChange={(e) => {
+                          const selectedArea = e.target.value;
+                          // Find the exact machine_parts row matching all 3 fields
+                          const match = machineParts.find(
+                            mp => mp.machine_name === formData.machineName
+                              && mp.part_name === formData.partName
+                              && mp.machine_area === selectedArea
+                          );
+                          setFormData(prev => ({
+                            ...prev,
+                            partArea: selectedArea,
+                            machinePartId: match?.id || null,
+                          }));
+                        }}
+                        className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        <option value="">Select Area</option>
+                        {machineParts
+                          .filter(mp => mp.machine_name === formData.machineName && mp.part_name === formData.partName)
+                          .map((mp, idx) => (
+                            <option key={idx} value={mp.machine_area}>{mp.machine_area}</option>
+                          ))}
+                      </select>
+                    </div>
+
+                  </div>
+                )}
+
                 {/* Date, Time and Frequency */}
-                <div className={`grid gap-3 ${taskType === 'delegation' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+                <div className={`grid gap-3 ${taskType === 'delegation' || taskType === 'maintenance' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                   {/* Task Start Date Picker (Delegation only) */}
                   {taskType === 'delegation' && (
                     <div className="space-y-2">
@@ -1069,6 +1234,24 @@ useEffect(() => {
                       <Clock className="absolute left-2 top-2.5 h-4 w-4 text-purple-500" />
                     </div>
                   </div>
+
+                  {/* NEW: Duration Field (Maintenance only) placed next to Time */}
+                  {taskType === 'maintenance' && (
+                    <div className="space-y-2">
+                      <label htmlFor="duration" className="block text-sm font-medium text-purple-700">
+                        Duration
+                      </label>
+                      <input
+                        type="text"
+                        id="duration"
+                        name="duration"
+                        value={formData.duration}
+                        onChange={handleChange}
+                        placeholder="e.g. 2 hours"
+                        className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      />
+                    </div>
+                  )}
 
                   {/* Frequency */}
                   <div className="space-y-2">
@@ -1269,6 +1452,10 @@ useEffect(() => {
                       frequency: "daily",
                       enableReminders: true,
                       requireAttachment: false,
+                      machineName: "",
+                      partName: "",
+                      partArea: "",
+                      duration: "",
                     });
                     setSelectedDate(null);
                     setStartDate(new Date());

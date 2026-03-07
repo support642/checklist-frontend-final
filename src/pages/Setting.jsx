@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { useDispatch, useSelector } from 'react-redux';
-import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails } from '../redux/slice/settingSlice';
+import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, machineDetails, createMachineThunk, updateMachineThunk, deleteMachineThunk } from '../redux/slice/settingSlice';
 import { extendTaskApi } from '../redux/api/settingApi';
 import { uniqueDoerNameData } from '../redux/slice/assignTaskSlice';
 // import supabase from '../SupabaseClient';
@@ -58,9 +58,25 @@ const Setting = () => {
   const [taskAssignments, setTaskAssignments] = useState({});
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [fetchError, setFetchError] = useState('');
+
+  // Machine Management State
+  const [showMachineModal, setShowMachineModal] = useState(false);
+  const [isEditingMachine, setIsEditingMachine] = useState(false);
+  const [currentMachineId, setCurrentMachineId] = useState(null);
+  const [machineForm, setMachineForm] = useState({
+    machine_name: '',
+    part_name: '',
+    machine_area: ''
+  });
+
+  // Hierarchical machine form state for Create New Machine
+  const [newMachineName, setNewMachineName] = useState('');
+  const [newMachineParts, setNewMachineParts] = useState([
+    { part_name: '', machine_area: '' }
+  ]);
   
   
-  const { userData, department, departmentsOnly, givenBy, loading, error } = useSelector((state) => state.setting);
+  const { userData, department, departmentsOnly, givenBy, machines, loading, error } = useSelector((state) => state.setting);
   const { doerName } = useSelector((state) => state.assignTask);
   // Get current logged-in user to check for super_admin role
   const { userData: currentUser } = useSelector((state) => state.login);
@@ -198,6 +214,9 @@ const debugUserStatus = async () => {
     } else if (activeTab === 'departments') {
       resetDeptForm();
       setShowDeptModal(true);
+    } else if (activeTab === 'machines') {
+      resetMachineForm();
+      setShowMachineModal(true);
     }
     // No action for leave tab
   };
@@ -566,6 +585,8 @@ const handleConfirmDelegation = async () => {
       dispatch(uniqueDoerNameData()); // Fetch all doer names for delegation
     } else if (tab === 'extendTask') {
       dispatch(userDetails());
+    } else if (tab === 'machines') {
+      dispatch(machineDetails());
     }
   };
 
@@ -970,6 +991,99 @@ const resetUserForm = () => {
     setCurrentDeptId(null);
   };
 
+  // Machine form handlers
+  const handleMachineInputChange = (e) => {
+    const { name, value } = e.target;
+    setMachineForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAddMachine = async (e) => {
+    e.preventDefault();
+    try {
+      if (!newMachineName.trim()) {
+        alert('Please enter a machine name.');
+        return;
+      }
+      const validParts = newMachineParts.filter(p => p.part_name.trim() || p.machine_area.trim());
+      if (validParts.length === 0) {
+        alert('Please add at least one part.');
+        return;
+      }
+      for (const part of validParts) {
+        await dispatch(createMachineThunk({
+          machine_name: newMachineName.trim(),
+          part_name: part.part_name.trim(),
+          machine_area: part.machine_area.trim()
+        })).unwrap();
+      }
+      resetMachineForm();
+      setShowMachineModal(false);
+      dispatch(machineDetails());
+    } catch (error) {
+      console.error('Error adding machine:', error);
+    }
+  };
+
+  const handleEditMachine = (machineId) => {
+    const machine = machines.find(m => m.id === machineId);
+    setMachineForm({
+      machine_name: machine.machine_name || '',
+      part_name: machine.part_name || '',
+      machine_area: machine.machine_area || ''
+    });
+    setCurrentMachineId(machineId);
+    setIsEditingMachine(true);
+    setShowMachineModal(true);
+  };
+
+  const handleUpdateMachine = async (e) => {
+    e.preventDefault();
+    try {
+      await dispatch(updateMachineThunk({ id: currentMachineId, updatedMachine: machineForm })).unwrap();
+      resetMachineForm();
+      setShowMachineModal(false);
+      dispatch(machineDetails());
+    } catch (error) {
+      console.error('Error updating machine:', error);
+    }
+  };
+
+  const handleDeleteMachine = async (machineId) => {
+    if (!window.confirm('Are you sure you want to delete this machine?')) return;
+    try {
+      await dispatch(deleteMachineThunk(machineId)).unwrap();
+      dispatch(machineDetails());
+    } catch (error) {
+      console.error('Error deleting machine:', error);
+    }
+  };
+
+  const resetMachineForm = () => {
+    setMachineForm({ machine_name: '', part_name: '', machine_area: '' });
+    setNewMachineName('');
+    setNewMachineParts([{ part_name: '', machine_area: '' }]);
+    setIsEditingMachine(false);
+    setCurrentMachineId(null);
+  };
+
+  // Machine part row handlers
+  const handlePartRowChange = (index, field, value) => {
+    setNewMachineParts(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const addPartRow = () => {
+    setNewMachineParts(prev => [...prev, { part_name: '', machine_area: '' }]);
+  };
+
+  const removePartRow = (index) => {
+    if (newMachineParts.length === 1) return;
+    setNewMachineParts(prev => prev.filter((_, i) => i !== index));
+  };
+
 
   // Add this filtered users calculation for leave tab
   const filteredLeaveUsers = userData?.filter(user =>
@@ -1011,14 +1125,14 @@ const resetUserForm = () => {
                 <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
               
-              {(activeTab === 'users' || activeTab === 'departments') && localStorage.getItem('role') === 'super_admin' && (
+              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && localStorage.getItem('role') === 'super_admin' && (
                 <>
                   <button
                     onClick={handleAddButtonClick}
                     className="flex items-center gap-2 px-3 py-2 text-sm rounded-md bg-purple-600 text-white hover:bg-purple-700"
                   >
                     <Plus size={16} />
-                    <span>{activeTab === 'users' ? 'Add User' : 'Add Department'}</span>
+                    <span>{activeTab === 'users' ? 'Add User' : activeTab === 'machines' ? 'Add Machine' : 'Add Department'}</span>
                   </button>
                   {activeTab === 'departments' && (
                     <button
@@ -1091,6 +1205,19 @@ const resetUserForm = () => {
             >
               <Calendar size={18} />
               Extend Task
+            </button>
+            <button
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'machines' 
+                  ? 'border-purple-600 text-purple-600 bg-purple-50' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+              onClick={() => {
+                handleTabChange('machines');
+              }}
+            >
+              <Settings size={18} />
+              Machines
             </button>
           </div>
         </div>
@@ -1888,6 +2015,284 @@ const resetUserForm = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Machines Tab */}
+        {activeTab === 'machines' && (
+          <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-medium text-purple-700">Machine Management</h2>
+            </div>
+
+            {loading && (
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <p className="mt-2 text-gray-600">Loading...</p>
+              </div>
+            )}
+
+            {!loading && (
+              <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
+                {/* Mobile Card View */}
+                <div className="sm:hidden space-y-3 p-3">
+                  {machines && machines.length > 0 ? (
+                    machines.map((machine, index) => (
+                      <div key={machine.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                        <div className="flex justify-between items-start mb-2">
+                          <p className="text-sm font-medium text-gray-900">#{index + 1} {machine.machine_name || '—'}</p>
+                          {localStorage.getItem('role') === 'super_admin' && (
+                            <div className="flex gap-2">
+                              <button onClick={() => handleEditMachine(machine.id)} className="text-blue-600" title="Edit">
+                                <Edit size={16} />
+                              </button>
+                              <button onClick={() => handleDeleteMachine(machine.id)} className="text-red-600" title="Delete">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{machine.part_name || '—'}</span></div>
+                          <div><span className="text-gray-500">Area:</span> <span className="font-medium">{machine.machine_area || '—'}</span></div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-gray-500 text-sm">No machines found</div>
+                  )}
+                </div>
+
+                {/* Desktop Table View */}
+                <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Name</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Name</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Area</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {machines && machines.length > 0 ? (
+                      machines.map((machine) => (
+                        <tr key={machine.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{machine.machine_name || '—'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{machine.part_name || '—'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{machine.machine_area || '—'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex space-x-2">
+                              {localStorage.getItem('role') === 'super_admin' && (
+                                <>
+                                  <button onClick={() => handleEditMachine(machine.id)} className="text-blue-600 hover:text-blue-900">
+                                    <Edit size={18} />
+                                  </button>
+                                  <button onClick={() => handleDeleteMachine(machine.id)} className="text-red-600 hover:text-red-900">
+                                    <Trash2 size={18} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">No machines found</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Machine Modal */}
+        {showMachineModal && (
+          <div className="fixed z-10 inset-0 overflow-y-auto">
+            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <div className={`inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle ${isEditingMachine ? 'sm:max-w-md' : 'sm:max-w-2xl'} sm:w-full sm:p-6`}>
+                <div>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      {isEditingMachine ? 'Edit Machine' : 'Add New Machine'}
+                    </h3>
+                    <button
+                      onClick={() => { setShowMachineModal(false); resetMachineForm(); }}
+                      className="text-gray-400 hover:text-gray-500"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <div className="mt-6">
+                    <form onSubmit={isEditingMachine ? handleUpdateMachine : handleAddMachine}>
+                      {isEditingMachine ? (
+                        /* Edit mode - single row form */
+                        <div className="space-y-4">
+                          <div>
+                            <label htmlFor="machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
+                            <input
+                              type="text"
+                              id="machine_name"
+                              name="machine_name"
+                              value={machineForm.machine_name}
+                              onChange={handleMachineInputChange}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Enter machine name"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="part_name" className="block text-sm font-medium text-gray-700">Part Name</label>
+                            <input
+                              type="text"
+                              id="part_name"
+                              name="part_name"
+                              value={machineForm.part_name}
+                              onChange={handleMachineInputChange}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Enter part name"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
+                            <input
+                              type="text"
+                              id="machine_area"
+                              name="machine_area"
+                              value={machineForm.machine_area}
+                              onChange={handleMachineInputChange}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Enter machine area"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        /* Create mode - machine name + dynamic parts */
+                        <div className="space-y-4">
+                          {/* Machine Name - single input */}
+                          <div>
+                            <label htmlFor="new_machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
+                            <input
+                              type="text"
+                              id="new_machine_name"
+                              value={newMachineName}
+                              onChange={(e) => setNewMachineName(e.target.value)}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              placeholder="Enter machine name"
+                              required
+                            />
+                          </div>
+
+                          {/* Parts Section */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Parts</label>
+
+                            {/* Parts Column Headers */}
+                            <div className="grid grid-cols-12 gap-3 mb-2">
+                              <div className="col-span-1">
+                                <span className="block text-xs font-semibold text-gray-500 uppercase">#</span>
+                              </div>
+                              <div className="col-span-5">
+                                <span className="block text-xs font-semibold text-gray-500 uppercase">Part Name</span>
+                              </div>
+                              <div className="col-span-5">
+                                <span className="block text-xs font-semibold text-gray-500 uppercase">Machine Area</span>
+                              </div>
+                              <div className="col-span-1">
+                                <span className="block text-xs font-semibold text-gray-500 uppercase"></span>
+                              </div>
+                            </div>
+
+                            {/* Dynamic Part Rows */}
+                            <div className="max-h-[40vh] overflow-y-auto space-y-2">
+                              {newMachineParts.map((part, index) => (
+                                <div key={index} className="grid grid-cols-12 gap-3 items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                  {/* Row Number */}
+                                  <div className="col-span-1 flex items-center justify-center">
+                                    <span className="text-sm font-medium text-gray-500 bg-white w-7 h-7 rounded-full flex items-center justify-center border border-gray-300">
+                                      {index + 1}
+                                    </span>
+                                  </div>
+
+                                  {/* Part Name */}
+                                  <div className="col-span-5">
+                                    <input
+                                      type="text"
+                                      value={part.part_name}
+                                      onChange={(e) => handlePartRowChange(index, 'part_name', e.target.value)}
+                                      placeholder="Enter Part Name"
+                                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                                    />
+                                  </div>
+
+                                  {/* Machine Area */}
+                                  <div className="col-span-5">
+                                    <input
+                                      type="text"
+                                      value={part.machine_area}
+                                      onChange={(e) => handlePartRowChange(index, 'machine_area', e.target.value)}
+                                      placeholder="Enter Machine Area"
+                                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                                    />
+                                  </div>
+
+                                  {/* Remove Part Button */}
+                                  <div className="col-span-1 flex items-center justify-center">
+                                    {newMachineParts.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removePartRow(index)}
+                                        className="text-red-400 hover:text-red-600 transition-colors"
+                                        title="Remove this part"
+                                      >
+                                        <X size={18} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Add Part Button */}
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={addPartRow}
+                                className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
+                              >
+                                <Plus size={16} />
+                                Add Part
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="mt-6 flex justify-end space-x-3">
+                        <button
+                          type="button"
+                          onClick={() => { setShowMachineModal(false); resetMachineForm(); }}
+                          className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                        >
+                          <Save size={18} className="mr-2" />
+                          {isEditingMachine ? 'Update' : 'Save'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

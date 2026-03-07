@@ -1,0 +1,562 @@
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { CheckCircle2, Trash2, X, Edit, Save } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import { deleteUniqueMaintenanceTask, uniqueMaintenanceTaskData, updateUniqueMaintenanceTask, resetUniqueMaintenancePagination } from "../redux/slice/maintenanceSlice";
+
+const CONFIG = {
+  PAGE_CONFIG: {
+    description: "Showing all unique maintenance tasks",
+  },
+};
+
+function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
+  const [successMessage, setSuccessMessage] = useState("");
+  const [error, setError] = useState(null);
+  const [userRole, setUserRole] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedTasks, setSelectedTasks] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Edit State
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  const { uniqueMaintenanceTasks, loading, uniqueMaintenanceHasMore, uniqueMaintenancePage } = useSelector((state) => state.maintenance);
+  const dispatch = useDispatch();
+  const tableContainerRef = useRef(null);
+
+  useEffect(() => {
+    dispatch(resetUniqueMaintenancePagination());
+    dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }));
+  }, [dispatch]);
+
+  useEffect(() => {
+    const role = localStorage.getItem("role");
+    setUserRole(role || "");
+    setIsInitialized(true);
+  }, []);
+
+  // Handle Infinite Scroll
+  const handleScroll = useCallback(() => {
+    if (!tableContainerRef.current || loading) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = tableContainerRef.current;
+    
+    // Check if scrolled near bottom (within 100px)
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      if (uniqueMaintenanceHasMore) {
+        dispatch(uniqueMaintenanceTaskData({ 
+          page: uniqueMaintenancePage, 
+          pageSize: 50, 
+          nameFilter,
+          append: true 
+        }));
+      }
+    }
+  }, [loading, uniqueMaintenanceHasMore, uniqueMaintenancePage, nameFilter, dispatch]);
+
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
+  // Handle Edit Click
+  const handleEditClick = (task) => {
+    setEditingTaskId(task.task_id);
+    setEditFormData({
+      task_id: task.task_id,
+      task_description: task.task_description || '',
+      machine_name: task.machine_name || '',
+      part_name: task.part_name || '',
+      part_area: task.part_area || '',
+      given_by: task.given_by || '',
+      name: task.name || '',
+      frequency: task.frequency || '',
+      duration: task.duration || '',
+      status: task.status || '',
+      remark: task.remark || ''
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTaskId(null);
+    setEditFormData({});
+  };
+
+  const handleInputChange = (field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editFormData.task_id) return;
+
+    const originalTask = uniqueMaintenanceTasks.find(task => task.task_id === editFormData.task_id);
+    if (!originalTask) return;
+
+    setIsSaving(true);
+    try {
+      await dispatch(updateUniqueMaintenanceTask({
+        updatedTask: editFormData,
+        originalTask: {
+          name: originalTask.name,
+          task_description: originalTask.task_description
+        }
+      })).unwrap();
+
+      setEditingTaskId(null);
+      setEditFormData({});
+
+      // Refresh
+      dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter, append: false }));
+
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      setError("Failed to update task");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle checkbox selection
+  const handleCheckboxChange = (task) => {
+    const alreadySelected = selectedTasks.find(t => t.task_id === task.task_id);
+    if (alreadySelected) {
+      setSelectedTasks(selectedTasks.filter(t => t.task_id !== task.task_id));
+    } else {
+      setSelectedTasks([...selectedTasks, task]);
+    }
+  };
+
+  // Select all
+  const handleSelectAll = (filteredData) => {
+    if (selectedTasks.length === filteredData.length) {
+      setSelectedTasks([]);
+    } else {
+      setSelectedTasks(filteredData);
+    }
+  };
+
+  // Delete
+  const handleDeleteSelected = async () => {
+    if (selectedTasks.length === 0) return;
+    
+    setIsDeleting(true);
+    try {
+      await dispatch(deleteUniqueMaintenanceTask(selectedTasks)).unwrap();
+      setSelectedTasks([]);
+      setSuccessMessage("Tasks deleted successfully");
+      
+      // Refresh
+      dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter, append: false }));
+      
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (error) {
+      console.error("Failed to delete tasks:", error);
+      setError("Failed to delete tasks");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const filteredTasks = useMemo(() => {
+    let filtered = uniqueMaintenanceTasks || [];
+    
+    if (searchTerm) {
+        filtered = filtered.filter(task =>
+            task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            task.machine_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            task.part_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
+    
+    if (nameFilter) {
+      filtered = filtered.filter(task => task.name === nameFilter);
+    }
+    
+    if (freqFilter) {
+      filtered = filtered.filter(task => task.frequency === freqFilter);
+    }
+    
+    return filtered;
+  }, [uniqueMaintenanceTasks, searchTerm, nameFilter, freqFilter]);
+
+  return (
+    <>
+      {successMessage && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center shadow-lg">
+          <CheckCircle2 className="h-5 w-5 mr-2 text-green-500" />
+          {successMessage}
+          <button onClick={() => setSuccessMessage("")} className="text-green-500 hover:text-green-700 ml-4">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 bg-red-50 p-4 rounded-md text-red-800 text-center">
+          {error}{" "}
+          <button 
+            onClick={() => dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))} 
+            className="underline ml-2 hover:text-red-600"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {loading && uniqueMaintenanceTasks.length === 0 && (
+        <div className="mt-8 text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-2"></div>
+          <p className="text-purple-600">Loading maintenance data...</p>
+        </div>
+      )}
+
+      {!error && isInitialized && (!loading || uniqueMaintenanceTasks.length > 0) && (
+         <div className="mt-4 rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-3 sm:p-4 flex justify-between items-center">
+            <div>
+              <h2 className="text-purple-700 font-medium text-sm sm:text-base">Maintenance Tasks</h2>
+              <p className="text-purple-600 text-xs sm:text-sm mt-1">
+                {CONFIG.PAGE_CONFIG.description}
+              </p>
+            </div>
+            {selectedTasks.length > 0 && userRole === "super_admin" && (
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-purple-600">{selectedTasks.length} task(s) selected</span>
+                <button
+                  onClick={handleDeleteSelected}
+                  disabled={isDeleting}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 text-sm"
+                >
+                  <Trash2 size={16} />
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div 
+            ref={tableContainerRef}
+            className="overflow-x-auto overflow-y-auto custom-scrollbar" 
+            style={{ maxHeight: 'calc(100vh - 280px)' }}
+          >
+            {/* Mobile View */}
+            <div className="sm:hidden space-y-3 p-3">
+              {filteredTasks.length > 0 ? (
+                filteredTasks.map((task, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                       <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedTasks.some(t => t.task_id === task.task_id)}
+                            onChange={() => handleCheckboxChange(task)}
+                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          />
+                          <span className={`px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800`}>
+                            {task.frequency || "—"}
+                          </span>
+                       </div>
+                       {userRole === "super_admin" && (
+                         editingTaskId === task.task_id ? (
+                           <div className="flex gap-2">
+                             <button
+                               onClick={handleSaveEdit}
+                               disabled={isSaving}
+                               className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
+                             >
+                               <Save size={12} />
+                               {isSaving ? 'Saving...' : 'Save'}
+                             </button>
+                             <button
+                               onClick={handleCancelEdit}
+                               className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+                             >
+                               <X size={12} />
+                               Cancel
+                             </button>
+                           </div>
+                         ) : (
+                           <button
+                             onClick={() => handleEditClick(task)}
+                             className="text-blue-600 text-xs underline"
+                           >
+                             Edit
+                           </button>
+                         )
+                       )}
+                    </div>
+
+                    {/* Task Description */}
+                    {editingTaskId === task.task_id ? (
+                      <textarea
+                        value={editFormData.task_description}
+                        onChange={(e) => handleInputChange('task_description', e.target.value)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm mb-2"
+                        rows="3"
+                        placeholder="Task Description"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium text-gray-900 mb-2">{task.task_description || "—"}</p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {/* Name */}
+                      <div>
+                        <span className="text-gray-500">Name:</span>{' '}
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.name} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
+                        ) : (<span className="font-medium">{task.name || "—"}</span>)}
+                      </div>
+                      
+                      {/* Machine Name */}
+                      <div>
+                        <span className="text-gray-500">Machine:</span>{' '}
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.machine_name} onChange={(e) => handleInputChange('machine_name', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
+                        ) : (<span className="font-medium">{task.machine_name || "—"}</span>)}
+                      </div>
+
+                      {/* Part Name */}
+                      <div>
+                        <span className="text-gray-500">Part:</span>{' '}
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.part_name} onChange={(e) => handleInputChange('part_name', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
+                        ) : (<span className="font-medium">{task.part_name || "—"}</span>)}
+                      </div>
+
+                      {/* Part Area */}
+                      <div>
+                        <span className="text-gray-500">Area:</span>{' '}
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.part_area} onChange={(e) => handleInputChange('part_area', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
+                        ) : (<span className="font-medium">{task.part_area || "—"}</span>)}
+                      </div>
+                      
+                      {/* Given By (Assign From) */}
+                      <div>
+                        <span className="text-gray-500">Assigned By:</span>{' '}
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.given_by} onChange={(e) => handleInputChange('given_by', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
+                        ) : (<span className="font-medium">{task.given_by || "—"}</span>)}
+                      </div>
+
+                      {/* Status */}
+                      <div>
+                        <span className="text-gray-500">Status:</span>{' '}
+                        <span className="font-medium">{task.status || "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-gray-500 text-sm">
+                   {searchTerm || nameFilter || freqFilter ? "No tasks matching your filters" : "No maintenance tasks available"}
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
+              <thead className="bg-gray-50 sticky top-0 z-20">
+                <tr>
+                  <th className="px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedTasks.length === filteredTasks.length && filteredTasks.length > 0}
+                      onChange={() => handleSelectAll(filteredTasks)}
+                      className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                  </th>
+                  {[
+                    { key: 'task_id', label: 'Task ID' },
+                    { key: 'task_description', label: 'Task Description', minWidth: 'whitespace-nowrap' },
+                    { key: 'machine_name', label: 'Machine Name' },
+                    { key: 'part_name', label: 'Part Name' },
+                    { key: 'part_area', label: 'Part Area' },
+                    { key: 'given_by', label: 'Assign From' },
+                    { key: 'name', label: 'Name' },
+                    { key: 'planned_date', label: 'Planned Date' },
+                    { key: 'frequency', label: 'Frequency' },
+                    { key: 'duration', label: 'Duration' },
+                    { key: 'status', label: 'Status' },
+                    { key: 'remark', label: 'Remarks' },
+                    { key: 'actions', label: 'Actions' },
+                  ].map((column) => (
+                    <th
+                      key={column.label}
+                      className={`px-2 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.minWidth || ''}`}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredTasks.length > 0 ? (
+                  filteredTasks.map((task, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedTasks.some(t => t.task_id === task.task_id)}
+                          onChange={() => handleCheckboxChange(task)}
+                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                      </td>
+
+                      {/* Task ID */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.task_id || "—"}
+                      </td>
+
+                      {/* Task Description */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 text-sm text-gray-500 max-w-xs">
+                        {editingTaskId === task.task_id ? (
+                          <textarea value={editFormData.task_description} onChange={(e) => handleInputChange('task_description', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" rows="3" />
+                        ) : (
+                          <div className="break-words">{task.task_description || "—"}</div>
+                        )}
+                      </td>
+
+                      {/* Machine Name */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-900">
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.machine_name} onChange={(e) => handleInputChange('machine_name', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                        ) : (task.machine_name || "—")}
+                      </td>
+                      
+                      {/* Part Name */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.part_name} onChange={(e) => handleInputChange('part_name', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                        ) : (task.part_name || "—")}
+                      </td>
+
+                      {/* Part Area */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.part_area} onChange={(e) => handleInputChange('part_area', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                        ) : (task.part_area || "—")}
+                      </td>
+
+                      {/* Assign From */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.given_by} onChange={(e) => handleInputChange('given_by', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                        ) : (task.given_by || "—")}
+                      </td>
+
+                      {/* Name */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.name} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                        ) : (task.name || "—")}
+                      </td>
+
+                      {/* Working Day (Task Start Date) */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.task_start_date ? new Date(task.task_start_date).toLocaleDateString() : '—'}
+                      </td>
+
+                      {/* Frequency */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800`}>
+                          {task.frequency || "—"}
+                        </span>
+                      </td>
+
+                      {/* Duration */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <input 
+                            type="text" 
+                            value={editFormData.duration} 
+                            onChange={(e) => handleInputChange('duration', e.target.value)} 
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm" 
+                            placeholder="Duration"
+                          />
+                        ) : (task.duration || "—")}
+                      </td>
+
+                      {/* Status */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm font-medium">
+                        {editingTaskId === task.task_id ? (
+                          <select 
+                            value={editFormData.status} 
+                            onChange={(e) => handleInputChange('status', e.target.value)} 
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          >
+                            <option value="">Select Status</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                            <option value="Pending">Pending</option>
+                          </select>
+                        ) : (
+                          <span className={task.status === "Yes" ? "text-green-600" : task.status === "Pending" ? "text-yellow-600" : "text-red-600"}>
+                            {task.status || "—"}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Remarks */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 text-sm text-gray-500 max-w-[200px]">
+                        <div className="break-words truncate" title={task.remark}>{task.remark || "—"}</div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <div className="flex gap-2 flex-col xl:flex-row">
+                            <button onClick={handleSaveEdit} disabled={isSaving} className="flex items-center gap-1 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 justify-center">
+                              <Save size={14} />
+                              {isSaving ? '...' : 'Save'}
+                            </button>
+                            <button onClick={handleCancelEdit} className="flex items-center gap-1 px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 justify-center">
+                              <X size={14} />
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          userRole === "super_admin" && (
+                          <button onClick={() => handleEditClick(task)} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 justify-center">
+                            <Edit size={14} />
+                            Edit
+                          </button>
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={13} className="px-2 sm:px-6 py-2 sm:py-4 text-center text-gray-500">
+                      {searchTerm || nameFilter || freqFilter ? "No tasks matching your filters" : "No maintenance tasks available"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            
+            {loading && uniqueMaintenanceHasMore && (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-500"></div>
+                <p className="text-purple-600 text-sm mt-2">Loading more tasks...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export default MaintenanceQuickTaskPage;

@@ -172,7 +172,7 @@ export const createUserApi = async (newUser) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newUser),
     });
-    
+
     return await response.json();
   } catch (error) {
     console.log("Error creating user", error);
@@ -190,7 +190,7 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedUser),
     });
-    
+
     return await response.json();
   } catch (error) {
     console.log("Error updating user", error);
@@ -221,7 +221,7 @@ export const createDepartmentApi = async (newDept) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newDept),
     });
-    
+
     return await response.json();
   } catch (error) {
     console.log("Error adding department", error);
@@ -239,7 +239,7 @@ export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedDept),
     });
-    
+
     return await response.json();
   } catch (error) {
     console.log("Error updating department", error);
@@ -277,10 +277,74 @@ export const extendTaskApi = async (taskId, newStartDate) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, newStartDate }),
     });
-    
+
     return await response.json();
   } catch (error) {
     console.log("Error extending task", error);
+    return null;
+  }
+};
+
+// =======================================================
+// 9️⃣ FETCH MACHINES
+// =======================================================
+export const fetchMachinesApi = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/machines`);
+    return await response.json();
+  } catch (error) {
+    console.log("Error fetching machines", error);
+    return [];
+  }
+};
+
+// =======================================================
+// 🔟 CREATE MACHINE
+// =======================================================
+export const createMachineApi = async (newMachine) => {
+  try {
+    const response = await fetch(`${BASE_URL}/machines`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newMachine),
+    });
+
+    return await response.json();
+  } catch (error) {
+    console.log("Error creating machine", error);
+    return null;
+  }
+};
+
+// =======================================================
+// 1️⃣1️⃣ UPDATE MACHINE
+// =======================================================
+export const updateMachineApi = async ({ id, updatedMachine }) => {
+  try {
+    const response = await fetch(`${BASE_URL}/machines/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedMachine),
+    });
+
+    return await response.json();
+  } catch (error) {
+    console.log("Error updating machine", error);
+    return null;
+  }
+};
+
+// =======================================================
+// 1️⃣2️⃣ DELETE MACHINE
+// =======================================================
+export const deleteMachineApi = async (id) => {
+  try {
+    await fetch(`${BASE_URL}/machines/${id}`, {
+      method: "DELETE",
+    });
+    return id;
+  } catch (error) {
+    console.log("Error deleting machine", error);
     return null;
   }
 };
