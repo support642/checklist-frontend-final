@@ -873,15 +873,17 @@ useEffect(() => {
 const handleEditUser = (userId) => {
   const user = userData.find(u => u.id === userId);
   // Try to find the department record to pre-fill unit and division
-  const deptRecord = department?.find(d => d.department === user.user_access);
+  const deptName = (user?.user_access || user?.department)?.split(',')[0]?.trim();
+  const deptRecord = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
+  
   setUserForm({
     username: user.user_name,
     email: user.email_id,
     password: user.password || '',
     phone: user.number,
-    unit: deptRecord?.unit || '',
-    division: deptRecord?.division || '',
-    department: user.user_access || '',
+    unit: user?.unit || deptRecord?.unit || '',
+    division: user?.division || deptRecord?.division || '',
+    department: user?.department || user?.user_access || '',
     role: user.role,
     status: user.status
   });
