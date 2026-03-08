@@ -71,9 +71,8 @@ const Setting = () => {
 
   // Hierarchical machine form state for Create New Machine
   const [newMachineName, setNewMachineName] = useState('');
-  const [newMachineParts, setNewMachineParts] = useState([
-    { part_name: '', machine_area: '' }
-  ]);
+  const [newMachineArea, setNewMachineArea] = useState('');
+  const [newMachineParts, setNewMachineParts] = useState([{ part_name: '' }]);
   
   
   const { userData, department, departmentsOnly, givenBy, machines, loading, error } = useSelector((state) => state.setting);
@@ -1004,18 +1003,24 @@ const resetUserForm = () => {
         alert('Please enter a machine name.');
         return;
       }
-      const validParts = newMachineParts.filter(p => p.part_name.trim() || p.machine_area.trim());
-      if (validParts.length === 0) {
-        alert('Please add at least one part.');
+      if (!newMachineArea.trim()) {
+        alert('Please enter a machine area.');
         return;
       }
-      for (const part of validParts) {
-        await dispatch(createMachineThunk({
-          machine_name: newMachineName.trim(),
-          part_name: part.part_name.trim(),
-          machine_area: part.machine_area.trim()
-        })).unwrap();
+      const validParts = newMachineParts.filter(p => p.part_name.trim());
+      if (validParts.length === 0) {
+        alert('Please add at least one part name.');
+        return;
       }
+      
+      const payload = {
+        machine_name: newMachineName.trim(),
+        machine_area: newMachineArea.trim(),
+        parts: validParts.map(p => ({ part_name: p.part_name.trim() }))
+      };
+
+      await dispatch(createMachineThunk(payload)).unwrap();
+      
       resetMachineForm();
       setShowMachineModal(false);
       dispatch(machineDetails());
@@ -1061,7 +1066,8 @@ const resetUserForm = () => {
   const resetMachineForm = () => {
     setMachineForm({ machine_name: '', part_name: '', machine_area: '' });
     setNewMachineName('');
-    setNewMachineParts([{ part_name: '', machine_area: '' }]);
+    setNewMachineArea('');
+    setNewMachineParts([{ part_name: '' }]);
     setIsEditingMachine(false);
     setCurrentMachineId(null);
   };
@@ -1076,7 +1082,7 @@ const resetUserForm = () => {
   };
 
   const addPartRow = () => {
-    setNewMachineParts(prev => [...prev, { part_name: '', machine_area: '' }]);
+    setNewMachineParts(prev => [...prev, { part_name: '' }]);
   };
 
   const removePartRow = (index) => {
@@ -1515,14 +1521,16 @@ const resetUserForm = () => {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div><span className="text-gray-500">Email:</span> <span className="font-medium">{user?.email_id || "—"}</span></div>
                 <div><span className="text-gray-500">Phone:</span> <span className="font-medium">{user?.number || "—"}</span></div>
-                <div><span className="text-gray-500">Dept:</span> <span className="font-medium">{user?.user_access || "N/A"}</span></div>
+                <div><span className="text-gray-500">Dept:</span> <span className="font-medium">{user?.user_access || user?.department || "N/A"}</span></div>
                 <div><span className="text-gray-500">Unit:</span> <span className="font-medium">{(() => {
-                  const deptName = user?.user_access?.split(',')[0]?.trim();
+                  if (user?.unit) return user.unit;
+                  const deptName = (user?.user_access || user?.department)?.split(',')[0]?.trim();
                   const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
                   return match?.unit || "—";
                 })()}</span></div>
                 <div><span className="text-gray-500">Division:</span> <span className="font-medium">{(() => {
-                  const deptName = user?.user_access?.split(',')[0]?.trim();
+                  if (user?.division) return user.division;
+                  const deptName = (user?.user_access || user?.department)?.split(',')[0]?.trim();
                   const match = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
                   return match?.division || "—";
                 })()}</span></div>
@@ -2173,20 +2181,34 @@ const resetUserForm = () => {
                           </div>
                         </div>
                       ) : (
-                        /* Create mode - machine name + dynamic parts */
+                        /* Create mode - machine name + area + dynamic parts */
                         <div className="space-y-4">
-                          {/* Machine Name - single input */}
-                          <div>
-                            <label htmlFor="new_machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
-                            <input
-                              type="text"
-                              id="new_machine_name"
-                              value={newMachineName}
-                              onChange={(e) => setNewMachineName(e.target.value)}
-                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                              placeholder="Enter machine name"
-                              required
-                            />
+                          {/* Top Level Configuration */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label htmlFor="new_machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
+                              <input
+                                type="text"
+                                id="new_machine_name"
+                                value={newMachineName}
+                                onChange={(e) => setNewMachineName(e.target.value)}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                                placeholder="Enter machine name"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor="new_machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
+                              <input
+                                type="text"
+                                id="new_machine_area"
+                                value={newMachineArea}
+                                onChange={(e) => setNewMachineArea(e.target.value)}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                                placeholder="Enter machine area"
+                                required
+                              />
+                            </div>
                           </div>
 
                           {/* Parts Section */}
@@ -2195,16 +2217,13 @@ const resetUserForm = () => {
 
                             {/* Parts Column Headers */}
                             <div className="grid grid-cols-12 gap-3 mb-2">
-                              <div className="col-span-1">
+                              <div className="col-span-2 sm:col-span-1">
                                 <span className="block text-xs font-semibold text-gray-500 uppercase">#</span>
                               </div>
-                              <div className="col-span-5">
+                              <div className="col-span-8 sm:col-span-10">
                                 <span className="block text-xs font-semibold text-gray-500 uppercase">Part Name</span>
                               </div>
-                              <div className="col-span-5">
-                                <span className="block text-xs font-semibold text-gray-500 uppercase">Machine Area</span>
-                              </div>
-                              <div className="col-span-1">
+                              <div className="col-span-2 sm:col-span-1">
                                 <span className="block text-xs font-semibold text-gray-500 uppercase"></span>
                               </div>
                             </div>
@@ -2214,14 +2233,14 @@ const resetUserForm = () => {
                               {newMachineParts.map((part, index) => (
                                 <div key={index} className="grid grid-cols-12 gap-3 items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
                                   {/* Row Number */}
-                                  <div className="col-span-1 flex items-center justify-center">
+                                  <div className="col-span-2 sm:col-span-1 flex items-center justify-center">
                                     <span className="text-sm font-medium text-gray-500 bg-white w-7 h-7 rounded-full flex items-center justify-center border border-gray-300">
                                       {index + 1}
                                     </span>
                                   </div>
 
                                   {/* Part Name */}
-                                  <div className="col-span-5">
+                                  <div className="col-span-8 sm:col-span-10">
                                     <input
                                       type="text"
                                       value={part.part_name}
@@ -2231,19 +2250,8 @@ const resetUserForm = () => {
                                     />
                                   </div>
 
-                                  {/* Machine Area */}
-                                  <div className="col-span-5">
-                                    <input
-                                      type="text"
-                                      value={part.machine_area}
-                                      onChange={(e) => handlePartRowChange(index, 'machine_area', e.target.value)}
-                                      placeholder="Enter Machine Area"
-                                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                                    />
-                                  </div>
-
                                   {/* Remove Part Button */}
-                                  <div className="col-span-1 flex items-center justify-center">
+                                  <div className="col-span-2 sm:col-span-1 flex items-center justify-center">
                                     {newMachineParts.length > 1 && (
                                       <button
                                         type="button"

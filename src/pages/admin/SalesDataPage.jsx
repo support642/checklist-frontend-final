@@ -1832,7 +1832,7 @@ const submissionData = await Promise.all(
                                   setMaintRemarksData(prev => { const d = {...prev}; delete d[item.task_id]; return d; });
                                 }
                               }}
-                              className="border border-gray-300 rounded-md px-2 py-1 flex w-full min-w-24 disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm"
+                              className="border border-gray-300 rounded-md px-2 py-1 flex w-full min-w-[100px] disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm"
                             >
                               <option value="">Select...</option>
                               <option value="Yes">Yes</option>
@@ -2181,7 +2181,7 @@ const submissionData = await Promise.all(
                                   });
                                 }
                               }}
-                              className="border border-gray-300 rounded-md px-2 py-1 w-full disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm"
+                              className="border border-gray-300 rounded-md px-2 py-1 w-full min-w-[100px] disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm"
                             >
                               <option value="">Select...</option>
                               <option value="Yes">Yes</option>
