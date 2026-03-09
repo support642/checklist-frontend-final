@@ -69,6 +69,9 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
     setEditingTaskId(task.task_id);
     setEditFormData({
       task_id: task.task_id,
+      department: task.department || '',
+      unit: task.unit || '',
+      division: task.division || '',
       task_description: task.task_description || '',
       machine_name: task.machine_name || '',
       part_name: task.part_name || '',

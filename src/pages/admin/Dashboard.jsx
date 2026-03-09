@@ -26,6 +26,7 @@ import {
   getChecklistDateRangeStatsApi
 } from "../../redux/api/dashboardApi.js"
 import { fetchDepartmentDataApi } from "../../redux/api/settingApi.js"
+import MaintenanceView from "../../components/Maintenance/MaintenanceView.jsx"
 import { fetchDelegationDataSortByDate } from "../../redux/api/delegationApi.js"
 
 export default function AdminDashboard() {
@@ -123,8 +124,10 @@ useEffect(() => {
         setIsLoadingMore(true);
 
         if (dashboardType === "checklist") {
+          const userAccess = localStorage.getItem("user_access") || "";
+          
           // Use the new date range API for checklist
-          const filteredData = await fetchChecklistDataByDateRangeApi(
+          let filteredData = await fetchChecklistDataByDateRangeApi(
             startDate,
             endDate,
             dashboardStaffFilter,
@@ -134,7 +137,7 @@ useEffect(() => {
           );
 
           // Also get statistics for the date range
-          const stats = await getChecklistDateRangeStatsApi(
+          let stats = await getChecklistDateRangeStatsApi(
             startDate,
             endDate,
             dashboardStaffFilter,
@@ -142,6 +145,17 @@ useEffect(() => {
             unitFilter,
             divisionFilter
           );
+
+          // Admin-level restrictions if filter is "all"
+          const userRole = localStorage.getItem("role");
+          const userDepartments = userAccess ? userAccess.split(',').map(dept => dept.trim().toLowerCase()) : [];
+          
+          if (userRole === "admin" && userDepartments.length > 0) {
+              filteredData = filteredData.filter(task => {
+                  const taskDept = (task.department || "").toLowerCase().trim();
+                  return userDepartments.includes(taskDept);
+              });
+          }
 
           // Process the filtered data
           processFilteredData(filteredData, stats);
@@ -178,8 +192,20 @@ useEffect(() => {
   const processFilteredData = (data, stats) => {
     const username = localStorage.getItem("user-name");
     const userRole = localStorage.getItem("role");
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
+    const todayInProcess = new Date();
+    todayInProcess.setHours(23, 59, 59, 999);
+
+    // Admin-level restrictions: Filter data by department
+    const userAccess = localStorage.getItem("user_access") || "";
+    const userDepartments = userAccess ? userAccess.split(',').map(dept => dept.trim().toLowerCase()) : [];
+    
+    let filteredData = data;
+    if (userRole === "admin" && userDepartments.length > 0) {
+      filteredData = data.filter(task => {
+        const taskDept = (task.department || "").toLowerCase().trim();
+        return userDepartments.includes(taskDept);
+      });
+    }
 
     let totalTasks = 0;
     let completedTasks = 0;
@@ -202,7 +228,7 @@ useEffect(() => {
     };
 
     // Process tasks
-    const processedTasks = data
+    const processedTasks = filteredData
       .map((task) => {
         // Skip if not assigned to current user (for non-admin)
         if ((userRole !== "admin" && userRole !== "super_admin") && task.name?.toLowerCase() !== username?.toLowerCase()) {
@@ -232,7 +258,7 @@ useEffect(() => {
             }
 
             // Overdue tasks for checklist: past tasks with status not 'Yes'
-            if (taskStartDate && taskStartDate < today && task.status !== 'Yes') {
+            if (taskStartDate && taskStartDate < todayInProcess && task.status !== 'Yes') {
               overdueTasks++;
             }
           } else {
@@ -241,7 +267,7 @@ useEffect(() => {
               completedTasks++;
             } else {
               pendingTasks++;
-              if (taskStartDate && taskStartDate < today) {
+              if (taskStartDate && taskStartDate < todayInProcess) {
                 overdueTasks++;
               }
             }
@@ -553,10 +579,19 @@ useEffect(() => {
         Dec: { completed: 0, pending: 0 },
       }
 
-      // FIRST: Filter data by dashboard type - REMOVE this filter for checklist to include all tasks
-      let filteredData = data
+      // Admin-level restrictions: Filter data by department
+      const userAccess = localStorage.getItem("user_access") || "";
+      const userDepartments = userAccess ? userAccess.split(',').map(dept => dept.trim().toLowerCase()) : [];
+      
+      let filteredData = data;
+      if (userRole === "admin" && userDepartments.length > 0) {
+        filteredData = data.filter(task => {
+          const taskDept = (task.department || "").toLowerCase().trim();
+          return userDepartments.includes(taskDept);
+        });
+      }
 
-      // Extract unique staff names for the dropdown BEFORE staff filtering
+      // Extract unique staff names for the dropdown from the filtered data
       let uniqueStaff;
 
       if (dashboardType === 'checklist' && departmentFilter !== 'all') {
@@ -565,20 +600,27 @@ useEffect(() => {
           uniqueStaff = await getStaffNamesByDepartmentApi(departmentFilter);
         } catch (error) {
           console.error('Error fetching staff by department:', error);
-          uniqueStaff = [...new Set(data.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+          uniqueStaff = [...new Set(filteredData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
         }
       } else if (dashboardType === 'delegation') {
         // For delegation, fetch all delegation tasks from existing API and extract staff names
         try {
           const delegationData = await fetchDelegationDataSortByDate();
-          uniqueStaff = [...new Set(delegationData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+          let filteredDelegation = delegationData;
+          if (userRole === "admin" && userDepartments.length > 0) {
+            filteredDelegation = delegationData.filter(task => {
+              const taskDept = (task.department || "").toLowerCase().trim();
+              return userDepartments.includes(taskDept);
+            });
+          }
+          uniqueStaff = [...new Set(filteredDelegation.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
         } catch (error) {
           console.error('Error fetching staff from delegation:', error);
-          uniqueStaff = [...new Set(data.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+          uniqueStaff = [...new Set(filteredData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
         }
       } else {
         // Default behavior - extract from task data
-        uniqueStaff = [...new Set(data.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+        uniqueStaff = [...new Set(filteredData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
       }
 
       // For non-admin users, always ensure current user appears in staff dropdown
@@ -1092,84 +1134,144 @@ useEffect(() => {
   // const notDoneTask = (displayStats.totalTasks || 0) - (displayStats.completedTasks || 0);
   const notDoneTask = useSelector((state) => state.dashBoard.notDoneTask);
 
+  // Persistence for active module tab
+  const [activeModule, setActiveModule] = useState(() => {
+    return localStorage.getItem("admin_dashboard_active_module") || "checklist";
+  });
+
+  const handleModuleChange = (module) => {
+    setActiveModule(module);
+    localStorage.setItem("admin_dashboard_active_module", module);
+  };
+
   return (
     <AdminLayout>
-
-      
       <div className="space-y-6">
-        <DashboardHeader
-          dashboardType={dashboardType}
-          setDashboardType={setDashboardType}
-          dashboardStaffFilter={dashboardStaffFilter}
-          setDashboardStaffFilter={setDashboardStaffFilter}
-          availableStaff={availableStaff}
-          userRole={userRole}
-          username={username}
-          departmentFilter={departmentFilter}
-          setDepartmentFilter={setDepartmentFilter}
-          availableDepartments={availableDepartments}
-          unitFilter={unitFilter}
-          setUnitFilter={setUnitFilter}
-          availableUnits={availableUnits}
-          divisionFilter={divisionFilter}
-          setDivisionFilter={setDivisionFilter}
-          availableDivisions={availableDivisions}
-          isLoadingMore={isLoadingMore}
-          onDateRangeChange={handleDateRangeChange} // Add this prop
-        />
+        {/* Top Level Module Switcher (Segmented Control) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-2">
+          <div className="flex items-center gap-2">
+             {/* Left side empty or logo space */}
+          </div>
 
-        <StatisticsCards
-          totalTask={displayStats.totalTasks}
-          completeTask={displayStats.completedTasks}
-          pendingTask={displayStats.pendingTasks}
-          overdueTask={displayStats.overdueTasks}
-          notDoneTask={notDoneTask}
-          dashboardType={dashboardType}
-          dateRange={dateRange.filtered ? dateRange : null}
-          dashboardStaffFilter={dashboardStaffFilter}
-          allStaffTasks={departmentData.allTasks}
-        />
+          <div className="flex p-1 bg-white rounded-2xl border border-white-100 dark:border-white-800 shadow-sm">
+            <button
+              onClick={() => handleModuleChange("checklist")}
+              className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeModule === "checklist"
+                  ? "bg-blue-600 text-white shadow-lg scale-105"
+                  : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+              }`}
+            >
+              <i className="fas fa-clipboard-list h-4 w-4" />
+              Checklist
+            </button>
+            <button
+              onClick={() => handleModuleChange("maintenance")}
+              className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeModule === "maintenance"
+                  ? "bg-blue-600 text-white shadow-lg scale-105"
+                  : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+              }`}
+            >
+              <i className="fas fa-tools h-4 w-4" />
+              Maintenance
+            </button>
+          </div>
+          
+          <div className="hidden sm:block">
+             {/* Spacing or other admin info */}
+          </div>
+        </div>
 
-        <TaskNavigationTabs
-          taskView={taskView}
-          setTaskView={setTaskView}
-          dashboardType={dashboardType}
-          dashboardStaffFilter={dashboardStaffFilter}
-          departmentFilter={departmentFilter}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          filterStaff={filterStaff}
-          setFilterStaff={setFilterStaff}
-          departmentData={departmentData}
-          getTasksByView={getTasksByView}
-          getFrequencyColor={getFrequencyColor}
-          isLoadingMore={isLoadingMore}
-          hasMoreData={hasMoreData}
-          username={username}
-          userRole={userRole}
-          onTaskComplete={() => {
-            // Trigger refresh
-            setCurrentPage(1)
-            fetchDepartmentData(1, false)
-          }}
-        />
+        {/* Dashboard Title below switcher - only for Maintenance since Checklist has its own */}
+        {activeModule === "maintenance" && (
+          <div className="mt-4">
+            <h1 className="text-2xl font-black tracking-tight text-purple-600 dark:text-purple-400">
+              Dashboard
+            </h1>
+          </div>
+        )}
 
-        {activeTab === "overview" && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-purple-200 shadow-md bg-white">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
-                <h3 className="text-purple-700 font-medium">Staff Task Summary</h3>
-                <p className="text-purple-600 text-sm">Overview of tasks assigned to each staff member</p>
+        {activeModule === "checklist" ? (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <DashboardHeader
+              dashboardType={dashboardType}
+              setDashboardType={setDashboardType}
+              dashboardStaffFilter={dashboardStaffFilter}
+              setDashboardStaffFilter={setDashboardStaffFilter}
+              availableStaff={availableStaff}
+              userRole={userRole}
+              username={username}
+              departmentFilter={departmentFilter}
+              setDepartmentFilter={setDepartmentFilter}
+              availableDepartments={availableDepartments}
+              unitFilter={unitFilter}
+              setUnitFilter={setUnitFilter}
+              availableUnits={availableUnits}
+              divisionFilter={divisionFilter}
+              setDivisionFilter={setDivisionFilter}
+              availableDivisions={availableDivisions}
+              isLoadingMore={isLoadingMore}
+              onDateRangeChange={handleDateRangeChange}
+            />
+
+            <StatisticsCards
+              totalTask={displayStats.totalTasks}
+              completeTask={displayStats.completedTasks}
+              pendingTask={displayStats.pendingTasks}
+              overdueTask={displayStats.overdueTasks}
+              notDoneTask={notDoneTask}
+              dashboardType={dashboardType}
+              dateRange={dateRange.filtered ? dateRange : null}
+              dashboardStaffFilter={dashboardStaffFilter}
+              allStaffTasks={departmentData.allTasks}
+            />
+
+            <TaskNavigationTabs
+              taskView={taskView}
+              setTaskView={setTaskView}
+              dashboardType={dashboardType}
+              dashboardStaffFilter={dashboardStaffFilter}
+              departmentFilter={departmentFilter}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              filterStaff={filterStaff}
+              setFilterStaff={setFilterStaff}
+              departmentData={departmentData}
+              getTasksByView={getTasksByView}
+              getFrequencyColor={getFrequencyColor}
+              isLoadingMore={isLoadingMore}
+              hasMoreData={hasMoreData}
+              username={username}
+              userRole={userRole}
+              onTaskComplete={() => {
+                setCurrentPage(1)
+                fetchDepartmentData(1, false)
+              }}
+            />
+
+            {activeTab === "overview" && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-purple-200 shadow-md bg-white">
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">
+                    <h3 className="text-purple-700 font-medium">Staff Task Summary</h3>
+                    <p className="text-purple-600 text-sm">Overview of tasks assigned to each staff member</p>
+                  </div>
+                  <div className="p-4">
+                    <StaffTasksTable
+                      dashboardType={dashboardType}
+                      dashboardStaffFilter={dashboardStaffFilter}
+                      departmentFilter={departmentFilter}
+                      parseTaskStartDate={parseTaskStartDate}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="p-4">
-                <StaffTasksTable
-                  dashboardType={dashboardType}
-                  dashboardStaffFilter={dashboardStaffFilter}
-                  departmentFilter={departmentFilter}
-                  parseTaskStartDate={parseTaskStartDate}
-                />
-              </div>
-            </div>
+            )}
+          </div>
+        ) : (
+          <div className="animate-in fade-in duration-500">
+            <MaintenanceView />
           </div>
         )}
       </div>

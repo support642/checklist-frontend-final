@@ -1,19 +1,17 @@
-"use client"
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
-import { useState } from "react"
-import { Link } from "react-router-dom"
-
-const UserDashboard = () => {
-  const [taskView, setTaskView] = useState("recent")
-  const [activeTab, setActiveTab] = useState("tasks")
+const ChecklistView = () => {
+  const [taskView, setTaskView] = useState("recent");
+  const [activeTab, setActiveTab] = useState("tasks");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <h1 className="text-2xl font-bold tracking-tight text-green-700 dark:text-green-400">My Dashboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-purple-500">Dashboard</h1>
         <Link
           to="/user/tasks"
-          className="btn btn-primary bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
+          className="btn btn-primary bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white shadow-md"
         >
           View All Tasks
         </Link>
@@ -65,12 +63,11 @@ const UserDashboard = () => {
         </div>
       </div>
 
-      {/* Task Navigation Tabs */}
-      <div className="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+      <div className="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
         <div className="grid grid-cols-3">
           <button
             className={`py-3 text-center font-medium transition-colors ${taskView === "recent"
-              ? "bg-blue-600 text-white"
+              ? "bg-blue-600 text-white shadow-inner"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
             onClick={() => setTaskView("recent")}
@@ -79,7 +76,7 @@ const UserDashboard = () => {
           </button>
           <button
             className={`py-3 text-center font-medium transition-colors ${taskView === "upcoming"
-              ? "bg-blue-600 text-white"
+              ? "bg-blue-600 text-white shadow-inner"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
             onClick={() => setTaskView("upcoming")}
@@ -88,7 +85,7 @@ const UserDashboard = () => {
           </button>
           <button
             className={`py-3 text-center font-medium transition-colors ${taskView === "overdue"
-              ? "bg-blue-600 text-white"
+              ? "bg-blue-600 text-white shadow-inner"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
             onClick={() => setTaskView("overdue")}
@@ -97,24 +94,24 @@ const UserDashboard = () => {
           </button>
         </div>
 
-        <div className="p-4">
+        <div className="p-4 bg-white dark:bg-gray-950">
           {taskView === "recent" && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
               <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Recently Assigned Tasks</h3>
               <TasksList filter="recent" />
             </div>
           )}
 
           {taskView === "upcoming" && (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
               <h3 className="text-lg font-medium text-blue-700 dark:text-blue-300">Upcoming Tasks</h3>
               <TasksList filter="upcoming" />
             </div>
           )}
 
           {taskView === "overdue" && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-red-700 dark:text-red-300">Overdue Tasks</h3>
+            <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
+              <h3 className="text-lg font-medium text-red-700 dark:text-green-300">Overdue Tasks</h3>
               <TasksList filter="overdue" />
             </div>
           )}
@@ -124,8 +121,8 @@ const UserDashboard = () => {
       <div className="space-y-4">
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
-            className={`py-2 px-4 font-medium ${activeTab === "tasks"
-              ? "border-b-2 border-green-600 text-green-600 dark:text-green-400"
+            className={`py-2 px-4 font-medium transition-all ${activeTab === "tasks"
+              ? "border-b-2 border-green-600 text-green-600 dark:text-green-400 bg-green-50/50 dark:bg-green-900/10"
               : "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
             onClick={() => setActiveTab("tasks")}
@@ -133,8 +130,8 @@ const UserDashboard = () => {
             My Tasks
           </button>
           <button
-            className={`py-2 px-4 font-medium ${activeTab === "overview"
-              ? "border-b-2 border-green-600 text-green-600 dark:text-green-400"
+            className={`py-2 px-4 font-medium transition-all ${activeTab === "overview"
+              ? "border-b-2 border-green-600 text-green-600 dark:text-green-400 bg-green-50/50 dark:bg-green-900/10"
               : "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
               }`}
             onClick={() => setActiveTab("overview")}
@@ -144,25 +141,25 @@ const UserDashboard = () => {
         </div>
 
         {activeTab === "tasks" && (
-          <div className="card border-green-200 dark:border-green-800 shadow-md">
+          <div className="card border-green-200 dark:border-green-800 shadow-md animate-in fade-in duration-300">
             <div className="card-header bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950">
               <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Pending Tasks</h3>
               <p className="text-sm text-green-600 dark:text-green-400">Tasks that require your attention</p>
             </div>
-            <div className="card-body">
+            <div className="card-body bg-white dark:bg-gray-950">
               <TasksList />
             </div>
           </div>
         )}
 
         {activeTab === "overview" && (
-          <div className="card border-green-200 dark:border-green-800 shadow-md">
+          <div className="card border-green-200 dark:border-green-800 shadow-md animate-in fade-in duration-300">
             <div className="card-header bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950">
               <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Task Completion</h3>
               <p className="text-sm text-green-600 dark:text-green-400">Your task completion over time</p>
             </div>
-            <div className="card-body">
-              <div className="h-[350px] w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-md">
+            <div className="card-body bg-white dark:bg-gray-950">
+              <div className="h-[350px] w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-md border border-dashed border-gray-300">
                 <p className="text-gray-500 dark:text-gray-400">Task completion chart would be displayed here</p>
               </div>
             </div>
@@ -170,10 +167,10 @@ const UserDashboard = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-// Simple TasksList component
+// Internal TasksList component (moved from UserDashboard.jsx)
 const TasksList = ({ filter }) => {
   const tasks = [
     {
@@ -200,17 +197,16 @@ const TasksList = ({ filter }) => {
       frequency: "monthly",
       completed: false,
     },
-  ]
+  ];
 
-  // Filter tasks based on the filter prop
   const filteredTasks = filter
     ? tasks.filter((task) => {
-      if (filter === "recent") return true // Show all for demo
-      if (filter === "upcoming") return !task.completed
-      if (filter === "overdue") return false // No overdue tasks in this demo
-      return true
+      if (filter === "recent") return true;
+      if (filter === "upcoming") return !task.completed;
+      if (filter === "overdue") return false;
+      return true;
     })
-    : tasks
+    : tasks;
 
   return (
     <div className="space-y-4">
@@ -223,7 +219,7 @@ const TasksList = ({ filter }) => {
           <div
             key={task.id}
             className={`card ${task.completed ? "opacity-60" : ""} border-l-4 ${task.completed ? "border-l-green-500" : "border-l-blue-500"
-              } transition-all hover:shadow-md`}
+              } transition-all hover:shadow-md cursor-default`}
           >
             <div className="p-4 pb-2 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 border-b border-blue-200 dark:border-blue-800">
               <div className="flex items-center justify-between">
@@ -245,15 +241,14 @@ const TasksList = ({ filter }) => {
               </div>
               <p className="text-sm text-blue-600 dark:text-blue-400">Due: {task.dueDate}</p>
             </div>
-            <div className="p-4">
+            <div className="p-4 bg-white dark:bg-gray-950">
               <p className="text-sm text-gray-600 dark:text-gray-300">{task.description}</p>
             </div>
           </div>
         ))
       )}
     </div>
-  )
-}
+  );
+};
 
-export default UserDashboard
-
+export default ChecklistView;

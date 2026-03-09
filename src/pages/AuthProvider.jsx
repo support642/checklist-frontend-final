@@ -5,7 +5,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "r
 import LoginPage from "./pages/LoginPage"
 import AdminDashboard from "./pages/admin/Dashboard"
 import AdminAssignTask from "./pages/admin/AssignTask"
-import UserDashboard from "./pages/user/Dashboard"
+import UserDashboard from "./pages/user/UserDashboard"
 import UserTasks from "./pages/user/Tasks"
 import AdminLayout from "./components/layout/AdminLayout"
 import UserLayout from "./components/layout/UserLayout"

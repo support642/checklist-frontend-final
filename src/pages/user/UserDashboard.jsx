@@ -1,0 +1,104 @@
+import React, { useState, useEffect } from "react";
+import ChecklistView from "../../components/Checklist/ChecklistView";
+import MaintenanceView from "../../components/Maintenance/MaintenanceView";
+import { LayoutDashboard, Tool, Building2 } from "lucide-react";
+
+const UserDashboard = () => {
+  // Persistence for active module tab
+  const [activeModule, setActiveModule] = useState(() => {
+    return localStorage.getItem("user_dashboard_active_module") || "checklist";
+  });
+  
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [userDepartments, setUserDepartments] = useState([]);
+
+  const userRole = localStorage.getItem("role");
+  const userAccess = localStorage.getItem("user_access") || "";
+
+  // Handle department prefill for admins
+  useEffect(() => {
+    const depts = userAccess 
+      ? userAccess.split(',').map(dept => dept.trim()) 
+      : [];
+    setUserDepartments(depts);
+
+    if (userRole === "admin" && depts.length > 0) {
+      // Prefill with the first assigned department if not already set or if 'all' isn't explicitly wanted
+      // In User dashboard, restricted admins should focus on their dept
+      setDepartmentFilter(depts[0]);
+    }
+  }, [userRole, userAccess]);
+
+  const handleModuleChange = (module) => {
+    setActiveModule(module);
+    localStorage.setItem("user_dashboard_active_module", module);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Level Module Switcher (Segmented Control) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-blue-600 rounded-lg shadow-md">
+            <LayoutDashboard className="h-5 w-5 text-white" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">TaskDesk</h1>
+        </div>
+
+        <div className="flex p-1 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+          <button
+            onClick={() => handleModuleChange("checklist")}
+            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+              activeModule === "checklist"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+            }`}
+          >
+            <Building2 className="h-4 w-4" />
+            Checklist
+          </button>
+          <button
+            onClick={() => handleModuleChange("maintenance")}
+            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+              activeModule === "maintenance"
+                ? "bg-blue-600 text-white shadow-lg scale-105"
+                : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+            }`}
+          >
+             <i className="fas fa-tools h-4 w-4" />
+            Maintenance
+          </button>
+        </div>
+      </div>
+
+      {/* Dashboard Title below switcher - only for Maintenance since Checklist has its own */}
+      {activeModule === "maintenance" && (
+        <div className="mt-4 flex items-center justify-between">
+          <h1 className="text-2xl font-black tracking-tight text-purple-600 dark:text-purple-400">
+            Dashboard
+          </h1>
+        </div>
+      )}
+
+      {/* Dynamic Department Indicator for Admins */}
+      {userRole === "admin" && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-full w-fit">
+          <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">Dept:</span>
+          <span className="text-xs font-medium text-amber-800 dark:text-amber-300">{departmentFilter}</span>
+        </div>
+      )}
+
+      {/* Main Module Content */}
+      <div className="mt-6">
+        {activeModule === "checklist" ? (
+          <ChecklistView />
+        ) : (
+          <MaintenanceView />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default UserDashboard;
+

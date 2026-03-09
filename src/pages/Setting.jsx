@@ -61,18 +61,14 @@ const Setting = () => {
 
   // Machine Management State
   const [showMachineModal, setShowMachineModal] = useState(false);
-  const [isEditingMachine, setIsEditingMachine] = useState(false);
-  const [currentMachineId, setCurrentMachineId] = useState(null);
   const [machineForm, setMachineForm] = useState({
     machine_name: '',
     part_name: '',
     machine_area: ''
   });
 
-  // Hierarchical machine form state for Create New Machine
-  const [newMachineName, setNewMachineName] = useState('');
-  const [newMachineArea, setNewMachineArea] = useState('');
-  const [newMachineParts, setNewMachineParts] = useState([{ part_name: '' }]);
+  const [isEditingMachine, setIsEditingMachine] = useState(false);
+  const [currentMachineId, setCurrentMachineId] = useState(null);
   
   
   const { userData, department, departmentsOnly, givenBy, machines, loading, error } = useSelector((state) => state.setting);
@@ -1001,28 +997,7 @@ const resetUserForm = () => {
   const handleAddMachine = async (e) => {
     e.preventDefault();
     try {
-      if (!newMachineName.trim()) {
-        alert('Please enter a machine name.');
-        return;
-      }
-      if (!newMachineArea.trim()) {
-        alert('Please enter a machine area.');
-        return;
-      }
-      const validParts = newMachineParts.filter(p => p.part_name.trim());
-      if (validParts.length === 0) {
-        alert('Please add at least one part name.');
-        return;
-      }
-      
-      const payload = {
-        machine_name: newMachineName.trim(),
-        machine_area: newMachineArea.trim(),
-        parts: validParts.map(p => ({ part_name: p.part_name.trim() }))
-      };
-
-      await dispatch(createMachineThunk(payload)).unwrap();
-      
+      await dispatch(createMachineThunk(machineForm)).unwrap();
       resetMachineForm();
       setShowMachineModal(false);
       dispatch(machineDetails());
@@ -1033,14 +1008,16 @@ const resetUserForm = () => {
 
   const handleEditMachine = (machineId) => {
     const machine = machines.find(m => m.id === machineId);
-    setMachineForm({
-      machine_name: machine.machine_name || '',
-      part_name: machine.part_name || '',
-      machine_area: machine.machine_area || ''
-    });
-    setCurrentMachineId(machineId);
-    setIsEditingMachine(true);
-    setShowMachineModal(true);
+    if (machine) {
+      setMachineForm({
+        machine_name: machine.machine_name || '',
+        part_name: machine.part_name || '',
+        machine_area: machine.machine_area || ''
+      });
+      setCurrentMachineId(machineId);
+      setIsEditingMachine(true);
+      setShowMachineModal(true);
+    }
   };
 
   const handleUpdateMachine = async (e) => {
@@ -1067,36 +1044,27 @@ const resetUserForm = () => {
 
   const resetMachineForm = () => {
     setMachineForm({ machine_name: '', part_name: '', machine_area: '' });
-    setNewMachineName('');
-    setNewMachineArea('');
-    setNewMachineParts([{ part_name: '' }]);
     setIsEditingMachine(false);
     setCurrentMachineId(null);
+    setShowMachineModal(false); // Restore showMachineModal state
   };
-
-  // Machine part row handlers
-  const handlePartRowChange = (index, field, value) => {
-    setNewMachineParts(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
-  };
-
-  const addPartRow = () => {
-    setNewMachineParts(prev => [...prev, { part_name: '' }]);
-  };
-
-  const removePartRow = (index) => {
-    if (newMachineParts.length === 1) return;
-    setNewMachineParts(prev => prev.filter((_, i) => i !== index));
-  };
-
 
   // Add this filtered users calculation for leave tab
-  const filteredLeaveUsers = userData?.filter(user =>
-    !leaveUsernameFilter || user.user_name.toLowerCase().includes(leaveUsernameFilter.toLowerCase())
-  );
+  const filteredLeaveUsers = userData?.filter(user => {
+    const matchesSearch = !leaveUsernameFilter || user.user_name.toLowerCase().includes(leaveUsernameFilter.toLowerCase());
+    
+    // Admin department filtering
+    const userRole = localStorage.getItem('role');
+    const userAccess = localStorage.getItem('user_access') || '';
+    const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+    
+    if (userRole === 'admin' && userDepartments.length > 0) {
+      const uDept = (user.user_access || user.department || '').split(',')[0].trim().toLowerCase();
+      return matchesSearch && userDepartments.includes(uDept);
+    }
+    
+    return matchesSearch;
+  });
 
 
   const getStatusColor = (status) => {
@@ -1493,9 +1461,22 @@ const resetUserForm = () => {
     <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
       {/* Mobile Card View */}
       <div className="sm:hidden space-y-3 p-3">
-        {userData
-          ?.filter(user => !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase()))
-          .map((user, index) => (
+        {(() => {
+          const userRole = localStorage.getItem('role');
+          const userAccess = localStorage.getItem('user_access') || '';
+          const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+          
+          let displayedUsers = userData;
+          if (userRole === 'admin' && userDepartments.length > 0) {
+            displayedUsers = userData?.filter(u => {
+              const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
+              return userDepartments.includes(uDept);
+            });
+          }
+          
+          return displayedUsers
+            ?.filter(user => !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase()))
+            .map((user, index) => (
             <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2">
@@ -1538,7 +1519,8 @@ const resetUserForm = () => {
                 })()}</span></div>
               </div>
             </div>
-          ))}
+          ));
+        })()}
       </div>
 
       {/* Desktop Table View */}
@@ -1579,11 +1561,22 @@ const resetUserForm = () => {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-             {userData
-            ?.filter(user =>
-              !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase())
-            )
-            .map((user, index) => (
+             {(() => {
+                const userRole = localStorage.getItem('role');
+                const userAccess = localStorage.getItem('user_access') || '';
+                const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+                
+                let displayedUsers = userData;
+                if (userRole === 'admin' && userDepartments.length > 0) {
+                  displayedUsers = userData?.filter(u => {
+                    const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
+                    return userDepartments.includes(uDept);
+                  });
+                }
+                
+                return displayedUsers
+                  ?.filter(user => !usernameFilter || user.user_name.toLowerCase().includes(usernameFilter.toLowerCase()))
+                  .map((user, index) => (
               <tr key={index} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -1686,7 +1679,8 @@ const resetUserForm = () => {
                   )}
                 </td>
               </tr>
-            ))}
+            ));
+        })()}
         </tbody>
       </table>
     </div>
@@ -2076,40 +2070,51 @@ const resetUserForm = () => {
 
                 {/* Desktop Table View */}
                 <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Name</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Name</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Area</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Name</th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {machines && machines.length > 0 ? (
-                      machines.map((machine) => (
-                        <tr key={machine.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{machine.machine_name || '—'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{machine.part_name || '—'}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{machine.machine_area || '—'}</td>
+                      machines.map((machine, index) => (
+                        <tr key={machine.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm font-medium text-gray-900">{machine.machine_name || '—'}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-600">{machine.machine_area || '—'}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-600">{machine.part_name || '—'}</span>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex space-x-2">
-                              {localStorage.getItem('role') === 'super_admin' && (
-                                <>
-                                  <button onClick={() => handleEditMachine(machine.id)} className="text-blue-600 hover:text-blue-900">
-                                    <Edit size={18} />
-                                  </button>
-                                  <button onClick={() => handleDeleteMachine(machine.id)} className="text-red-600 hover:text-red-900">
-                                    <Trash2 size={18} />
-                                  </button>
-                                </>
-                              )}
+                            <div className="flex justify-end gap-3 text-gray-400">
+                              <button 
+                                onClick={() => handleEditMachine(machine.id)} 
+                                className="hover:text-blue-600 transition-colors"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteMachine(machine.id)} 
+                                className="hover:text-red-600 transition-colors"
+                              >
+                                <Trash2 size={18} />
+                              </button>
                             </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">No machines found</td>
+                        <td colSpan="4" className="px-6 py-10 text-center text-gray-500">
+                          <Settings className="mx-auto h-8 w-8 text-gray-400 mb-2 opacity-50" />
+                          <p className="text-sm">No machines found.</p>
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -2142,147 +2147,41 @@ const resetUserForm = () => {
                   </div>
                   <div className="mt-6">
                     <form onSubmit={isEditingMachine ? handleUpdateMachine : handleAddMachine}>
-                      {isEditingMachine ? (
-                        /* Edit mode - single row form */
-                        <div className="space-y-4">
-                          <div>
-                            <label htmlFor="machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
-                            <input
-                              type="text"
-                              id="machine_name"
-                              name="machine_name"
-                              value={machineForm.machine_name}
-                              onChange={handleMachineInputChange}
-                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                              placeholder="Enter machine name"
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="part_name" className="block text-sm font-medium text-gray-700">Part Name</label>
-                            <input
-                              type="text"
-                              id="part_name"
-                              name="part_name"
-                              value={machineForm.part_name}
-                              onChange={handleMachineInputChange}
-                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                              placeholder="Enter part name"
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
-                            <input
-                              type="text"
-                              id="machine_area"
-                              name="machine_area"
-                              value={machineForm.machine_area}
-                              onChange={handleMachineInputChange}
-                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                              placeholder="Enter machine area"
-                            />
-                          </div>
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
+                          <input
+                            type="text"
+                            id="machine_name"
+                            value={machineForm.machine_name}
+                            onChange={(e) => setMachineForm({ ...machineForm, machine_name: e.target.value })}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                            required
+                          />
                         </div>
-                      ) : (
-                        /* Create mode - machine name + area + dynamic parts */
-                        <div className="space-y-4">
-                          {/* Top Level Configuration */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label htmlFor="new_machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
-                              <input
-                                type="text"
-                                id="new_machine_name"
-                                value={newMachineName}
-                                onChange={(e) => setNewMachineName(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                                placeholder="Enter machine name"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label htmlFor="new_machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
-                              <input
-                                type="text"
-                                id="new_machine_area"
-                                value={newMachineArea}
-                                onChange={(e) => setNewMachineArea(e.target.value)}
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                                placeholder="Enter machine area"
-                                required
-                              />
-                            </div>
-                          </div>
-
-                          {/* Parts Section */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Parts</label>
-
-                            {/* Parts Column Headers */}
-                            <div className="grid grid-cols-12 gap-3 mb-2">
-                              <div className="col-span-2 sm:col-span-1">
-                                <span className="block text-xs font-semibold text-gray-500 uppercase">#</span>
-                              </div>
-                              <div className="col-span-8 sm:col-span-10">
-                                <span className="block text-xs font-semibold text-gray-500 uppercase">Part Name</span>
-                              </div>
-                              <div className="col-span-2 sm:col-span-1">
-                                <span className="block text-xs font-semibold text-gray-500 uppercase"></span>
-                              </div>
-                            </div>
-
-                            {/* Dynamic Part Rows */}
-                            <div className="max-h-[40vh] overflow-y-auto space-y-2">
-                              {newMachineParts.map((part, index) => (
-                                <div key={index} className="grid grid-cols-12 gap-3 items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                  {/* Row Number */}
-                                  <div className="col-span-2 sm:col-span-1 flex items-center justify-center">
-                                    <span className="text-sm font-medium text-gray-500 bg-white w-7 h-7 rounded-full flex items-center justify-center border border-gray-300">
-                                      {index + 1}
-                                    </span>
-                                  </div>
-
-                                  {/* Part Name */}
-                                  <div className="col-span-8 sm:col-span-10">
-                                    <input
-                                      type="text"
-                                      value={part.part_name}
-                                      onChange={(e) => handlePartRowChange(index, 'part_name', e.target.value)}
-                                      placeholder="Enter Part Name"
-                                      className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                                    />
-                                  </div>
-
-                                  {/* Remove Part Button */}
-                                  <div className="col-span-2 sm:col-span-1 flex items-center justify-center">
-                                    {newMachineParts.length > 1 && (
-                                      <button
-                                        type="button"
-                                        onClick={() => removePartRow(index)}
-                                        className="text-red-400 hover:text-red-600 transition-colors"
-                                        title="Remove this part"
-                                      >
-                                        <X size={18} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Add Part Button */}
-                            <div className="mt-3">
-                              <button
-                                type="button"
-                                onClick={addPartRow}
-                                className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
-                              >
-                                <Plus size={16} />
-                                Add Part
-                              </button>
-                            </div>
-                          </div>
+                        <div>
+                          <label htmlFor="machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
+                          <input
+                            type="text"
+                            id="machine_area"
+                            value={machineForm.machine_area}
+                            onChange={(e) => setMachineForm({ ...machineForm, machine_area: e.target.value })}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                            required
+                          />
                         </div>
-                      )}
+                        <div>
+                          <label htmlFor="part_name" className="block text-sm font-medium text-gray-700">Part Name</label>
+                          <input
+                            type="text"
+                            id="part_name"
+                            value={machineForm.part_name}
+                            onChange={(e) => setMachineForm({ ...machineForm, part_name: e.target.value })}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                            required
+                          />
+                        </div>
+                      </div>
                       <div className="mt-6 flex justify-end space-x-3">
                         <button
                           type="button"
@@ -2295,7 +2194,6 @@ const resetUserForm = () => {
                           type="submit"
                           className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                         >
-                          <Save size={18} className="mr-2" />
                           {isEditingMachine ? 'Update' : 'Save'}
                         </button>
                       </div>
@@ -2931,11 +2829,27 @@ const resetUserForm = () => {
                         >
                           <option value="">Select a doer...</option>
                           {doerName && doerName.length > 0 ? (
-                            doerName.map((name, index) => (
-                              <option key={index} value={name}>
-                                {name}
-                              </option>
-                            ))
+                            doerName
+                              .filter(name => {
+                                const userRole = localStorage.getItem('role');
+                                const userAccess = localStorage.getItem('user_access') || '';
+                                const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+                                if (userRole === 'admin' && userDepartments.length > 0) {
+                                  // find user object by name to check department
+                                  const user = userData?.find(u => u.user_name === name);
+                                  if (user) {
+                                    const uDept = (user.user_access || user.department || '').split(',')[0].trim().toLowerCase();
+                                    return userDepartments.includes(uDept);
+                                  }
+                                  return false;
+                                }
+                                return true;
+                              })
+                              .map((name, index) => (
+                                <option key={index} value={name}>
+                                  {name}
+                                </option>
+                              ))
                           ) : (
                             <option value="" disabled>No doers available</option>
                           )}
@@ -3076,12 +2990,23 @@ const resetUserForm = () => {
                                               className="w-full text-xs border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
                                             >
                                               <option value="">Select user...</option>
-                                              {userData && userData.length > 0 ? (
-                                                userData.map((user) => (
-                                                  <option key={user.id} value={user.user_name}>
-                                                    {user.user_name}
-                                                  </option>
-                                                ))
+                                               {userData && userData.length > 0 ? (
+                                                userData
+                                                  .filter(u => {
+                                                    const userRole = localStorage.getItem('role');
+                                                    const userAccess = localStorage.getItem('user_access') || '';
+                                                    const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+                                                    if (userRole === 'admin' && userDepartments.length > 0) {
+                                                      const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
+                                                      return userDepartments.includes(uDept);
+                                                    }
+                                                    return true;
+                                                  })
+                                                  .map((user) => (
+                                                    <option key={user.id} value={user.user_name}>
+                                                      {user.user_name}
+                                                    </option>
+                                                  ))
                                               ) : (
                                                 <option value="" disabled>No users available</option>
                                               )}
