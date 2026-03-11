@@ -16,6 +16,7 @@ export default function StaffTasksTable({
   const [totalStaffCount, setTotalStaffCount] = useState(0)
   const [totalUsersCount, setTotalUsersCount] = useState(0)
   const [selectedMonthYear, setSelectedMonthYear] = useState("")
+  const [tillDate, setTillDate] = useState("")
   const [monthYearOptions, setMonthYearOptions] = useState([])
   const itemsPerPage = 20
 
@@ -64,7 +65,7 @@ export default function StaffTasksTable({
     setStaffMembers([])
     setHasMoreData(true)
     setTotalStaffCount(0)
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear])
+  }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate])
 
   // Function to load staff data from server
 const loadStaffData = useCallback(async (page = 1, append = false) => {
@@ -79,7 +80,8 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
       dashboardStaffFilter,
       page,
       itemsPerPage,
-      selectedMonthYear // Pass monthYear parameter
+      selectedMonthYear,
+      tillDate // Pass tillDate parameter
     )
 
       // Get total counts for both staff with tasks and total users
@@ -126,12 +128,12 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
     } finally {
       setIsLoadingMore(false)
     }
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, isLoadingMore, selectedMonthYear])
+  }, [dashboardType, dashboardStaffFilter, departmentFilter, isLoadingMore, selectedMonthYear, tillDate])
 
   // Initial load when component mounts or dependencies change
   useEffect(() => {
     loadStaffData(1, false)
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear])
+  }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate])
 
   // Function to load more data when scrolling
   const loadMoreData = () => {
@@ -209,6 +211,28 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
               ))}
             </select>
           </div>
+
+          {/* Till Date Filter */}
+          <div className="flex items-center space-x-2">
+            <label htmlFor="tillDateFilter" className="text-sm font-medium text-gray-700">
+              Till Date:
+            </label>
+            <input
+              type="date"
+              id="tillDateFilter"
+              value={tillDate}
+              onChange={(e) => setTillDate(e.target.value)}
+              className="block w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
+            {tillDate && (
+              <button
+                onClick={() => setTillDate("")}
+                className="text-xs text-red-500 hover:text-red-700 font-medium"
+              >
+                Clear
+              </button>
+            )}
+          </div>
           
           {totalStaffCount > 0 && (
             <div className="text-sm text-gray-600">
@@ -232,6 +256,11 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
           {selectedMonthYear && (
             <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
               Month: {monthYearOptions.find(opt => opt.value === selectedMonthYear)?.label || selectedMonthYear}
+            </span>
+          )}
+          {tillDate && (
+            <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
+              Till: {tillDate}
             </span>
           )}
         </div>

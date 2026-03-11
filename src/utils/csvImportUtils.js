@@ -23,6 +23,26 @@ export const CHECKLIST_COLUMNS = [
 
 export const DELEGATION_COLUMNS = [...CHECKLIST_COLUMNS];
 
+export const MAINTENANCE_COLUMNS = [
+  { key: 'unit', label: 'Unit', type: 'text', required: true },
+  { key: 'division', label: 'Division', type: 'text', required: true },
+  { key: 'department', label: 'Department', type: 'text', required: true },
+  { key: 'given_by', label: 'Given By', type: 'text' },
+  { key: 'name', label: 'Name (Doer)', type: 'text', required: true },
+  { key: 'task_description', label: 'Task Description', type: 'text', required: true },
+  { key: 'machine_name', label: 'Machine Name', type: 'text', required: true },
+  { key: 'part_name', label: 'Part Name', type: 'text', required: true },
+  { key: 'machine_area', label: 'Machine Area', type: 'text', required: true },
+  { key: 'duration', label: 'Duration', type: 'text' },
+  { key: 'frequency', label: 'Frequency', type: 'text', required: true },
+  { key: 'enable_reminder', label: 'Enable Reminder', type: 'select', options: ['yes', 'no'] },
+  { key: 'require_attachment', label: 'Require Attachment', type: 'select', options: ['yes', 'no'] },
+  { key: 'planned_date', label: 'Planned Date', type: 'datetime', required: true },
+  { key: 'time', label: 'Time (HH:MM)', type: 'text' },
+  { key: 'machine_department', label: 'Machine Department', type: 'text' },
+  { key: 'machine_division', label: 'Machine Division', type: 'text' }
+];
+
 /**
  * Parse CSV file using PapaParse
  * @param {File} file - The CSV file to parse
@@ -58,25 +78,59 @@ export const parseCSVFile = (file) => {
  */
 export const mapColumns = (csvHeaders, dbColumns) => {
   const mapping = {};
+  const usedDbColumns = new Set();
 
+  // Helper to normalize strings
+  const normalize = (str) => String(str || '').toLowerCase().trim().replace(/[_\s-]/g, '');
+
+  // Pass 1: Exact matches (Priority)
   csvHeaders.forEach(csvHeader => {
-    const normalizedCsvHeader = csvHeader.toLowerCase().trim().replace(/[_\s-]/g, '');
+    const normalizedCsvHeader = normalize(csvHeader);
 
-    // Try to find exact or similar match
-    const match = dbColumns.find(dbCol => {
-      const normalizedDbKey = dbCol.key.toLowerCase().replace(/[_\s-]/g, '');
-      const normalizedDbLabel = dbCol.label.toLowerCase().replace(/[_\s-]/g, '');
-
-      return normalizedCsvHeader === normalizedDbKey ||
-        normalizedCsvHeader === normalizedDbLabel ||
-        normalizedCsvHeader.includes(normalizedDbKey) ||
-        normalizedDbKey.includes(normalizedCsvHeader);
+    const exactMatch = dbColumns.find(dbCol => {
+      const normalizedDbKey = normalize(dbCol.key);
+      const normalizedDbLabel = normalize(dbCol.label);
+      return normalizedCsvHeader === normalizedDbKey || normalizedCsvHeader === normalizedDbLabel;
     });
 
-    if (match) {
-      mapping[csvHeader] = match.key;
+    if (exactMatch && !usedDbColumns.has(exactMatch.key)) {
+      mapping[csvHeader] = exactMatch.key;
+      usedDbColumns.add(exactMatch.key);
+    }
+  });
+
+  // Pass 2: Fuzzy matches for remaining columns
+  csvHeaders.forEach(csvHeader => {
+    if (mapping[csvHeader]) return; // Already mapped
+
+    const normalizedCsvHeader = normalize(csvHeader);
+
+    const fuzzyMatch = dbColumns.find(dbCol => {
+      if (usedDbColumns.has(dbCol.key)) return false;
+
+      const normalizedDbKey = normalize(dbCol.key);
+      const normalizedDbLabel = normalize(dbCol.label);
+
+      // Stricter fuzzy matching:
+      // 1. Label includes key or vice versa, but NOT generic matches
+      // Avoid matching "machine_name" to "name" by ensuring if they include each other,
+      // they aren't drastically different in length (heuristic)
+      const isGenericName = normalizedDbKey === 'name';
+      if (isGenericName && normalizedCsvHeader !== 'name' && normalizedCsvHeader !== 'doer') {
+        return false;
+      }
+
+      return normalizedCsvHeader.includes(normalizedDbKey) ||
+        normalizedDbKey.includes(normalizedCsvHeader) ||
+        normalizedCsvHeader.includes(normalizedDbLabel) ||
+        normalizedDbLabel.includes(normalizedCsvHeader);
+    });
+
+    if (fuzzyMatch) {
+      mapping[csvHeader] = fuzzyMatch.key;
+      usedDbColumns.add(fuzzyMatch.key);
     } else {
-      mapping[csvHeader] = null; // Unmapped column
+      mapping[csvHeader] = null;
     }
   });
 

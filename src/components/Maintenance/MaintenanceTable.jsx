@@ -52,11 +52,14 @@ const MaintenanceTable = ({
       const query = searchQuery.toLowerCase();
       result = result.filter(task => 
         (task.machine_name || '').toLowerCase().includes(query) ||
-        (task.part_name || '').toLowerCase().includes(query) ||
+        (Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '')).toLowerCase().includes(query) ||
         (task.task_description || '').toLowerCase().includes(query) ||
-        (task.doer || '').toLowerCase().includes(query)
+        (task.name || '').toLowerCase().includes(query)
       );
     }
+
+    // Status filter - only show pending
+    result = result.filter(task => (task.status || '').toLowerCase() === 'pending');
 
     return result;
   }, [tasks, timeFilter, searchQuery]);
@@ -182,6 +185,8 @@ const MaintenanceTable = ({
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Name</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Name</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Area</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dept</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Div</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assign From</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task Description</th>
@@ -231,16 +236,40 @@ const MaintenanceTable = ({
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                       {task.part_name || '-'}
+                       {Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '-')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                        {task.part_area || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {isEditing ? (
+                        <input
+                          name="machine_department"
+                          value={editFormData.machine_department || ''}
+                          onChange={handleEditChange}
+                          className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        />
+                      ) : (
+                        <div className="text-sm text-gray-900">{task.machine_department || '-'}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {isEditing ? (
+                        <input
+                          name="machine_division"
+                          value={editFormData.machine_division || ''}
+                          onChange={handleEditChange}
+                          className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        />
+                      ) : (
+                        <div className="text-sm text-gray-900">{task.machine_division || '-'}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                        {task.givenBy || task.given_by || 'Admin'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                       <div className="text-sm font-medium text-gray-900">{task.doer || '-'}</div>
+                       <div className="text-sm font-medium text-gray-900">{task.name || '-'}</div>
                     </td>
                     <td className="px-6 py-4 max-w-xs">
                       {isEditing ? (

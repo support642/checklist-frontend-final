@@ -63,12 +63,16 @@ const Setting = () => {
   const [showMachineModal, setShowMachineModal] = useState(false);
   const [machineForm, setMachineForm] = useState({
     machine_name: '',
-    part_name: '',
-    machine_area: ''
+    part_name: [],
+    machine_area: '',
+    machine_department: '',
+    machine_division: ''
   });
 
   const [isEditingMachine, setIsEditingMachine] = useState(false);
   const [currentMachineId, setCurrentMachineId] = useState(null);
+  const [partInput, setPartInput] = useState('');
+
   
   
   const { userData, department, departmentsOnly, givenBy, machines, loading, error } = useSelector((state) => state.setting);
@@ -994,6 +998,8 @@ const resetUserForm = () => {
     setMachineForm(prev => ({ ...prev, [name]: value }));
   };
 
+
+
   const handleAddMachine = async (e) => {
     e.preventDefault();
     try {
@@ -1011,8 +1017,10 @@ const resetUserForm = () => {
     if (machine) {
       setMachineForm({
         machine_name: machine.machine_name || '',
-        part_name: machine.part_name || '',
-        machine_area: machine.machine_area || ''
+        part_name: Array.isArray(machine.part_name) ? machine.part_name : (machine.part_name ? [machine.part_name] : []),
+        machine_area: machine.machine_area || '',
+        machine_department: machine.machine_department || '',
+        machine_division: machine.machine_division || ''
       });
       setCurrentMachineId(machineId);
       setIsEditingMachine(true);
@@ -1043,10 +1051,16 @@ const resetUserForm = () => {
   };
 
   const resetMachineForm = () => {
-    setMachineForm({ machine_name: '', part_name: '', machine_area: '' });
+    setMachineForm({
+      machine_name: '',
+      part_name: [],
+      machine_area: '',
+      machine_department: '',
+      machine_division: ''
+    });
     setIsEditingMachine(false);
     setCurrentMachineId(null);
-    setShowMachineModal(false); // Restore showMachineModal state
+    setShowMachineModal(false);
   };
 
   // Add this filtered users calculation for leave tab
@@ -2058,7 +2072,7 @@ const resetUserForm = () => {
                           )}
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{machine.part_name || '—'}</span></div>
+                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{Array.isArray(machine.part_name) ? machine.part_name.join(', ') : (machine.part_name || '—')}</span></div>
                           <div><span className="text-gray-500">Area:</span> <span className="font-medium">{machine.machine_area || '—'}</span></div>
                         </div>
                       </div>
@@ -2075,6 +2089,8 @@ const resetUserForm = () => {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Name</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine Area</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Name</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -2089,7 +2105,13 @@ const resetUserForm = () => {
                             <span className="text-sm text-gray-600">{machine.machine_area || '—'}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-600">{machine.part_name || '—'}</span>
+                            <span className="text-sm text-gray-600">{Array.isArray(machine.part_name) ? machine.part_name.join(', ') : (machine.part_name || '—')}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-600">{machine.machine_department || '—'}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-gray-600">{machine.machine_division || '—'}</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end gap-3 text-gray-400">
@@ -2147,41 +2169,164 @@ const resetUserForm = () => {
                   </div>
                   <div className="mt-6">
                     <form onSubmit={isEditingMachine ? handleUpdateMachine : handleAddMachine}>
-                      <div className="space-y-4">
-                        <div>
-                          <label htmlFor="machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
-                          <input
-                            type="text"
-                            id="machine_name"
-                            value={machineForm.machine_name}
-                            onChange={(e) => setMachineForm({ ...machineForm, machine_name: e.target.value })}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                            required
-                          />
+                      {isEditingMachine ? (
+                        <div className="space-y-4">
+                          <div>
+                            <label htmlFor="machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
+                            <input
+                              type="text"
+                              id="machine_name"
+                              value={machineForm.machine_name}
+                              onChange={(e) => setMachineForm({ ...machineForm, machine_name: e.target.value })}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
+                            <input
+                              type="text"
+                              id="machine_area"
+                              value={machineForm.machine_area}
+                              onChange={(e) => setMachineForm({ ...machineForm, machine_area: e.target.value })}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="part_name_edit" className="block text-sm font-medium text-gray-700">Part Names</label>
+                            <div className="mt-1 flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
+                              {machineForm.part_name.map((part, idx) => (
+                                <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                                  {part}
+                                  <button type="button" onClick={() => setMachineForm(prev => ({ ...prev, part_name: prev.part_name.filter((_, i) => i !== idx) }))} className="text-purple-600 hover:text-purple-900">&times;</button>
+                                </span>
+                              ))}
+                              <input
+                                type="text"
+                                id="part_name_edit"
+                                value={partInput}
+                                onChange={(e) => setPartInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
+                                    e.preventDefault();
+                                    if (!machineForm.part_name.includes(partInput.trim())) {
+                                      setMachineForm(prev => ({ ...prev, part_name: [...prev.part_name, partInput.trim()] }));
+                                    }
+                                    setPartInput('');
+                                  }
+                                }}
+                                placeholder={machineForm.part_name.length === 0 ? "Type part name, press Enter" : "Add more..."}
+                                className="flex-1 min-w-[120px] outline-none text-sm py-1"
+                              />
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">Press Enter or comma to add each part</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label htmlFor="machine_department" className="block text-sm font-medium text-gray-700">Department</label>
+                              <input
+                                type="text"
+                                id="machine_department"
+                                name="machine_department"
+                                value={machineForm.machine_department}
+                                onChange={handleMachineInputChange}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor="machine_division" className="block text-sm font-medium text-gray-700">Division</label>
+                              <input
+                                type="text"
+                                id="machine_division"
+                                name="machine_division"
+                                value={machineForm.machine_division}
+                                onChange={handleMachineInputChange}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label htmlFor="machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
-                          <input
-                            type="text"
-                            id="machine_area"
-                            value={machineForm.machine_area}
-                            onChange={(e) => setMachineForm({ ...machineForm, machine_area: e.target.value })}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                            required
-                          />
+                      ) : (
+                        <div className="space-y-4">
+                          <div>
+                            <label htmlFor="machine_name" className="block text-sm font-medium text-gray-700">Machine Name</label>
+                            <input
+                              type="text"
+                              id="machine_name"
+                              value={machineForm.machine_name}
+                              onChange={(e) => setMachineForm({ ...machineForm, machine_name: e.target.value })}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="machine_area" className="block text-sm font-medium text-gray-700">Machine Area</label>
+                            <input
+                              type="text"
+                              id="machine_area"
+                              value={machineForm.machine_area}
+                              onChange={(e) => setMachineForm({ ...machineForm, machine_area: e.target.value })}
+                              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="part_name_add" className="block text-sm font-medium text-gray-700">Part Names</label>
+                            <div className="mt-1 flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
+                              {machineForm.part_name.map((part, idx) => (
+                                <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                                  {part}
+                                  <button type="button" onClick={() => setMachineForm(prev => ({ ...prev, part_name: prev.part_name.filter((_, i) => i !== idx) }))} className="text-purple-600 hover:text-purple-900">&times;</button>
+                                </span>
+                              ))}
+                              <input
+                                type="text"
+                                id="part_name_add"
+                                value={partInput}
+                                onChange={(e) => setPartInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
+                                    e.preventDefault();
+                                    if (!machineForm.part_name.includes(partInput.trim())) {
+                                      setMachineForm(prev => ({ ...prev, part_name: [...prev.part_name, partInput.trim()] }));
+                                    }
+                                    setPartInput('');
+                                  }
+                                }}
+                                placeholder={machineForm.part_name.length === 0 ? "Type part name, press Enter" : "Add more..."}
+                                className="flex-1 min-w-[120px] outline-none text-sm py-1"
+                              />
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">Press Enter or comma to add each part</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label htmlFor="machine_department_add" className="block text-sm font-medium text-gray-700">Department</label>
+                              <input
+                                type="text"
+                                id="machine_department_add"
+                                name="machine_department"
+                                value={machineForm.machine_department}
+                                onChange={handleMachineInputChange}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor="machine_division_add" className="block text-sm font-medium text-gray-700">Division</label>
+                              <input
+                                type="text"
+                                id="machine_division_add"
+                                name="machine_division"
+                                value={machineForm.machine_division}
+                                onChange={handleMachineInputChange}
+                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label htmlFor="part_name" className="block text-sm font-medium text-gray-700">Part Name</label>
-                          <input
-                            type="text"
-                            id="part_name"
-                            value={machineForm.part_name}
-                            onChange={(e) => setMachineForm({ ...machineForm, part_name: e.target.value })}
-                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                            required
-                          />
-                        </div>
-                      </div>
+                      )}
+                      
                       <div className="mt-6 flex justify-end space-x-3">
                         <button
                           type="button"
@@ -2194,7 +2339,7 @@ const resetUserForm = () => {
                           type="submit"
                           className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                         >
-                          {isEditingMachine ? 'Update' : 'Save'}
+                          {isEditingMachine ? 'Update' : 'Submit'}
                         </button>
                       </div>
                     </form>

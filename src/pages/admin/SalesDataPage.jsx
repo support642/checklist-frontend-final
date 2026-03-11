@@ -7,16 +7,22 @@ import { checklistData, checklistHistoryData, updateChecklist } from "../../redu
 import { maintenanceData, updateMaintenance } from "../../redux/slice/maintenanceSlice"
 import { postChecklistAdminDoneAPI, sendChecklistWhatsAppAPI } from "../../redux/api/checkListApi"
 import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice";
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 // Configuration object - Move all configurations here
 const CONFIG = {
-  PAGE_CONFIG: {
+  checklist: {
     title: "Checklist Tasks",
     historyTitle: "Checklist Task History",
     description: "Showing today's tasks and past due tasks",
     historyDescription: "Read-only view of completed tasks with submission history (excluding admin-processed items)",
   },
+  maintenance: {
+    title: "Maintenance Tasks",
+    historyTitle: "Maintenance Task History",
+    description: "Showing today's maintenance items and past due tasks",
+    historyDescription: "Read-only view of completed maintenance tasks with submission history",
+  }
 }
 
 function AccountDataPage() {
@@ -53,6 +59,7 @@ function AccountDataPage() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const tableContainerRef = useRef(null);
@@ -77,7 +84,11 @@ function AccountDataPage() {
     dispatch(checklistHistoryData(1))
     dispatch(uniqueDoerNameData());
 
-  }, [dispatch])
+    const view = searchParams.get('view');
+    if (view === 'maintenance') {
+      setActiveView('maintenance');
+    }
+  }, [dispatch, searchParams])
 
   // Debounce search term and re-fetch data
   useEffect(() => {
@@ -1124,7 +1135,7 @@ const submissionData = await Promise.all(
         <div className="flex flex-col gap-3 sm:gap-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700">
-              {showHistory ? CONFIG.PAGE_CONFIG.historyTitle : CONFIG.PAGE_CONFIG.title}
+              {showHistory ? CONFIG[activeView].historyTitle : CONFIG[activeView].title}
             </h1>
             
             {/* Checklist / Maintenance Toggle */}
@@ -1267,12 +1278,12 @@ const submissionData = await Promise.all(
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-3 sm:p-4">
             <h2 className="text-purple-700 font-medium text-sm sm:text-base">
-              {showHistory ? `Completed ${CONFIG.SHEET_NAME} Tasks` : activeView === 'maintenance' ? `Pending Maintenance Tasks` : `Pending Checklist Tasks`}
+              {showHistory ? `Completed ${activeView === 'maintenance' ? 'Maintenance' : 'Checklist'} Tasks` : activeView === 'maintenance' ? `Pending Maintenance Tasks` : `Pending Checklist Tasks`}
             </h2>
             <p className="text-purple-600 text-xs sm:text-sm mt-1">
               {showHistory
-                ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${userRole === "admin" ? "all" : "your"} tasks`
-                : CONFIG.PAGE_CONFIG.description}
+                ? `${CONFIG[activeView].historyDescription} for ${userRole === "admin" ? "all" : "your"} tasks`
+                : CONFIG[activeView].description}
             </p>
           </div>
 
@@ -1647,8 +1658,10 @@ const submissionData = await Promise.all(
                           <div><span className="text-gray-500">Dept:</span> <span className="font-medium">{item.department || "—"}</span></div>
                           <div><span className="text-gray-500">Unit:</span> <span className="font-medium">{item.unit || "—"}</span></div>
                           <div><span className="text-gray-500">Division:</span> <span className="font-medium">{item.division || "—"}</span></div>
+                          <div><span className="text-gray-500">M-Dept:</span> <span className="font-medium">{item.machine_department || "—"}</span></div>
+                          <div><span className="text-gray-500">M-Div:</span> <span className="font-medium">{item.machine_division || "—"}</span></div>
                           <div><span className="text-gray-500">Machine:</span> <span className="font-medium">{item.machine_name || "—"}</span></div>
-                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{item.part_name || "—"}</span></div>
+                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{item.machine_name}{item.part_name ? ` / ${Array.isArray(item.part_name) ? item.part_name.join(', ') : item.part_name}` : '' || "—"}</span></div>
                           <div><span className="text-gray-500">Area:</span> <span className="font-medium">{item.part_area || "—"}</span></div>
                           <div><span className="text-gray-500">Given By:</span> <span className="font-medium">{item.given_by || "—"}</span></div>
                           <div><span className="text-gray-500">Planned Date:</span> <span className="font-medium">{item.planned_date || "—"}</span></div>
@@ -1777,6 +1790,8 @@ const submissionData = await Promise.all(
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Unit</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Division</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Dept</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">M-Dept</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">M-Div</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Machine</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Part</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Area</th>
@@ -1813,8 +1828,10 @@ const submissionData = await Promise.all(
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.unit || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.department || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_department || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_division || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_name || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.part_name || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{Array.isArray(item.part_name) ? item.part_name.join(', ') : (item.part_name || "—")}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.part_area || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div></td>

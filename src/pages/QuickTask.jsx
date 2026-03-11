@@ -33,19 +33,22 @@ export default function QuickTask() {
   const { 
     quickTask, 
     loading, 
-    delegationTasks, 
-    users,                    // Add this
-    checklistPage,            // Add this
-    checklistHasMore,         // Add this
-    delegationPage,           // Add this
-    delegationHasMore         // Add this
+    delegationTasks,
+    delegationTotal,
+    users,
+    checklistPage,
+    checklistTotal,
+    checklistHasMore,
+    delegationPage,
+    delegationHasMore
   } = useSelector((state) => state.quickTask);
+  const { uniqueMaintenanceTotal } = useSelector((state) => state.maintenance);
   const dispatch = useDispatch();
 
 useEffect(() => {
   dispatch(fetchUsers());
   dispatch(resetChecklistPagination());
-  dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '' }));
+  dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '', freqFilter: '' }));
 }, [dispatch]);
 
 
@@ -62,6 +65,7 @@ const handleScroll = useCallback(() => {
         page: checklistPage, 
         pageSize: 50, 
         nameFilter,
+        freqFilter,
         append: true 
       }));
     } else if (activeTab === 'delegation' && delegationHasMore) {
@@ -69,6 +73,7 @@ const handleScroll = useCallback(() => {
         page: delegationPage, 
         pageSize: 50, 
         nameFilter,
+        freqFilter,
         append: true 
       }));
     }
@@ -132,7 +137,7 @@ useEffect(() => {
       setEditFormData({});
 
       // Refresh the data to show all updated rows
-      dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, append: false }));
+      dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter, append: false }));
 
     } catch (error) {
       console.error("Failed to update task:", error);
@@ -224,28 +229,50 @@ const handleNameFilterSelect = (name) => {
   setNameFilter(name);
   
   if (activeTab === 'checklist') {
-    dispatch(resetChecklistPagination());
-    dispatch(uniqueChecklistTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: name,
-      append: false 
-    }));
-  } else {
-    dispatch(resetDelegationPagination());
-    dispatch(uniqueDelegationTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: name,
-      append: false 
-    }));
-  }
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: name,
+        freqFilter: freqFilter,
+        append: false 
+      }));
+    } else {
+      dispatch(resetDelegationPagination());
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: name,
+        freqFilter: freqFilter,
+        append: false 
+      }));
+    }
   
   setDropdownOpen({ ...dropdownOpen, name: false });
 };
 
   const handleFrequencyFilterSelect = (freq) => {
     setFreqFilter(freq);
+    
+    if (activeTab === 'checklist') {
+      dispatch(resetChecklistPagination());
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: nameFilter,
+        freqFilter: freq,
+        append: false 
+      }));
+    } else if (activeTab === 'delegation') {
+      dispatch(resetDelegationPagination());
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: nameFilter,
+        freqFilter: freq,
+        append: false 
+      }));
+    }
+    
     setDropdownOpen({ ...dropdownOpen, frequency: false });
   };
 
@@ -253,28 +280,50 @@ const clearNameFilter = () => {
   setNameFilter('');
   
   if (activeTab === 'checklist') {
-    dispatch(resetChecklistPagination());
-    dispatch(uniqueChecklistTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: '',
-      append: false 
-    }));
-  } else {
-    dispatch(resetDelegationPagination());
-    dispatch(uniqueDelegationTaskData({ 
-      page: 0, 
-      pageSize: 50, 
-      nameFilter: '',
-      append: false 
-    }));
-  }
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: '',
+        freqFilter: freqFilter,
+        append: false 
+      }));
+    } else {
+      dispatch(resetDelegationPagination());
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: '',
+        freqFilter: freqFilter,
+        append: false 
+      }));
+    }
   
   setDropdownOpen({ ...dropdownOpen, name: false });
 };
 
   const clearFrequencyFilter = () => {
     setFreqFilter('');
+    
+    if (activeTab === 'checklist') {
+      dispatch(resetChecklistPagination());
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: nameFilter,
+        freqFilter: '',
+        append: false 
+      }));
+    } else if (activeTab === 'delegation') {
+      dispatch(resetDelegationPagination());
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: nameFilter,
+        freqFilter: '',
+        append: false 
+      }));
+    }
+    
     setDropdownOpen({ ...dropdownOpen, frequency: false });
   };
 
@@ -284,13 +333,8 @@ const allNames = [
 ].filter(name => name && typeof name === 'string' && name.trim() !== '')
  .sort();
 
-  // Keep allFrequencies as is (or modify if you want to fetch frequencies from elsewhere)
-  const allFrequencies = [
-    ...new Set([
-      ...quickTask.map(task => task.frequency),
-      ...delegationTasks.map(task => task.frequency)
-    ])
-  ].filter(frequency => frequency && typeof frequency === 'string' && frequency.trim() !== '');
+  // Static frequency options - always available regardless of loaded data
+  const allFrequencies = ['daily', 'weekly', 'monthly', 'quarterly', 'half-yearly', 'yearly'];
 
 
 const filteredChecklistTasks = quickTask.filter(task => {
@@ -377,10 +421,10 @@ const filteredChecklistTasks = quickTask.filter(task => {
             </h1>
             <p className="text-purple-600 text-sm">
               {activeTab === 'checklist'
-                ? `Showing ${quickTask.length} checklist tasks`
+                ? `Showing ${checklistTotal} checklist tasks`
                 : activeTab === 'delegation' 
-                  ? `Showing delegation tasks` 
-                  : `Showing maintenance tasks`}
+                  ? `Showing ${delegationTotal} delegation tasks` 
+                  : `Showing ${uniqueMaintenanceTotal} maintenance tasks`}
             </p>
           </div>
 
@@ -391,7 +435,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
   onClick={() => {
     setActiveTab('checklist');
     dispatch(resetChecklistPagination());
-    dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter }));
+    dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
   }}
 >
                 Checklist
@@ -401,7 +445,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
   onClick={() => {
     setActiveTab('delegation');
     dispatch(resetDelegationPagination());
-    dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter }));
+    dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
   }}
 >
                 Delegation
@@ -579,7 +623,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
           {error}{" "}
           <button
             onClick={() => {
-              dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
+              dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '', freqFilter: '', append: false }))
             }}
             className="underline ml-2 hover:text-red-600"
           >

@@ -26,11 +26,11 @@ function DelegationPage({ searchTerm, nameFilter, freqFilter, setNameFilter, set
   const [selectedTasks, setSelectedTasks] = useState([])
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const { delegationTasks, loading } = useSelector((state) => state.quickTask)
+  const { delegationTasks, loading, delegationTotal, delegationHasMore, delegationPage } = useSelector((state) => state.quickTask)
   const dispatch = useDispatch()
 useEffect(()=>{
-  dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
-},[dispatch])
+  dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))
+},[dispatch, nameFilter, freqFilter])
 
  // Handle checkbox selection
   const handleCheckboxChange = (taskId) => {
@@ -62,7 +62,7 @@ useEffect(()=>{
       setSelectedTasks([])
       setSuccessMessage("Tasks deleted successfully")
       // Refresh the task list
-      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
+      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -138,9 +138,9 @@ useEffect(()=>{
   useEffect(() => {
     if (isInitialized) {
      // fetchData()
-     dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))
+     dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))
     }
-  }, [dispatch, isInitialized])
+  }, [dispatch, isInitialized, nameFilter, freqFilter])
 
   const filteredTasks = useMemo(() => {
     let filtered = delegationTasks;
@@ -206,7 +206,7 @@ useEffect(()=>{
             <div>
               <h2 className="text-purple-700 font-medium">Delegation Tasks</h2>
               <p className="text-purple-600 text-sm">
-                {CONFIG.PAGE_CONFIG.description} ({filteredTasks.length} tasks)
+                {CONFIG.PAGE_CONFIG.description} ({delegationTotal} tasks)
               </p>
             </div>
             

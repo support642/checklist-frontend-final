@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useMemo } from "react"
+import { useSearchParams } from "react-router-dom"
 import { Search, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 import { useDispatch, useSelector } from "react-redux"
@@ -45,6 +46,7 @@ function HistoryPage() {
   const { doerName } = useSelector((state) => state.assignTask)
   const { history: maintHistory, historyTotalCount: maintTotalCount, historyApprovedCount: maintApprovedCount, loading: maintLoading } = useSelector((state) => state.maintenance)
   const dispatch = useDispatch()
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -66,7 +68,12 @@ function HistoryPage() {
     setUserRole(role || "")
     setUsername(user || "")
     setIsSuperAdmin(role === "super_admin" || role === "admin")
-  }, [])
+
+    const tab = searchParams.get('tab')
+    if (tab === 'maintenance') {
+      setActiveTab('maintenance')
+    }
+  }, [searchParams])
 
   const parseSupabaseDate = (dateStr) => {
     if (!dateStr) return null
@@ -330,13 +337,13 @@ function HistoryPage() {
         return matchesSearch && matchesMember && matchesDateRange
       })
       .filter((item) => {
-        const isDone = item.admin_done === 'Done' || item.admin_done === 'true' || item.admin_done === true
+        const isDone = item.admin_done === 'Done' || item.admin_done === 'true' || item.admin_done === true;
         if (approvalStatusFilter === "pending") {
-          return !isDone
+          return !isDone;
         } else if (approvalStatusFilter === "completed") {
-          return isDone
+          return isDone;
         }
-        return true
+        return true;
       })
       .sort((a, b) => {
         const dateA = parseSupabaseDate(a.submission_date)
@@ -808,6 +815,8 @@ function HistoryPage() {
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">M-Dept</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">M-Div</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">Submission Time</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proof</th>
@@ -874,7 +883,7 @@ function HistoryPage() {
                           </div>
                           {(item.machine_name || item.part_name) && (
                             <div className="text-xs text-gray-500 mt-0.5">
-                              {item.machine_name}{item.part_name ? ` / ${item.part_name}` : ''}
+                              {item.machine_name}{item.part_name ? ` / ${Array.isArray(item.part_name) ? item.part_name.join(', ') : item.part_name}` : ''}
                             </div>
                           )}
                         </td>
@@ -886,6 +895,12 @@ function HistoryPage() {
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Division">
                           <div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="M-Dept">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.machine_department || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="M-Div">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.machine_division || "—"}</div>
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4 bg-green-50" data-label="Submission Time">
                           <div className="text-xs sm:text-sm text-gray-900">

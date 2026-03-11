@@ -254,10 +254,12 @@ export default function AssignTask() {
     enableReminders: true,
     requireAttachment: false,
     machineName: "",
-    partName: "",
+    partName: [],
     partArea: "",
     duration: "",
     machinePartId: null,
+    machineDepartment: "",
+    machineDivision: "",
   });
 
   // Filter doer names based on role and selected department
@@ -296,6 +298,70 @@ export default function AssignTask() {
     const depts = [...new Set(filtered.map(d => d.department).filter(Boolean))];
     return depts;
   }, [deptFullData, formData.unit, formData.division]);
+
+  // Hierarchical Maintenance Data
+  const maintenanceDivisions = useMemo(() => {
+    return [...new Set(machineParts.map(mp => mp.machine_division).filter(Boolean))];
+  }, [machineParts]);
+
+  const maintenanceDepartments = useMemo(() => {
+    if (!formData.machineDivision) return [];
+    return [...new Set(
+      machineParts
+        .filter(mp => mp.machine_division === formData.machineDivision)
+        .map(mp => mp.machine_department)
+        .filter(Boolean)
+    )];
+  }, [machineParts, formData.machineDivision]);
+
+  const maintenanceNames = useMemo(() => {
+    if (!formData.machineDepartment) return [];
+    return [...new Set(
+      machineParts
+        .filter(mp => 
+          mp.machine_division === formData.machineDivision && 
+          mp.machine_department === formData.machineDepartment
+        )
+        .map(mp => mp.machine_name)
+        .filter(Boolean)
+    )];
+  }, [machineParts, formData.machineDivision, formData.machineDepartment]);
+
+  const maintenanceAreas = useMemo(() => {
+    if (!formData.machineName) return [];
+    return [...new Set(
+      machineParts
+        .filter(mp => 
+          mp.machine_division === formData.machineDivision && 
+          mp.machine_department === formData.machineDepartment &&
+          mp.machine_name === formData.machineName
+        )
+        .map(mp => mp.machine_area)
+        .filter(Boolean)
+    )];
+  }, [machineParts, formData.machineDivision, formData.machineDepartment, formData.machineName]);
+
+  const maintenanceParts = useMemo(() => {
+    if (!formData.partArea) return [];
+    const filtered = machineParts
+      .filter(mp => 
+        mp.machine_division === formData.machineDivision && 
+        mp.machine_department === formData.machineDepartment &&
+        mp.machine_name === formData.machineName &&
+        mp.machine_area === formData.partArea
+      );
+    // Flatten part_name arrays into individual selectable options
+    const parts = [];
+    filtered.forEach(mp => {
+      const names = Array.isArray(mp.part_name) ? mp.part_name : (mp.part_name ? [mp.part_name] : []);
+      names.forEach(name => {
+        if (name && !parts.find(p => p.name === name)) {
+          parts.push({ id: mp.id, name });
+        }
+      });
+    });
+    return parts;
+  }, [machineParts, formData.machineDivision, formData.machineDepartment, formData.machineName, formData.partArea]);
 
   // Auto-fill Unit if there's only one option
   useEffect(() => {
@@ -469,8 +535,10 @@ useEffect(() => {
         ...(taskType === 'maintenance' && {
           machineName: formData.machineName,
           partName: formData.partName,
-          partArea: formData.partArea,
-          duration: formData.duration
+          machineArea: formData.partArea,
+          duration: formData.duration,
+          machine_department: formData.machineDepartment,
+          machine_division: formData.machineDivision
         })
       });
     } else {
@@ -574,8 +642,10 @@ useEffect(() => {
           ...(taskType === 'maintenance' && {
             machineName: formData.machineName,
             partName: formData.partName,
-            partArea: formData.partArea,
-            duration: formData.duration
+            machineArea: formData.partArea,
+            duration: formData.duration,
+            machine_department: formData.machineDepartment,
+            machine_division: formData.machineDivision
           })
         });
 
@@ -648,7 +718,9 @@ useEffect(() => {
             partName: formData.partName,
             partArea: formData.partArea,
             duration: formData.duration,
-            time: time
+            time: time,
+            machine_department: formData.machineDepartment,
+            machine_division: formData.machineDivision
           })
         });
       } else {
@@ -745,7 +817,9 @@ useEffect(() => {
               partName: formData.partName,
               partArea: formData.partArea,
               duration: formData.duration,
-              time: time
+              time: time,
+              machine_department: formData.machineDepartment,
+              machine_division: formData.machineDivision
             })
           });
 
@@ -776,10 +850,12 @@ useEffect(() => {
         enableReminders: true,
         requireAttachment: false,
         machineName: "",
-        partName: "",
+        partName: [],
         partArea: "",
         duration: "",
         machinePartId: null,
+        machineDepartment: "",
+        machineDivision: "",
       });
       setSelectedDate(new Date()); // Reset to today's date instead of null
       setStartDate(new Date());
@@ -1062,99 +1138,193 @@ useEffect(() => {
                   />
                 </div>
 
-                {/* Maintenance Fields (Only visible if taskType is maintenance) */}
+                {/* Hierarchical Maintenance Selection */}
                 {taskType === 'maintenance' && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 border border-blue-100 bg-blue-50/30 p-3 rounded-md">
-                    <div className="space-y-2">
-                      <label htmlFor="machineName" className="block text-sm font-medium text-purple-700">
-                        Machine Name
-                      </label>
-                      <select
-                        id="machineName"
-                        name="machineName"
-                        value={formData.machineName}
-                        onChange={(e) => {
-                          const selectedMachine = e.target.value;
-                          setFormData(prev => ({
-                            ...prev,
-                            machineName: selectedMachine,
-                            partName: "",
-                            partArea: "",
-                            machinePartId: null,
-                          }));
-                        }}
-                        required
-                        className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      >
-                        <option value="">Select Machine</option>
-                        {[...new Set(machineParts.map(mp => mp.machine_name).filter(Boolean))].map((name, idx) => (
-                          <option key={idx} value={name}>{name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label htmlFor="partName" className="block text-sm font-medium text-purple-700">
-                        Part Name
-                      </label>
-                      <select
-                        id="partName"
-                        name="partName"
-                        value={formData.partName}
-                        onChange={(e) => {
-                          const selectedPart = e.target.value;
-                          setFormData(prev => ({
-                            ...prev,
-                            partName: selectedPart,
-                            partArea: "",
-                            machinePartId: null,
-                          }));
-                        }}
-                        className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      >
-                        <option value="">Select Part</option>
-                        {[...new Set(
-                          machineParts
-                            .filter(mp => mp.machine_name === formData.machineName)
-                            .map(mp => mp.part_name)
-                            .filter(Boolean)
-                        )].map((name, idx) => (
-                          <option key={idx} value={name}>{name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label htmlFor="partArea" className="block text-sm font-medium text-purple-700">
-                        Part Area
-                      </label>
-                      <select
-                        id="partArea"
-                        name="partArea"
-                        value={formData.partArea}
-                        onChange={(e) => {
-                          const selectedArea = e.target.value;
-                          // Find the exact machine_parts row matching all 3 fields
-                          const match = machineParts.find(
-                            mp => mp.machine_name === formData.machineName
-                              && mp.part_name === formData.partName
-                              && mp.machine_area === selectedArea
-                          );
-                          setFormData(prev => ({
-                            ...prev,
-                            partArea: selectedArea,
-                            machinePartId: match?.id || null,
-                          }));
-                        }}
-                        className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                      >
-                        <option value="">Select Area</option>
-                        {machineParts
-                          .filter(mp => mp.machine_name === formData.machineName && mp.part_name === formData.partName)
-                          .map((mp, idx) => (
-                            <option key={idx} value={mp.machine_area}>{mp.machine_area}</option>
+                  <div className="space-y-4 border border-purple-200 p-4 rounded-md mt-4 bg-purple-50/30">
+                    <h3 className="text-sm font-semibold text-purple-700 mb-2">Machine Selection Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Division Selection */}
+                      <div className="space-y-1">
+                        <label htmlFor="machineDivision" className="block text-xs font-medium text-purple-600">
+                          Machine Division
+                        </label>
+                        <select
+                          id="machineDivision"
+                          name="machineDivision"
+                          value={formData.machineDivision}
+                          onChange={(e) => {
+                            setFormData(prev => ({
+                              ...prev,
+                              machineDivision: e.target.value,
+                              machineDepartment: "",
+                              machineName: "",
+                              partArea: "",
+                              partName: [],
+                              machinePartId: null,
+                            }));
+                          }}
+                          required
+                          className="w-full rounded-md border border-purple-200 p-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        >
+                          <option value="">Select Division</option>
+                          {maintenanceDivisions.map((div, idx) => (
+                            <option key={idx} value={div}>{div}</option>
                           ))}
-                      </select>
-                    </div>
+                        </select>
+                      </div>
 
+                      {/* Department Selection */}
+                      <div className="space-y-1">
+                        <label htmlFor="machineDepartment" className="block text-xs font-medium text-purple-600">
+                          Machine Department
+                        </label>
+                        <select
+                          id="machineDepartment"
+                          name="machineDepartment"
+                          value={formData.machineDepartment}
+                          onChange={(e) => {
+                            setFormData(prev => ({
+                              ...prev,
+                              machineDepartment: e.target.value,
+                              machineName: "",
+                              partArea: "",
+                              partName: [],
+                              machinePartId: null,
+                            }));
+                          }}
+                          disabled={!formData.machineDivision}
+                          required
+                          className="w-full rounded-md border border-purple-200 p-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:bg-gray-100"
+                        >
+                          <option value="">Select Department</option>
+                          {maintenanceDepartments.map((dept, idx) => (
+                            <option key={idx} value={dept}>{dept}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Machine Name Selection */}
+                      <div className="space-y-1">
+                        <label htmlFor="machineName" className="block text-xs font-medium text-purple-600">
+                          Machine Name
+                        </label>
+                        <select
+                          id="machineName"
+                          name="machineName"
+                          value={formData.machineName}
+                          onChange={(e) => {
+                            setFormData(prev => ({
+                              ...prev,
+                              machineName: e.target.value,
+                              partArea: "",
+                              partName: [],
+                              machinePartId: null,
+                            }));
+                          }}
+                          disabled={!formData.machineDepartment}
+                          required
+                          className="w-full rounded-md border border-purple-200 p-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:bg-gray-100"
+                        >
+                          <option value="">Select Machine</option>
+                          {maintenanceNames.map((name, idx) => (
+                            <option key={idx} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Machine Area Selection */}
+                      <div className="space-y-1">
+                        <label htmlFor="partArea" className="block text-xs font-medium text-purple-600">
+                          Machine Area
+                        </label>
+                        <select
+                          id="partArea"
+                          name="partArea"
+                          value={formData.partArea}
+                          onChange={(e) => {
+                            setFormData(prev => ({
+                              ...prev,
+                              partArea: e.target.value,
+                              partName: [],
+                              machinePartId: null,
+                            }));
+                          }}
+                          disabled={!formData.machineName}
+                          required
+                          className="w-full rounded-md border border-purple-200 p-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:bg-gray-100"
+                        >
+                          <option value="">Select Area</option>
+                          {maintenanceAreas.map((area, idx) => (
+                            <option key={idx} value={area}>{area}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Machine Part Selection */}
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="block text-xs font-medium text-purple-600 mb-2">
+                          Machine Part (Select Multiple)
+                        </label>
+                        {!formData.partArea ? (
+                          <div className="p-4 text-center text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-md">
+                            Select Machine Area first to see available parts
+                          </div>
+                        ) : maintenanceParts.length === 0 ? (
+                          <div className="p-4 text-center text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-md">
+                            No parts found for this machine area
+                          </div>
+                        ) : (
+                          <div className="border border-purple-100 rounded-md bg-white p-3 max-h-48 overflow-y-auto shadow-inner">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {maintenanceParts.map((p, idx) => {
+                                const isChecked = formData.partName.includes(p.name);
+                                return (
+                                  <label 
+                                    key={idx} 
+                                    className={`flex items-center space-x-2 p-2 rounded-md transition-colors cursor-pointer border ${
+                                      isChecked 
+                                        ? "bg-purple-50 border-purple-200 text-purple-700" 
+                                        : "bg-white border-transparent hover:bg-gray-50 text-gray-600"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        setFormData(prev => {
+                                          const newPartNames = isChecked
+                                            ? prev.partName.filter(name => name !== p.name)
+                                            : [...prev.partName, p.name];
+                                          
+                                          // Update machinePartId to the most recently added part's ID, or null if list is empty
+                                          const lastPartName = newPartNames[newPartNames.length - 1];
+                                          const match = maintenanceParts.find(part => part.name === lastPartName);
+                                          
+                                          return {
+                                            ...prev,
+                                            partName: newPartNames,
+                                            machinePartId: match?.id || null,
+                                          };
+                                        });
+                                      }}
+                                    />
+                                    <span className="text-xs font-medium truncate" title={p.name}>
+                                      {p.name}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {formData.partName.length > 0 && (
+                          <div className="mt-2 text-xs text-purple-600 font-medium">
+                            {formData.partName.length} part(s) selected
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1453,9 +1623,11 @@ useEffect(() => {
                       enableReminders: true,
                       requireAttachment: false,
                       machineName: "",
-                      partName: "",
+                      partName: [],
                       partArea: "",
                       duration: "",
+                      machineDepartment: "",
+                      machineDivision: "",
                     });
                     setSelectedDate(null);
                     setStartDate(new Date());

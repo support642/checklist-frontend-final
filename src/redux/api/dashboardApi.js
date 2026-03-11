@@ -177,7 +177,8 @@ export const fetchStaffTasksDataApi = async (
   staffFilter = "all",
   page = 1,
   limit = 50,
-  monthYear = "" // Add this parameter
+  monthYear = "",
+  tillDate = ""
 ) => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
@@ -191,6 +192,11 @@ export const fetchStaffTasksDataApi = async (
   // Add monthYear if provided
   if (monthYear) {
     params.append('monthYear', monthYear);
+  }
+
+  // Add tillDate if provided
+  if (tillDate) {
+    params.append('tillDate', tillDate);
   }
 
   const res = await fetch(

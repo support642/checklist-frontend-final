@@ -59,8 +59,8 @@ export const maintenanceAdminDone = createAsyncThunk(
 // ============================================================
 export const uniqueMaintenanceTaskData = createAsyncThunk(
     "fetch/uniqueMaintenanceTask",
-    async ({ page = 0, pageSize = 50, nameFilter = "", append = false }) => {
-        const result = await fetchUniqueMaintenanceData(page, pageSize, nameFilter);
+    async ({ page = 0, pageSize = 50, nameFilter = "", freqFilter = "", append = false }) => {
+        const result = await fetchUniqueMaintenanceData(page, pageSize, nameFilter, freqFilter);
         return { ...result, append };
     }
 );
@@ -192,8 +192,13 @@ const maintenanceSlice = createSlice({
                 state.loading = true;
             })
 
-            .addCase(updateMaintenance.fulfilled, (state) => {
+            .addCase(updateMaintenance.fulfilled, (state, action) => {
                 state.loading = false;
+                // action.meta.arg is the submissionData array we sent
+                const submittedIds = action.meta.arg.map(item => item.taskId);
+                state.maintenance = state.maintenance.filter(
+                    task => !submittedIds.includes(task.task_id)
+                );
             })
 
             .addCase(updateMaintenance.rejected, (state, action) => {

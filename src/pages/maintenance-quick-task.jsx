@@ -22,14 +22,14 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
   const [editFormData, setEditFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
 
-  const { uniqueMaintenanceTasks, loading, uniqueMaintenanceHasMore, uniqueMaintenancePage } = useSelector((state) => state.maintenance);
+  const { uniqueMaintenanceTasks, loading, uniqueMaintenanceHasMore, uniqueMaintenancePage, uniqueMaintenanceTotal } = useSelector((state) => state.maintenance);
   const dispatch = useDispatch();
   const tableContainerRef = useRef(null);
 
   useEffect(() => {
     dispatch(resetUniqueMaintenancePagination());
-    dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }));
-  }, [dispatch]);
+    dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }));
+  }, [dispatch, nameFilter, freqFilter]);
 
   useEffect(() => {
     const role = localStorage.getItem("role");
@@ -50,6 +50,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
           page: uniqueMaintenancePage, 
           pageSize: 50, 
           nameFilter,
+          freqFilter,
           append: true 
         }));
       }
@@ -74,7 +75,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
       division: task.division || '',
       task_description: task.task_description || '',
       machine_name: task.machine_name || '',
-      part_name: task.part_name || '',
+      part_name: Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || ''),
       part_area: task.part_area || '',
       given_by: task.given_by || '',
       name: task.name || '',
@@ -175,7 +176,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
         filtered = filtered.filter(task =>
             task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             task.machine_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            task.part_name?.toLowerCase().includes(searchTerm.toLowerCase())
+            (Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '')).toLowerCase().includes(searchTerm.toLowerCase())
         );
     }
     
@@ -206,7 +207,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
         <div className="mt-4 bg-red-50 p-4 rounded-md text-red-800 text-center">
           {error}{" "}
           <button 
-            onClick={() => dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: '', append: false }))} 
+            onClick={() => dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: '', freqFilter: '', append: false }))} 
             className="underline ml-2 hover:text-red-600"
           >
             Try again
@@ -226,8 +227,8 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
           <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-3 sm:p-4 flex justify-between items-center">
             <div>
               <h2 className="text-purple-700 font-medium text-sm sm:text-base">Maintenance Tasks</h2>
-              <p className="text-purple-600 text-xs sm:text-sm mt-1">
-                {CONFIG.PAGE_CONFIG.description}
+              <p className="text-purple-600 text-sm mt-1">
+                {CONFIG.PAGE_CONFIG.description} ({uniqueMaintenanceTotal} tasks)
               </p>
             </div>
             {selectedTasks.length > 0 && userRole === "super_admin" && (
@@ -327,12 +328,28 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
                         ) : (<span className="font-medium">{task.machine_name || "—"}</span>)}
                       </div>
 
+                      {/* Machine Dept */}
+                      <div>
+                        <span className="text-gray-500">Dept:</span>{' '}
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.machine_department} onChange={(e) => handleInputChange('machine_department', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
+                        ) : (<span className="font-medium">{task.machine_department || "—"}</span>)}
+                      </div>
+
+                      {/* Machine Div */}
+                      <div>
+                        <span className="text-gray-500">Div:</span>{' '}
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.machine_division} onChange={(e) => handleInputChange('machine_division', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
+                        ) : (<span className="font-medium">{task.machine_division || "—"}</span>)}
+                      </div>
+                      
                       {/* Part Name */}
                       <div>
                         <span className="text-gray-500">Part:</span>{' '}
                         {editingTaskId === task.task_id ? (
                           <input type="text" value={editFormData.part_name} onChange={(e) => handleInputChange('part_name', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
-                        ) : (<span className="font-medium">{task.part_name || "—"}</span>)}
+                        ) : (<span className="font-medium">{Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || "—")}</span>)}
                       </div>
 
                       {/* Part Area */}
@@ -384,6 +401,8 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
                     { key: 'machine_name', label: 'Machine Name' },
                     { key: 'part_name', label: 'Part Name' },
                     { key: 'part_area', label: 'Part Area' },
+                    { key: 'machine_department', label: 'Dept' },
+                    { key: 'machine_division', label: 'Div' },
                     { key: 'given_by', label: 'Assign From' },
                     { key: 'name', label: 'Name' },
                     { key: 'planned_date', label: 'Planned Date' },
@@ -441,7 +460,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
                       <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
                         {editingTaskId === task.task_id ? (
                           <input type="text" value={editFormData.part_name} onChange={(e) => handleInputChange('part_name', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-                        ) : (task.part_name || "—")}
+                        ) : (Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || "—"))}
                       </td>
 
                       {/* Part Area */}
@@ -449,6 +468,20 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
                         {editingTaskId === task.task_id ? (
                           <input type="text" value={editFormData.part_area} onChange={(e) => handleInputChange('part_area', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
                         ) : (task.part_area || "—")}
+                      </td>
+
+                      {/* Machine Dept */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.machine_department} onChange={(e) => handleInputChange('machine_department', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                        ) : (task.machine_department || "—")}
+                      </td>
+
+                      {/* Machine Div */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {editingTaskId === task.task_id ? (
+                          <input type="text" value={editFormData.machine_division} onChange={(e) => handleInputChange('machine_division', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
+                        ) : (task.machine_division || "—")}
                       </td>
 
                       {/* Assign From */}

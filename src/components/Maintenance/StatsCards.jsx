@@ -1,8 +1,9 @@
 import { Settings, ClipboardList, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
-const StatsCards = ({ stats }) => {
+const StatsCards = ({ stats, onCardClick }) => {
   const cards = [
     {
+      type: "machines",
       title: "Total Machines",
       value: stats.totalMachines || 0,
       borderColor: "border-l-blue-500",
@@ -13,6 +14,7 @@ const StatsCards = ({ stats }) => {
       description: "Asset distribution"
     },
     {
+      type: "total_tasks",
       title: "Total Tasks",
       value: stats.totalTasks || 0,
       borderColor: "border-l-indigo-500",
@@ -23,6 +25,7 @@ const StatsCards = ({ stats }) => {
       description: "All activities"
     },
     {
+      type: "completed",
       title: "Tasks Complete",
       value: stats.completedTasks || 0,
       borderColor: "border-l-green-500",
@@ -33,6 +36,7 @@ const StatsCards = ({ stats }) => {
       description: `${Math.round((stats.completedTasks / (stats.totalTasks || 1)) * 100)}% completion`
     },
     {
+      type: "pending",
       title: "Tasks Pending",
       value: stats.pendingTasks || 0,
       borderColor: "border-l-amber-500",
@@ -43,6 +47,7 @@ const StatsCards = ({ stats }) => {
       description: "Awaiting action"
     },
     {
+      type: "overdue",
       title: "Tasks Overdue",
       value: stats.overdueTasks || 0,
       borderColor: "border-l-red-500",
@@ -58,8 +63,9 @@ const StatsCards = ({ stats }) => {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
       {cards.map((card, index) => (
         <div 
-          key={index} 
-          className={`bg-white rounded-lg border border-gray-200 ${card.borderColor} border-l-4 shadow-md hover:shadow-lg transition-all overflow-hidden`}
+          key={index}
+          onClick={() => onCardClick?.(card.type)}
+          className={`bg-white rounded-lg border border-gray-200 ${card.borderColor} border-l-4 shadow-md hover:shadow-lg transition-all overflow-hidden cursor-pointer transform hover:-translate-y-1 active:scale-95`}
         >
           <div className={`p-3 flex items-center justify-between ${card.headerBg} border-b border-gray-100`}>
              <span className={`text-[10px] font-bold ${card.textColor} uppercase tracking-tight truncate`}>

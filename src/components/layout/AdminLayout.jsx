@@ -103,7 +103,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
     },
     {
       href: "/dashboard/data/sales",
-      label: "Checklist",
+      label: "Pending Task",
       icon: CalendarCheck,
       active: location.pathname === "/dashboard/data/sales",
       showFor: ["admin", "user", "super_admin"],

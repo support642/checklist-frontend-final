@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Upload, FileText, CheckCircle, AlertCircle, Table2 } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle, AlertCircle, Table } from 'lucide-react';
 import {
   parseCSVFile,
   mapColumns,
@@ -7,7 +7,8 @@ import {
   prepareImportData,
   getPreviewData,
   CHECKLIST_COLUMNS,
-  DELEGATION_COLUMNS
+  DELEGATION_COLUMNS,
+  MAINTENANCE_COLUMNS
 } from '../utils/csvImportUtils';
 
 const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
@@ -21,7 +22,11 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState([]);
 
-  const dbColumns = importType === 'checklist' ? CHECKLIST_COLUMNS : DELEGATION_COLUMNS;
+  const dbColumns = importType === 'checklist' 
+    ? CHECKLIST_COLUMNS 
+    : importType === 'maintenance' 
+      ? MAINTENANCE_COLUMNS 
+      : DELEGATION_COLUMNS;
   const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/import`;
 
   // Reset state when modal closes
@@ -66,8 +71,8 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
       const mapping = mapColumns(parsed.headers, dbColumns);
       setColumnMapping(mapping);
       
-      // Select all mapped columns by default
-      const mappedColumns = Object.values(mapping).filter(col => col !== null);
+      // Select all mapped columns by default (using Set for uniqueness)
+      const mappedColumns = [...new Set(Object.values(mapping).filter(col => col !== null))];
       setSelectedColumns(mappedColumns);
       
       setStep(3);
@@ -122,7 +127,9 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
       // Call import API
       const endpoint = importType === 'checklist' 
         ? `${BASE_URL}/checklist`
-        : `${BASE_URL}/delegation`;
+        : importType === 'maintenance'
+          ? `${BASE_URL}/maintenance`
+          : `${BASE_URL}/delegation`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -236,7 +243,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
                   onClick={() => handleTypeSelect('checklist')}
                   className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
                 >
-                  <Table2 className="h-12 w-12 text-purple-500 mx-auto mb-3" />
+                  <Table className="h-12 w-12 text-purple-500 mx-auto mb-3" />
                   <h3 className="text-xl font-semibold text-purple-700 mb-2">Checklist Tasks</h3>
                   <p className="text-sm text-gray-600">
                     Import recurring tasks with frequencies (daily, weekly, monthly, etc.)
@@ -252,6 +259,21 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
                     Import one-time tasks or delegated assignments
                   </p>
                 </button>
+                <button
+                  onClick={() => handleTypeSelect('maintenance')}
+                  className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                >
+                  <div className="p-3 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors w-min mx-auto mb-3">
+                    <svg className="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-blue-700 mb-2">Maintenance Tasks</h3>
+                  <p className="text-sm text-gray-600">
+                    Import recurring machine and equipment maintenance tasks
+                  </p>
+                </button>
               </div>
             </div>
           )}
@@ -262,7 +284,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
               <div className="text-center">
                 <Upload className="h-16 w-16 text-purple-500 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                  Upload CSV File for {importType === 'checklist' ? 'Checklist' : 'Delegation'}
+                  Upload CSV File for {importType === 'checklist' ? 'Checklist' : importType === 'maintenance' ? 'Maintenance' : 'Delegation'}
                 </h3>
                 <p className="text-gray-600 mb-6">
                   Select a CSV file with your task data. The file should include headers.
@@ -294,6 +316,9 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
                 <h4 className="font-semibold text-blue-900 mb-2">CSV Format Requirements:</h4>
                 <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
                   <li>Required columns: <code className="bg-blue-100 px-1 rounded">name</code> (doer), <code className="bg-blue-100 px-1 rounded">task_description</code></li>
+                  {importType === 'maintenance' && (
+                    <li>Maintenance specific: <code className="bg-blue-100 px-1 rounded">machine_name</code>, <code className="bg-blue-100 px-1 rounded">part_name</code>, <code className="bg-blue-100 px-1 rounded">machine_area</code></li>
+                  )}
                   <li>Optional columns: department, given_by, frequency, enable_reminder, etc.</li>
                   <li>First row should contain column headers</li>
                   <li>Date columns should be in YYYY-MM-DD format</li>
@@ -416,7 +441,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
                         const col = dbColumns.find(c => c.key === colKey);
                         return (
                           <th key={colKey} className="px-3 py-2 text-left text-xs font-semibold text-purple-700">
-                            {col?.label}
+                            {col?.label || colKey}
                           </th>
                         );
                       })}
@@ -447,6 +472,9 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
                   <strong>Note:</strong> {csvData.data.length} total rows will be imported. 
                   The <code className="bg-blue-100 px-1 rounded">task_id</code> will be auto-generated and 
                   <code className="bg-blue-100 px-1 rounded ml-1">created_at</code> will be set to the current timestamp.
+                  {importType === 'maintenance' && (
+                    <span className="ml-1">Machine part details will be resolved automatically.</span>
+                  )}
                 </p>
               </div>
 
