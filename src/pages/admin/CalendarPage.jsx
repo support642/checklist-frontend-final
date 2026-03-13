@@ -11,6 +11,7 @@ export default function CalendarPage() {
   const [showPopup, setShowPopup] = useState(false);
   const [checklistTasks, setChecklistTasks] = useState([]);
   const [delegationTasks, setDelegationTasks] = useState([]);
+  const [maintenanceTasks, setMaintenanceTasks] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Fetch tasks when month/year changes
@@ -26,6 +27,7 @@ export default function CalendarPage() {
         const data = await fetchCalendarTasks(month, year, username, role);
         setChecklistTasks(data.checklist || []);
         setDelegationTasks(data.delegation || []);
+        setMaintenanceTasks(data.maintenance || []);
       } catch (error) {
         console.error("Error loading calendar tasks:", error);
       } finally {
@@ -64,7 +66,7 @@ export default function CalendarPage() {
         const dateKey = formatDateKey(task.task_start_date);
         if (dateKey) {
           if (!grouped[dateKey]) {
-            grouped[dateKey] = { checklist: [], delegation: [] };
+            grouped[dateKey] = { checklist: [], delegation: [], maintenance: [] };
           }
           grouped[dateKey].checklist.push(task);
         }
@@ -77,21 +79,35 @@ export default function CalendarPage() {
         const dateKey = formatDateKey(task.task_start_date);
         if (dateKey) {
           if (!grouped[dateKey]) {
-            grouped[dateKey] = { checklist: [], delegation: [] };
+            grouped[dateKey] = { checklist: [], delegation: [], maintenance: [] };
           }
           grouped[dateKey].delegation.push(task);
         }
       });
     }
 
+    // Process maintenance tasks using task_start_date
+    if (maintenanceTasks && maintenanceTasks.length > 0) {
+      maintenanceTasks.forEach((task) => {
+        const dateKey = formatDateKey(task.task_start_date);
+        if (dateKey) {
+          if (!grouped[dateKey]) {
+            grouped[dateKey] = { checklist: [], delegation: [], maintenance: [] };
+          }
+          grouped[dateKey].maintenance = grouped[dateKey].maintenance || [];
+          grouped[dateKey].maintenance.push(task);
+        }
+      });
+    }
+
     return grouped;
-  }, [checklistTasks, delegationTasks]);
+  }, [checklistTasks, delegationTasks, maintenanceTasks]);
 
   // Get tasks for selected date
   const selectedDateTasks = useMemo(() => {
-    if (!selectedDate) return { checklist: [], delegation: [] };
+    if (!selectedDate) return { checklist: [], delegation: [], maintenance: [] };
     const dateKey = formatDateKey(selectedDate);
-    return tasksByDate[dateKey] || { checklist: [], delegation: [] };
+    return tasksByDate[dateKey] || { checklist: [], delegation: [], maintenance: [] };
   }, [selectedDate, tasksByDate]);
 
   // Navigation
@@ -173,6 +189,10 @@ export default function CalendarPage() {
             <div className="w-3 h-3 rounded-full bg-orange-500"></div>
             <span className="text-gray-600">Delegation</span>
           </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+            <span className="text-gray-600">Maintenance</span>
+          </div>
         </div>
 
         {/* Calendar Grid */}
@@ -202,7 +222,9 @@ export default function CalendarPage() {
               const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const dayTasks = tasksByDate[dateKey];
               const isToday = today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
-              const totalTasks = dayTasks ? (dayTasks.checklist.length + dayTasks.delegation.length) : 0;
+              const totalTasks = dayTasks 
+                ? (dayTasks.checklist.length + dayTasks.delegation.length + (dayTasks.maintenance?.length || 0)) 
+                : 0;
 
               return (
                 <div
@@ -237,6 +259,14 @@ export default function CalendarPage() {
                           <div className="w-2 h-2 rounded-full bg-orange-500"></div>
                           <span className="text-[10px] text-orange-700 font-medium truncate">
                             {dayTasks.delegation.length} Delegation
+                          </span>
+                        </div>
+                      )}
+                      {dayTasks.maintenance?.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          <span className="text-[10px] text-blue-700 font-medium truncate">
+                            {dayTasks.maintenance.length} Maint.
                           </span>
                         </div>
                       )}
@@ -280,7 +310,9 @@ export default function CalendarPage() {
 
               {/* Popup Content */}
               <div className="flex-1 overflow-y-auto p-4">
-                {selectedDateTasks.checklist.length === 0 && selectedDateTasks.delegation.length === 0 ? (
+                {selectedDateTasks.checklist.length === 0 && 
+                 selectedDateTasks.delegation.length === 0 && 
+                 (selectedDateTasks.maintenance?.length || 0) === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <Circle className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                     <p>No tasks for this date</p>
@@ -375,6 +407,56 @@ export default function CalendarPage() {
                                   {task.status && (
                                     <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${
                                       task.status === 'done' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {task.status}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Maintenance Tasks */}
+                    {selectedDateTasks.maintenance?.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-blue-700 mb-2 flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                          Maintenance Tasks ({selectedDateTasks.maintenance.length})
+                        </h3>
+                        <div className="space-y-2">
+                          {selectedDateTasks.maintenance.map((task, index) => (
+                            <div key={index} className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                              <div className="flex items-start gap-2">
+                                <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 truncate">
+                                    {task.task_description || task.task_id || "Maintenance Task"}
+                                  </p>
+                                  <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
+                                    {task.name && (
+                                      <span className="flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                        {task.name}
+                                      </span>
+                                    )}
+                                    {task.department && (
+                                      <span className="text-gray-400">
+                                        {task.department}
+                                      </span>
+                                    )}
+                                    {task.task_start_date && (
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        {formatTime(task.task_start_date)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {task.status && (
+                                    <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full ${
+                                      task.status === 'Done' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
                                     }`}>
                                       {task.status}
                                     </span>
