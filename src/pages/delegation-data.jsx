@@ -17,16 +17,14 @@ const CONFIG = {
 
 
 
-function DelegationPage({ searchTerm, nameFilter, freqFilter, setNameFilter, setFreqFilter }) {
+function DelegationPage({ searchTerm, nameFilter, freqFilter }) {
  const [successMessage, setSuccessMessage] = useState("")
   const [error, setError] = useState(null)
-  const [userRole, setUserRole] = useState("")
-  const [username, setUsername] = useState("")
   const [isInitialized, setIsInitialized] = useState(false)
   const [selectedTasks, setSelectedTasks] = useState([])
   const [isDeleting, setIsDeleting] = useState(false)
 
-  const { delegationTasks, loading, delegationTotal, delegationHasMore, delegationPage } = useSelector((state) => state.quickTask)
+  const { delegationTasks, loading, delegationTotal } = useSelector((state) => state.quickTask)
   const dispatch = useDispatch()
 useEffect(()=>{
   dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))
@@ -46,7 +44,7 @@ useEffect(()=>{
     if (selectedTasks.length === filteredTasks.length) {
       setSelectedTasks([])
     } else {
-      setSelectedTasks(filteredTasks.map(task => task_id))
+      setSelectedTasks(filteredTasks.map(task => task.task_id))
     }
   }
 
@@ -89,16 +87,9 @@ useEffect(()=>{
   }, [])
 
   useEffect(() => {
-    const role = localStorage.getItem("role")
-    const user = localStorage.getItem("user-name")
-    setUserRole(role || "")
-    setUsername(user || "")
     setIsInitialized(true)
   }, [])
 
-  // const fetchData = useCallback(async () => {
-  //   if (!isInitialized || !username) return
-    
   //   try {
   //   //  setLoading(true)
   //     setError(null)
@@ -183,7 +174,7 @@ useEffect(()=>{
         <div className="mt-4 bg-red-50 p-4 rounded-md text-red-800 text-center">
           {error}{" "}
           <button 
-            onClick={fetchData} 
+            onClick={() => dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))}
             className="underline ml-2 hover:text-red-600"
           >
             Try again
@@ -223,9 +214,112 @@ useEffect(()=>{
             )}
           </div>
 
+          <div className="overflow-x-auto overflow-y-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 280px)' }}>
+            {/* Mobile Card View */}
+            <div className="sm:hidden space-y-3 p-3">
+              {filteredTasks.length > 0 ? (
+                filteredTasks.map((task, index) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedTasks.includes(task.task_id)}
+                          onChange={() => handleCheckboxChange(task.task_id)}
+                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          task.frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
+                          task.frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
+                          task.frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {task.frequency}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        ID: {task.task_id || "—"}
+                      </div>
+                    </div>
+                    
+                    {/* Task Description */}
+                    <p className="text-sm font-medium text-gray-900 mb-2">{task.task_description || "—"}</p>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {/* Name */}
+                      <div>
+                        <span className="text-gray-500">Name:</span>{' '}
+                        <span className="font-medium">{task.name || "—"}</span>
+                      </div>
+                      
+                      {/* Department */}
+                      <div>
+                        <span className="text-gray-500">Dept:</span>{' '}
+                        <span className="font-medium">{task.department || "—"}</span>
+                      </div>
 
-          <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-            <table className="min-w-full divide-y divide-gray-200">
+                      {/* Unit */}
+                      <div>
+                        <span className="text-gray-500">Unit:</span>{' '}
+                        <span className="font-medium">{task.unit || "—"}</span>
+                      </div>
+                      
+                      {/* Division */}
+                      <div>
+                        <span className="text-gray-500">Div:</span>{' '}
+                        <span className="font-medium">{task.division || "—"}</span>
+                      </div>
+                      
+                      {/* Given By */}
+                      <div>
+                        <span className="text-gray-500">Given By:</span>{' '}
+                        <span className="font-medium">{task.given_by || "—"}</span>
+                      </div>
+                      
+                      {/* Start Date */}
+                      <div>
+                        <span className="text-gray-500">Start:</span>{' '}
+                        <span className="font-medium">{formatDateTime(task.task_start_date)}</span>
+                      </div>
+                      
+                      {/* End Date */}
+                      <div>
+                        <span className="text-gray-500">End:</span>{' '}
+                        <span className="font-medium">{formatDateTime(task.submission_date)}</span>
+                      </div>
+                      
+                      {/* Reminder */}
+                      <div>
+                        <span className="text-gray-500">Reminder:</span>{' '}
+                        <span className="font-medium">{task.enable_reminder || "—"}</span>
+                      </div>
+                      
+                      {/* Attachment */}
+                      <div>
+                        <span className="text-gray-500">Attachment:</span>{' '}
+                        <span className="font-medium">{task.require_attachment || "—"}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Timestamp */}
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="text-xs text-gray-400">
+                        Created: {formatDateTime(task.created_at)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-gray-500 text-sm">
+                  {searchTerm || nameFilter || freqFilter
+                    ? "No tasks matching your filters"
+                    : "No pending tasks found"}
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Table View */}
+            <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
               <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -156,7 +157,6 @@ export default function DashboardHeader({
           >
             {canAccessModule("checklist") && <option value="checklist">Checklist</option>}
             {canAccessModule("delegation") && <option value="delegation">Delegation</option>}
-            {canAccessModule("maintenance") && <option value="maintenance">Maintenance</option>}
           </select>
 
           {/* Unit Filter - Only show for checklist */}
@@ -306,7 +306,6 @@ export default function DashboardHeader({
           >
             {canAccessModule("checklist") && <option value="checklist">Checklist</option>}
             {canAccessModule("delegation") && <option value="delegation">Delegation</option>}
-            {canAccessModule("maintenance") && <option value="maintenance">Maintenance</option>}
           </select>
 
           {/* Unit Filter - Only show for checklist */}
