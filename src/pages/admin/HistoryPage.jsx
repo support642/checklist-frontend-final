@@ -8,6 +8,7 @@ import { checklistHistoryData } from "../../redux/slice/checklistSlice"
 import { postChecklistAdminDoneAPI } from "../../redux/api/checkListApi"
 import { postDelegationAdminDoneAPI } from "../../redux/api/delegationApi"
 import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice"
+import { hasPageAccess, canAccessModule } from "../../utils/permissionUtils"
 import { delegationDoneData } from "../../redux/slice/delegationSlice"
 import { maintenanceHistoryData, maintenanceAdminDone } from "../../redux/slice/maintenanceSlice"
 import { postMaintenanceAdminDoneAPI } from "../../redux/api/maintenanceApi"
@@ -74,6 +75,16 @@ function HistoryPage() {
       setActiveTab('maintenance')
     }
   }, [searchParams])
+
+  // Tab visibility fallback logic
+  useEffect(() => {
+    if (!canAccessModule(activeTab)) {
+      const availableTabs = ["checklist", "maintenance"].filter(canAccessModule);
+      if (availableTabs.length > 0) {
+        setActiveTab(availableTabs[0]);
+      }
+    }
+  }, [activeTab]);
 
   const parseSupabaseDate = (dateStr) => {
     if (!dateStr) return null
@@ -539,58 +550,63 @@ function HistoryPage() {
         </div>
 
         {/* Tabs - Compact */}
-        {/* Only Checklist tab shown for now — Delegation tab hidden */}
         <div className="bg-white rounded-md shadow-sm">
           <div className="flex gap-1">
-            <button
-              onClick={() => {
-                setActiveTab("checklist")
-                setSearchTerm("")
-                setSelectedHistoryItems([])
-                setSelectedDelegationItems([])
-                setSelectedMaintenanceItems([])
-                setCurrentPage(1)
-              }}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "checklist"
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              Checklist
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("maintenance")
-                setSearchTerm("")
-                setSelectedHistoryItems([])
-                setSelectedDelegationItems([])
-                setSelectedMaintenanceItems([])
-                setMaintCurrentPage(1)
-              }}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
-                activeTab === "maintenance"
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              Maintenance
-            </button>
-            {/* <button
-              onClick={() => {
-                setActiveTab("delegation")
-                setSearchTerm("")
-                setSelectedHistoryItems([])
-                setSelectedDelegationItems([])
-              }}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-r-md transition-colors ${
-                activeTab === "delegation"
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              Delegation
-            </button> */}
+            {canAccessModule("checklist") && (
+              <button
+                onClick={() => {
+                  setActiveTab("checklist")
+                  setSearchTerm("")
+                  setSelectedHistoryItems([])
+                  setSelectedDelegationItems([])
+                  setSelectedMaintenanceItems([])
+                  setCurrentPage(1)
+                }}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === "checklist"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                Checklist
+              </button>
+            )}
+            {canAccessModule("maintenance") && (
+              <button
+                onClick={() => {
+                  setActiveTab("maintenance")
+                  setSearchTerm("")
+                  setSelectedHistoryItems([])
+                  setSelectedDelegationItems([])
+                  setSelectedMaintenanceItems([])
+                  setMaintCurrentPage(1)
+                }}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                  activeTab === "maintenance"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                Maintenance
+              </button>
+            )}
+            {canAccessModule("delegation") && false && ( // Delegation tab still explicitly hidden per original code
+              <button
+                onClick={() => {
+                  setActiveTab("delegation")
+                  setSearchTerm("")
+                  setSelectedHistoryItems([])
+                  setSelectedDelegationItems([])
+                }}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-r-md transition-colors ${
+                  activeTab === "delegation"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                Delegation
+              </button>
+            )}
           </div>
         </div>
 

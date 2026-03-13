@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { format } from 'date-fns';
 import { Search, ChevronDown, Filter, Trash2, Edit, Save, X } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
-import { hasPageAccess } from "../utils/permissionUtils";
+import { hasPageAccess, canAccessModule } from "../utils/permissionUtils";
 import DelegationPage from "./delegation-data";
 import MaintenanceQuickTaskPage from "./maintenance-quick-task";
 import { useDispatch, useSelector } from "react-redux";
@@ -16,7 +16,12 @@ export default function QuickTask() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [activeTab, setActiveTab] = useState('checklist');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (canAccessModule('checklist')) return 'checklist';
+    if (canAccessModule('delegation')) return 'delegation';
+    if (canAccessModule('maintenance')) return 'maintenance';
+    return 'checklist';
+  });
   const [nameFilter, setNameFilter] = useState('');
   const [freqFilter, setFreqFilter] = useState('');
     const tableContainerRef = useRef(null);
@@ -432,34 +437,40 @@ const filteredChecklistTasks = quickTask.filter(task => {
 
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto flex-wrap">
             <div className="flex border border-purple-200 rounded-md overflow-hidden self-start">
-             <button
-  className={`px-4 py-2 text-sm font-medium ${activeTab === 'checklist' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
-  onClick={() => {
-    setActiveTab('checklist');
-    dispatch(resetChecklistPagination());
-    dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
-  }}
->
-                Checklist
-              </button>
-              <button
-  className={`px-4 py-2 text-sm font-medium ${activeTab === 'delegation' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
-  onClick={() => {
-    setActiveTab('delegation');
-    dispatch(resetDelegationPagination());
-    dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
-  }}
->
-                Delegation
-              </button>
-              <button
-  className={`px-4 py-2 text-sm font-medium ${activeTab === 'maintenance' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
-  onClick={() => {
-    setActiveTab('maintenance');
-  }}
->
-                Maintenance
-              </button>
+              {canAccessModule('checklist') && (
+                <button
+                  className={`px-4 py-2 text-sm font-medium ${activeTab === 'checklist' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                  onClick={() => {
+                    setActiveTab('checklist');
+                    dispatch(resetChecklistPagination());
+                    dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
+                  }}
+                >
+                  Checklist
+                </button>
+              )}
+              {canAccessModule('delegation') && (
+                <button
+                  className={`px-4 py-2 text-sm font-medium ${activeTab === 'delegation' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                  onClick={() => {
+                    setActiveTab('delegation');
+                    dispatch(resetDelegationPagination());
+                    dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
+                  }}
+                >
+                  Delegation
+                </button>
+              )}
+              {canAccessModule('maintenance') && (
+                <button
+                  className={`px-4 py-2 text-sm font-medium ${activeTab === 'maintenance' ? 'bg-purple-600 text-white' : 'bg-white text-purple-600 hover:bg-purple-50'}`}
+                  onClick={() => {
+                    setActiveTab('maintenance');
+                  }}
+                >
+                  Maintenance
+                </button>
+              )}
             </div>
 
             <div className="relative flex-1 min-w-[200px]">

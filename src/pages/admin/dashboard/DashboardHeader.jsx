@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getTotalUsersCountApi } from "../../../redux/api/dashboardApi"
+import { canAccessModule } from "../../../utils/permissionUtils"
 
 export default function DashboardHeader({
   dashboardType,
@@ -153,8 +154,9 @@ export default function DashboardHeader({
             onChange={(e) => setDashboardType(e.target.value)}
             className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
           >
-            <option value="checklist">Checklist</option>
-            <option value="delegation">Delegation</option>
+            {canAccessModule("checklist") && <option value="checklist">Checklist</option>}
+            {canAccessModule("delegation") && <option value="delegation">Delegation</option>}
+            {canAccessModule("maintenance") && <option value="maintenance">Maintenance</option>}
           </select>
 
           {/* Unit Filter - Only show for checklist */}
@@ -302,8 +304,9 @@ export default function DashboardHeader({
             onChange={(e) => setDashboardType(e.target.value)}
             className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
           >
-            <option value="checklist">Checklist</option>
-            <option value="delegation">Delegation</option>
+            {canAccessModule("checklist") && <option value="checklist">Checklist</option>}
+            {canAccessModule("delegation") && <option value="delegation">Delegation</option>}
+            {canAccessModule("maintenance") && <option value="maintenance">Maintenance</option>}
           </select>
 
           {/* Unit Filter - Only show for checklist */}

@@ -8,6 +8,7 @@ import { maintenanceData, updateMaintenance } from "../../redux/slice/maintenanc
 import { postChecklistAdminDoneAPI, sendChecklistWhatsAppAPI } from "../../redux/api/checkListApi"
 import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice";
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { hasModifyAccess, canAccessModule } from "../../utils/permissionUtils";
 
 // Configuration object - Move all configurations here
 const CONFIG = {
@@ -90,6 +91,16 @@ function AccountDataPage() {
       setActiveView('maintenance');
     }
   }, [dispatch, searchParams])
+
+  // Module visibility fallback logic
+  useEffect(() => {
+    if (!canAccessModule(activeView)) {
+      const availableViews = ["checklist", "maintenance"].filter(canAccessModule);
+      if (availableViews.length > 0) {
+        setActiveView(availableViews[0]);
+      }
+    }
+  }, [activeView]);
 
   // Debounce search term and re-fetch data
   useEffect(() => {
@@ -1034,6 +1045,11 @@ const fileToBase64 = (file) => {
 
   // UPDATED: MAIN SUBMIT FUNCTION with date-time formatting
 const handleSubmit = async () => {
+  // Permission guard: view-only users cannot submit
+  if (!hasModifyAccess('pending_task')) {
+    alert('You have view-only access and cannot submit tasks.');
+    return;
+  }
   const selectedItemsArray = Array.from(selectedItems);
   if (selectedItemsArray.length === 0) {
     alert("Please select at least one item to submit");
@@ -1138,26 +1154,30 @@ const submissionData = await Promise.all(
             
             {/* Checklist / Maintenance Toggle */}
             <div className="flex bg-gray-200 rounded-lg p-1">
-              <button
-                onClick={() => setActiveView('checklist')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeView === 'checklist' 
-                    ? 'bg-white text-purple-700 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Checklist
-              </button>
-              <button
-                onClick={() => setActiveView('maintenance')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  activeView === 'maintenance' 
-                    ? 'bg-white text-purple-700 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Maintenance
-              </button>
+              {canAccessModule("checklist") && (
+                <button
+                  onClick={() => setActiveView('checklist')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeView === 'checklist' 
+                      ? 'bg-white text-purple-700 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Checklist
+                </button>
+              )}
+              {canAccessModule("maintenance") && (
+                <button
+                  onClick={() => setActiveView('maintenance')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeView === 'maintenance' 
+                      ? 'bg-white text-purple-700 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Maintenance
+                </button>
+              )}
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
@@ -1209,8 +1229,8 @@ const submissionData = await Promise.all(
                   <span className="sm:hidden">History</span>
                 </div>
               </button>
-              {/* Submit Selected Button - Only for Users */}
-              {!showHistory && (userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+              {/* Submit Selected Button - Only for Users with Modify Access */}
+              {!showHistory && (userRole === "user" || userRole === "admin" || userRole === "super_admin") && hasModifyAccess('pending_task') && (
                 <button
                   onClick={activeView === 'checklist' ? handleSubmit : handleMaintSubmit}
                   disabled={(activeView === 'checklist' ? selectedItemsCount === 0 : maintSelectedItems.size === 0) || isSubmitting}

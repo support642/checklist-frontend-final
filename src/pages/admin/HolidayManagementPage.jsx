@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Calendar, Plus, Trash2, X, CalendarDays, AlertCircle } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { hasPageAccess } from "../../utils/permissionUtils";
+import { hasPageAccess, hasModifyAccess } from "../../utils/permissionUtils";
 import {
   fetchHolidays,
   addHoliday,
@@ -158,7 +158,7 @@ export default function HolidayManagementPage() {
             <h1 className="text-xl font-bold text-gray-800">Holiday & Working Day Management</h1>
             <p className="text-sm text-gray-500">Manage holidays and working days</p>
           </div>
-          {canManageHolidays && (
+          {canManageHolidays && hasModifyAccess('holiday_management') && (
           <button
             onClick={() => setShowAddForm(true)}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"

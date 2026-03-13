@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft } from "lucide-react";
+import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft, Settings } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { hasPageAccess } from "../../utils/permissionUtils";
+import { hasPageAccess, hasModifyAccess, canAccessModule } from "../../utils/permissionUtils";
 import { fetchUniqueDepartmentDataApi, fetchUniqueDoerNameDataApi, fetchUniqueGivenByDataApi, pushAssignTaskApi } from "../../redux/api/assignTaskApi";
 import { useDispatch, useSelector } from "react-redux";
 import { assignTaskInTable, uniqueDepartmentData, uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
 import { departmentDetails } from "../../redux/slice/settingSlice";
-import CSVImportModal from "../../components/CSVImportModal";
 import { fetchMachinePartsData } from "../../redux/slice/maintenanceSlice";
+import CSVImportModal from "../../components/CSVImportModal";
 // import supabase from "../../SupabaseClient";
 
 // Calendar Component (defined outside)
@@ -892,8 +892,13 @@ useEffect(() => {
     return `${dateStr} at ${timeStr}`;
   };
 
-
-
+  const handleSelection = (type) => {
+    setTaskType(type);
+    setFormData(prev => ({
+      ...prev,
+      frequency: type === 'delegation' ? 'one-time' : 'daily'
+    }));
+  };
 
 
   // UPDATED: Date formatting function to return DD/MM/YYYY format (for working days comparison)
@@ -962,60 +967,54 @@ useEffect(() => {
           </button>
         </div>
         {!taskType ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-8">
             {/* Checklist Card */}
-            <div 
-              onClick={() => {
-                setTaskType('checklist');
-                setFormData(prev => ({ ...prev, frequency: 'daily' }));
-              }}
-              className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
-            >
-              <div className="p-4 bg-purple-50 rounded-full group-hover:bg-purple-100 transition-colors">
-                <ClipboardList className="h-12 w-12 text-purple-600" />
+            {canAccessModule("checklist") && (
+              <div 
+                onClick={() => handleSelection('checklist')}
+                className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
+              >
+                <div className="p-4 bg-purple-50 rounded-full group-hover:bg-purple-100 transition-colors">
+                  <ClipboardList className="h-12 w-12 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Checklist</h3>
+                  <p className="text-gray-500 mt-2">Create recurring tasks with daily, weekly, or monthly frequencies.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Checklist</h3>
-                <p className="text-gray-500 mt-2">Create recurring tasks with daily, weekly, or monthly frequencies.</p>
-              </div>
-            </div>
+            )}
 
             {/* Delegation Card */}
-            <div 
-              onClick={() => {
-                setTaskType('delegation');
-                setFormData(prev => ({ ...prev, frequency: 'one-time' }));
-              }}
-              className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
-            >
-              <div className="p-4 bg-pink-50 rounded-full group-hover:bg-pink-100 transition-colors">
-                <Users className="h-12 w-12 text-pink-600" />
+            {canAccessModule("delegation") && (
+              <div 
+                onClick={() => handleSelection('delegation')}
+                className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
+              >
+                <div className="p-4 bg-pink-50 rounded-full group-hover:bg-pink-100 transition-colors">
+                  <Users className="h-12 w-12 text-pink-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Delegation</h3>
+                  <p className="text-gray-500 mt-2">Assign one-time tasks to staff members with specific deadlines.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Delegation</h3>
-                <p className="text-gray-500 mt-2">Assign one-time tasks to staff members with specific deadlines.</p>
-              </div>
-            </div>
+            )}
 
-            {/* Maintenance Card */}
-            <div 
-              onClick={() => {
-                setTaskType('maintenance');
-                setFormData(prev => ({ ...prev, frequency: 'daily' }));
-              }}
-              className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
-            >
-              <div className="p-4 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors">
-                <svg className="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+            {/* NEW: Maintenance Card */}
+            {canAccessModule("maintenance") && (
+              <div 
+                onClick={() => handleSelection('maintenance')}
+                className="group cursor-pointer bg-white rounded-xl border-2 border-blue-100 p-8 shadow-sm hover:shadow-xl hover:border-blue-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
+              >
+                <div className="p-4 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors">
+                  <Settings className="h-12 w-12 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Maintenance</h3>
+                  <p className="text-gray-500 mt-2">Assign one-time maintenance tasks for machines and parts.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Maintenance</h3>
-                <p className="text-gray-500 mt-2">Schedule recurring machine and equipment maintenance tasks.</p>
-              </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="rounded-lg border border-purple-200 bg-white shadow-md overflow-hidden">
@@ -1651,13 +1650,15 @@ useEffect(() => {
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-md gradient-bg py-2 px-4 text-white hover:gradient-bg:hover focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? "Assigning..." : "Assign Task"}
-                </button>
+                {hasModifyAccess('assign_task') && (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="rounded-md gradient-bg py-2 px-4 text-white hover:gradient-bg:hover focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? "Assigning..." : "Assign Task"}
+                  </button>
+                )}
               </div>
             </form>
           </div>

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { CheckCircle2, Upload, X, Search, History, ArrowLeft, Calendar, Check } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 import ReactDOM from 'react-dom';
+import { hasModifyAccess } from '../../utils/permissionUtils';
 
 // Google Apps Script URL
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz47q4SiLvJJom8dRGteqjhufs0Iui4rYTLMeTYqOgY_MFrS0C0o0XkRCPzAOdEeg4jqg/exec"
@@ -688,7 +689,7 @@ const confirmMarkDone = async () => {
             )}
             
             {/* Submit Button - Only show when not in history view */}
-            {!showHistory && (
+            {!showHistory && hasModifyAccess('pending_task') && (
               <button
                 onClick={handleSubmit}
                 disabled={selectedItems.length === 0 || isSubmitting}

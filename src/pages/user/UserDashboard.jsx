@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { canAccessModule } from "../../utils/permissionUtils";
 import ChecklistView from "../../components/Checklist/ChecklistView";
 import MaintenanceView from "../../components/Maintenance/MaintenanceView";
 import { LayoutDashboard, Tool, Building2 } from "lucide-react";
@@ -34,6 +35,16 @@ const UserDashboard = () => {
     localStorage.setItem("user_dashboard_active_module", module);
   };
 
+  // Module visibility fallback logic
+  useEffect(() => {
+    if (!canAccessModule(activeModule)) {
+      const availableModules = ["checklist", "maintenance"].filter(canAccessModule);
+      if (availableModules.length > 0) {
+        setActiveModule(availableModules[0]);
+      }
+    }
+  }, [activeModule]);
+
   return (
     <div className="space-y-6">
       {/* Top Level Module Switcher (Segmented Control) */}
@@ -46,28 +57,32 @@ const UserDashboard = () => {
         </div>
 
         <div className="flex p-1 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-          <button
-            onClick={() => handleModuleChange("checklist")}
-            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-              activeModule === "checklist"
-                ? "bg-blue-600 text-white shadow-lg scale-105"
-                : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-            }`}
-          >
-            <Building2 className="h-4 w-4" />
-            Checklist
-          </button>
-          <button
-            onClick={() => handleModuleChange("maintenance")}
-            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-              activeModule === "maintenance"
-                ? "bg-blue-600 text-white shadow-lg scale-105"
-                : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-            }`}
-          >
-             <i className="fas fa-tools h-4 w-4" />
-            Maintenance
-          </button>
+          {canAccessModule("checklist") && (
+            <button
+              onClick={() => handleModuleChange("checklist")}
+              className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeModule === "checklist"
+                  ? "bg-blue-600 text-white shadow-lg scale-105"
+                  : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+              }`}
+            >
+              <Building2 className="h-4 w-4" />
+              Checklist
+            </button>
+          )}
+          {canAccessModule("maintenance") && (
+            <button
+              onClick={() => handleModuleChange("maintenance")}
+              className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeModule === "maintenance"
+                  ? "bg-blue-600 text-white shadow-lg scale-105"
+                  : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+              }`}
+            >
+               <i className="fas fa-tools h-4 w-4" />
+              Maintenance
+            </button>
+          )}
         </div>
       </div>
 

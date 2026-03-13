@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { CheckCircle2, Upload, X, Search, History, ArrowLeft } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
+import { hasModifyAccess } from '../../utils/permissionUtils';
 
 // Configuration object - Move all configurations here
 const CONFIG = {
@@ -608,7 +609,7 @@ function AccountDataPage() {
               )}
             </button>
 
-            {!showHistory && (
+            {!showHistory && hasModifyAccess('pending_task') && (
               <button
                 onClick={handleSubmit}
                 disabled={selectedItemsCount === 0 || isSubmitting}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import AdminLayout from "../../components/layout/AdminLayout.jsx"
-import { hasPageAccess } from "../../utils/permissionUtils"
+import { hasPageAccess, canAccessModule } from "../../utils/permissionUtils"
 
 import DashboardHeader from "./dashboard/DashboardHeader.jsx"
 import StatisticsCards from "./dashboard/StaticsCard.jsx"
@@ -108,6 +108,16 @@ useEffect(() => {
     setDivisionFilter("all");
   }
 }, []);
+
+// Tab visibility fallback logic
+useEffect(() => {
+  if (!canAccessModule(dashboardType)) {
+    const availableModules = ["checklist", "delegation", "maintenance"].filter(canAccessModule);
+    if (availableModules.length > 0) {
+      setDashboardType(availableModules[0]);
+    }
+  }
+}, [dashboardType]);
 
 
 
@@ -1138,7 +1148,12 @@ useEffect(() => {
 
   // Persistence for active module tab
   const [activeModule, setActiveModule] = useState(() => {
-    return localStorage.getItem("admin_dashboard_active_module") || "checklist";
+    const saved = localStorage.getItem("admin_dashboard_active_module");
+    if (saved && canAccessModule(saved)) return saved;
+    // Default fallback based on access
+    if (canAccessModule("checklist")) return "checklist";
+    if (canAccessModule("maintenance")) return "maintenance";
+    return "checklist"; // Hard fallback
   });
 
   const handleModuleChange = (module) => {
@@ -1156,28 +1171,32 @@ useEffect(() => {
           </div>
 
           <div className="flex p-1 bg-white rounded-2xl border border-white-100 dark:border-white-800 shadow-sm">
-            <button
-              onClick={() => handleModuleChange("checklist")}
-              className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                activeModule === "checklist"
-                  ? "bg-blue-600 text-white shadow-lg scale-105"
-                  : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-              }`}
-            >
-              <i className="fas fa-clipboard-list h-4 w-4" />
-              Checklist
-            </button>
-            <button
-              onClick={() => handleModuleChange("maintenance")}
-              className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                activeModule === "maintenance"
-                  ? "bg-blue-600 text-white shadow-lg scale-105"
-                  : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-              }`}
-            >
-              <i className="fas fa-tools h-4 w-4" />
-              Maintenance
-            </button>
+            {canAccessModule("checklist") && (
+              <button
+                onClick={() => handleModuleChange("checklist")}
+                className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                  activeModule === "checklist"
+                    ? "bg-blue-600 text-white shadow-lg scale-105"
+                    : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                }`}
+              >
+                <i className="fas fa-clipboard-list h-4 w-4" />
+                Checklist
+              </button>
+            )}
+            {canAccessModule("maintenance") && (
+              <button
+                onClick={() => handleModuleChange("maintenance")}
+                className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                  activeModule === "maintenance"
+                    ? "bg-blue-600 text-white shadow-lg scale-105"
+                    : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                }`}
+              >
+                <i className="fas fa-tools h-4 w-4" />
+                Maintenance
+              </button>
+            )}
           </div>
           
           <div className="hidden sm:block">

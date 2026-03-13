@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft, Settings } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { hasPageAccess } from "../../utils/permissionUtils";
+import { hasPageAccess, hasModifyAccess, canAccessModule } from "../../utils/permissionUtils";
 import { pushAssignTaskApi } from "../../redux/api/assignTaskApi";
 import { useDispatch, useSelector } from "react-redux";
 import { uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
@@ -957,55 +957,61 @@ useEffect(() => {
         {!taskType ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-8">
             {/* Checklist Card */}
-            <div 
-              onClick={() => {
-                setTaskType('checklist');
-                setFormData(prev => ({ ...prev, frequency: 'daily' }));
-              }}
-              className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
-            >
-              <div className="p-4 bg-purple-50 rounded-full group-hover:bg-purple-100 transition-colors">
-                <ClipboardList className="h-12 w-12 text-purple-600" />
+            {canAccessModule("checklist") && (
+              <div 
+                onClick={() => {
+                  setTaskType('checklist');
+                  setFormData(prev => ({ ...prev, frequency: 'daily' }));
+                }}
+                className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
+              >
+                <div className="p-4 bg-purple-50 rounded-full group-hover:bg-purple-100 transition-colors">
+                  <ClipboardList className="h-12 w-12 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Checklist</h3>
+                  <p className="text-gray-500 mt-2">Create recurring tasks with daily, weekly, or monthly frequencies.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Checklist</h3>
-                <p className="text-gray-500 mt-2">Create recurring tasks with daily, weekly, or monthly frequencies.</p>
-              </div>
-            </div>
+            )}
 
             {/* Delegation Card */}
-            <div 
-              onClick={() => {
-                setTaskType('delegation');
-                setFormData(prev => ({ ...prev, frequency: 'one-time' }));
-              }}
-              className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
-            >
-              <div className="p-4 bg-pink-50 rounded-full group-hover:bg-pink-100 transition-colors">
-                <Users className="h-12 w-12 text-pink-600" />
+            {canAccessModule("delegation") && (
+              <div 
+                onClick={() => {
+                  setTaskType('delegation');
+                  setFormData(prev => ({ ...prev, frequency: 'one-time' }));
+                }}
+                className="group cursor-pointer bg-white rounded-xl border-2 border-purple-100 p-8 shadow-sm hover:shadow-xl hover:border-purple-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
+              >
+                <div className="p-4 bg-pink-50 rounded-full group-hover:bg-pink-100 transition-colors">
+                  <Users className="h-12 w-12 text-pink-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Delegation</h3>
+                  <p className="text-gray-500 mt-2">Assign one-time tasks to staff members with specific deadlines.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Delegation</h3>
-                <p className="text-gray-500 mt-2">Assign one-time tasks to staff members with specific deadlines.</p>
-              </div>
-            </div>
+            )}
 
             {/* NEW: Maintenance Card */}
-            <div 
-              onClick={() => {
-                setTaskType('maintenance');
-                setFormData(prev => ({ ...prev, frequency: 'one-time' }));
-              }}
-              className="group cursor-pointer bg-white rounded-xl border-2 border-blue-100 p-8 shadow-sm hover:shadow-xl hover:border-blue-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
-            >
-              <div className="p-4 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors">
-                <Settings className="h-12 w-12 text-blue-600" />
+            {canAccessModule("maintenance") && (
+              <div 
+                onClick={() => {
+                  setTaskType('maintenance');
+                  setFormData(prev => ({ ...prev, frequency: 'one-time' }));
+                }}
+                className="group cursor-pointer bg-white rounded-xl border-2 border-blue-100 p-8 shadow-sm hover:shadow-xl hover:border-blue-400 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center text-center space-y-4"
+              >
+                <div className="p-4 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors">
+                  <Settings className="h-12 w-12 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">Maintenance</h3>
+                  <p className="text-gray-500 mt-2">Assign one-time maintenance tasks for machines and parts.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">Maintenance</h3>
-                <p className="text-gray-500 mt-2">Assign one-time maintenance tasks for machines and parts.</p>
-              </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="rounded-lg border border-purple-200 bg-white shadow-md overflow-hidden">
@@ -1619,6 +1625,7 @@ useEffect(() => {
                 >
                   Cancel
                 </button>
+                {hasModifyAccess('assign_task') && (
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -1626,6 +1633,7 @@ useEffect(() => {
                 >
                   {isSubmitting ? "Assigning..." : "Assign Task"}
                 </button>
+              )}
               </div>
             </form>
           </div>

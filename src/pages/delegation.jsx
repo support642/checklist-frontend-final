@@ -9,7 +9,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
-import { hasPageAccess } from "../utils/permissionUtils";
+import { hasPageAccess, hasModifyAccess } from "../utils/permissionUtils";
 import { useDispatch, useSelector } from "react-redux";
 import {
   delegationDoneData,
@@ -249,7 +249,7 @@ function DelegationDataPage() {
     return delegation_done
       .filter((item) => {
         const userMatch =
-          hasPageAccess("delegation_admin") ||
+          hasPageAccess("delegation") ||
           (item.name && item.name.toLowerCase() === username.toLowerCase());
         if (!userMatch) return false;
 
@@ -1185,6 +1185,7 @@ const handleSubmit = async () => {
             )}
 
             <div className="flex gap-2 w-full md:w-auto">
+              {hasModifyAccess('delegation') && (
               <button
                 onClick={handleSubmit}
                 disabled={selectedItems.size === 0 || isSubmitting}
@@ -1192,6 +1193,7 @@ const handleSubmit = async () => {
               >
                 {isSubmitting ? "..." : `Submit Tasks (${selectedItems.size})`}
               </button>
+              )}
               {(userRole === 'admin' || userRole === 'super_admin') && (
                 <>
                   <button

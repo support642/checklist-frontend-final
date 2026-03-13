@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Upload, FileText, CheckCircle, AlertCircle, Table } from 'lucide-react';
+import { canAccessModule } from '../utils/permissionUtils';
 import {
   parseCSVFile,
   mapColumns,
@@ -239,41 +240,47 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
             <div className="space-y-4">
               <p className="text-gray-600 mb-6">Select the type of tasks you want to import:</p>
               <div className="grid md:grid-cols-2 gap-4">
-                <button
-                  onClick={() => handleTypeSelect('checklist')}
-                  className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
-                >
-                  <Table className="h-12 w-12 text-purple-500 mx-auto mb-3" />
-                  <h3 className="text-xl font-semibold text-purple-700 mb-2">Checklist Tasks</h3>
-                  <p className="text-sm text-gray-600">
-                    Import recurring tasks with frequencies (daily, weekly, monthly, etc.)
-                  </p>
-                </button>
-                <button
-                  onClick={() => handleTypeSelect('delegation')}
-                  className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
-                >
-                  <FileText className="h-12 w-12 text-purple-500 mx-auto mb-3" />
-                  <h3 className="text-xl font-semibold text-purple-700 mb-2">Delegation Tasks</h3>
-                  <p className="text-sm text-gray-600">
-                    Import one-time tasks or delegated assignments
-                  </p>
-                </button>
-                <button
-                  onClick={() => handleTypeSelect('maintenance')}
-                  className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
-                >
-                  <div className="p-3 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors w-min mx-auto mb-3">
-                    <svg className="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-blue-700 mb-2">Maintenance Tasks</h3>
-                  <p className="text-sm text-gray-600">
-                    Import recurring machine and equipment maintenance tasks
-                  </p>
-                </button>
+                {canAccessModule("checklist") && (
+                  <button
+                    onClick={() => handleTypeSelect('checklist')}
+                    className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                  >
+                    <Table className="h-12 w-12 text-purple-500 mx-auto mb-3" />
+                    <h3 className="text-xl font-semibold text-purple-700 mb-2">Checklist Tasks</h3>
+                    <p className="text-sm text-gray-600">
+                      Import recurring tasks with frequencies (daily, weekly, monthly, etc.)
+                    </p>
+                  </button>
+                )}
+                {canAccessModule("delegation") && (
+                  <button
+                    onClick={() => handleTypeSelect('delegation')}
+                    className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                  >
+                    <FileText className="h-12 w-12 text-purple-500 mx-auto mb-3" />
+                    <h3 className="text-xl font-semibold text-purple-700 mb-2">Delegation Tasks</h3>
+                    <p className="text-sm text-gray-600">
+                      Import one-time tasks or delegated assignments
+                    </p>
+                  </button>
+                )}
+                {canAccessModule("maintenance") && (
+                  <button
+                    onClick={() => handleTypeSelect('maintenance')}
+                    className="p-6 border-2 border-purple-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                  >
+                    <div className="p-3 bg-blue-50 rounded-full group-hover:bg-blue-100 transition-colors w-min mx-auto mb-3">
+                      <svg className="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-blue-700 mb-2">Maintenance Tasks</h3>
+                    <p className="text-sm text-gray-600">
+                      Import recurring machine and equipment maintenance tasks
+                    </p>
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -37,15 +37,19 @@ const LoginPage = () => {
 
       localStorage.setItem('user-name', userData.user_name || userData.username || "");
       localStorage.setItem('role', (userData.role || "").toLowerCase());
-      localStorage.setItem('email_id', userData.email_id || userData.email || "");
+      const userEmail = userData.email_id || userData.email || "";
+      localStorage.setItem('email_id', userEmail);
       localStorage.setItem('user_access', userData.user_access || "");
       localStorage.setItem('unit', userData.unit || "");
       localStorage.setItem('division', userData.division || "");
       localStorage.setItem('department', userData.department || "");
-      localStorage.setItem('system_access', JSON.stringify(userData.system_access || []));
-      localStorage.setItem('page_access', JSON.stringify(userData.page_access || []));
+      const systemAccess = typeof userData.system_access === 'string' ? JSON.parse(userData.system_access || '[]') : (userData.system_access || []);
+      const pageAccess = typeof userData.page_access === 'string' ? JSON.parse(userData.page_access || '[]') : (userData.page_access || []);
 
-      console.log("Stored email:", userData.email_id || userData.email);
+      localStorage.setItem('system_access', JSON.stringify(systemAccess));
+      localStorage.setItem('page_access', JSON.stringify(pageAccess));
+
+      console.log("Stored email:", userEmail);
 
       navigate("/dashboard/admin")
     } else if (error) {

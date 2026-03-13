@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { hasModifyAccess } from "../../utils/permissionUtils";
 
 const UserTasks = () => {
   const [filterStatus, setFilterStatus] = useState("all")
@@ -187,6 +188,7 @@ const UserTasks = () => {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <h1 className="text-2xl font-bold tracking-tight text-green-700 dark:text-green-400">My Tasks</h1>
+        {hasModifyAccess('dashboard') && (
         <button
           onClick={handleSubmitTasks}
           disabled={selectedTasks.length === 0 || isSubmitting}
@@ -194,6 +196,7 @@ const UserTasks = () => {
         >
           {isSubmitting ? "Submitting..." : `Complete ${selectedTasks.length} Selected Tasks`}
         </button>
+      )}
       </div>
 
       <div className="card border-green-200 dark:border-green-800 shadow-md">
@@ -388,13 +391,15 @@ const UserTasks = () => {
                         </div>
                       )
                     })}
-                    <button
+                    {hasModifyAccess('dashboard') && (
+        <button
                       onClick={handleSubmitTasks}
                       disabled={isSubmitting}
                       className="w-full btn btn-primary bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white"
                     >
                       {isSubmitting ? "Submitting..." : `Complete ${selectedTasks.length} Selected Tasks`}
                     </button>
+      )}
                   </div>
                 )}
               </div>

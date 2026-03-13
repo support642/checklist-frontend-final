@@ -6,9 +6,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, machineDetails, createMachineThunk, updateMachineThunk, deleteMachineThunk } from '../redux/slice/settingSlice';
 import { extendTaskApi } from '../redux/api/settingApi';
 import { uniqueDoerNameData } from '../redux/slice/assignTaskSlice';
-import { hasPageAccess } from '../utils/permissionUtils';
+import { hasPageAccess, hasModifyAccess } from '../utils/permissionUtils';
 // import supabase from '../SupabaseClient';
-import { SYSTEM_PERMISSIONS, PAGE_PERMISSIONS } from '../constants/permissions';
+import { SYSTEM_PERMISSIONS, PAGE_PERMISSIONS, PAGE_PERMISSION_GROUPS, PAGE_SYSTEM_MAP } from '../constants/permissions';
 
 
 const Setting = () => {
@@ -88,14 +88,35 @@ const Setting = () => {
           : [...prev, permission]
       );
     }
-    if (type === 'page') {
+    if (type === 'page_view') {
+      // Toggle view; removing view also removes modify
+      const viewKey = `${permission}_view`;
+      const modifyKey = `${permission}_modify`;
       setPageAccess(prev =>
-        prev.includes(permission)
-          ? prev.filter(p => p !== permission)
-          : [...prev, permission]
+        prev.includes(viewKey)
+          ? prev.filter(p => p !== viewKey && p !== modifyKey)
+          : [...prev, viewKey]
       );
     }
+    if (type === 'page_modify') {
+      // Selecting modify automatically implies view
+      const viewKey = `${permission}_view`;
+      const modifyKey = `${permission}_modify`;
+      setPageAccess(prev => {
+        if (prev.includes(modifyKey)) {
+          // Deselect modify (keep view)
+          return prev.filter(p => p !== modifyKey);
+        } else {
+          // Select modify + ensure view is also present
+          const withView = prev.includes(viewKey) ? prev : [...prev, viewKey];
+          return [...withView, modifyKey];
+        }
+      });
+    }
   };
+
+  // Derived: does user have modify access to Settings (for gating UI buttons)
+  const canModifySettings = hasModifyAccess('settings');
 
   
   
@@ -757,7 +778,18 @@ const handleUpdateUser = async (e) => {
   }
 
   try {
-    await dispatch(updateUser({ id: currentUserId, updatedUser })).unwrap();
+    const result = await dispatch(updateUser({ id: currentUserId, updatedUser })).unwrap();
+    
+    // If the updated user is the currently logged-in user, refresh localStorage
+    const currentLoggedInUsername = localStorage.getItem('user-name');
+    if (result && result.user_name === currentLoggedInUsername) {
+      console.log('🔄 Updating local permissions for current user');
+      localStorage.setItem('role', (result.role || "").toLowerCase());
+      localStorage.setItem('user_access', result.user_access || "");
+      localStorage.setItem('system_access', JSON.stringify(result.system_access || []));
+      localStorage.setItem('page_access', JSON.stringify(result.page_access || []));
+    }
+
     resetUserForm();
     setShowUserModal(false);
     // setTimeout(() => window.location.reload(), 1000);
@@ -1168,7 +1200,7 @@ const resetUserForm = () => {
                 <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
               
-              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && canManageSettings && (
+              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && canManageSettings && canModifySettings && (
                 <>
                   <button
                     onClick={handleAddButtonClick}
@@ -2714,8 +2746,11 @@ const resetUserForm = () => {
                         {/* Manual Permission Selection for super_admin */}
                         {currentUserRole === 'super_admin' && (
                           <div className="sm:col-span-6 mt-4 pt-4 border-t border-gray-200">
-                            <h4 className="text-sm font-bold text-gray-800 mb-4">Manual Permission Selection</h4>
-                            
+                            <h4 className="text-sm font-bold text-gray-800 mb-1">Manual Permission Selection</h4>
+                            <p className="text-xs text-gray-500 italic mb-4">
+                              If no manual permissions are selected, role-based defaults apply automatically.
+                            </p>
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                               {/* System Access Section */}
                               <div className="space-y-3">
@@ -2739,31 +2774,64 @@ const resetUserForm = () => {
                                 </div>
                               </div>
 
-                              {/* Page Access Section */}
+                              {/* Page Access Section — View / Modify per page */}
                               <div className="space-y-3">
-                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                  Page Access
-                                </label>
-                                <div className="space-y-2 bg-gray-50 p-3 rounded-md border border-gray-200">
-                                  {PAGE_PERMISSIONS.map(permission => (
-                                    <label key={permission} className="flex items-center gap-2 cursor-pointer group">
-                                      <input
-                                        type="checkbox"
-                                        checked={pageAccess.includes(permission)}
-                                        onChange={() => togglePermission('page', permission)}
-                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
-                                      />
-                                      <span className="text-sm text-gray-700 group-hover:text-purple-700 transition-colors">
-                                        {permission.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                      </span>
-                                    </label>
-                                  ))}
+                                <div className="flex items-center justify-between">
+                                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    Page Access
+                                  </label>
+                                  <div className="flex gap-4 text-xs font-semibold text-gray-400 uppercase mr-1">
+                                    <span className="w-12 text-center">View</span>
+                                    <span className="w-14 text-center">Modify</span>
+                                  </div>
                                 </div>
+                                <div className="space-y-1 bg-gray-50 p-3 rounded-md border border-gray-200">
+                                  {PAGE_PERMISSION_GROUPS.filter(group => {
+                                    const allowedSystems = PAGE_SYSTEM_MAP[group.key] || [];
+                                    // If no system access is selected, show nothing to encourage selection
+                                    return systemAccess.some(sys => allowedSystems.includes(sys));
+                                  }).map(({ key, label }) => {
+                                    const viewKey = `${key}_view`;
+                                    const modifyKey = `${key}_modify`;
+                                    const hasView = pageAccess.includes(viewKey) || pageAccess.includes(modifyKey);
+                                    const hasModify = pageAccess.includes(modifyKey);
+                                    return (
+                                      <div key={key} className="flex items-center justify-between py-1 group">
+                                        <span className="text-sm text-gray-700 flex-1 group-hover:text-purple-700 transition-colors">
+                                          {label}
+                                        </span>
+                                        <div className="flex gap-4 mr-1">
+                                          {/* View checkbox */}
+                                          <div className="w-12 flex justify-center">
+                                            <input
+                                              type="checkbox"
+                                              checked={hasView}
+                                              onChange={() => togglePermission('page_view', key)}
+                                              className="rounded border-gray-300 text-blue-500 focus:ring-blue-400 h-4 w-4 cursor-pointer"
+                                              title="View only"
+                                            />
+                                          </div>
+                                          {/* Modify checkbox */}
+                                          <div className="w-14 flex justify-center">
+                                            <input
+                                              type="checkbox"
+                                              checked={hasModify}
+                                              onChange={() => togglePermission('page_modify', key)}
+                                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4 cursor-pointer"
+                                              title="Full modify access (implies view)"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <p className="text-xs text-gray-400">
+                                  <span className="text-blue-500 font-semibold">View</span> = read-only &nbsp;|&nbsp;
+                                  <span className="text-purple-600 font-semibold">Modify</span> = full access (implies view)
+                                </p>
                               </div>
                             </div>
-                            <p className="mt-2 text-xs text-gray-500 italic">
-                              * Manual selections will override default role-based permissions.
-                            </p>
                           </div>
                         )}
                       </div>

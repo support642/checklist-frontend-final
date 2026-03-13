@@ -34,6 +34,10 @@ const ProtectedRoute = ({ children, page }) => {
 
   // Permission check
   if (page && !hasPageAccess(page)) {
+    // If user doesn't even have dashboard access, don't redirect to dashboard (causes infinite loop)
+    if (page === "dashboard") {
+      return <Navigate to="/login" replace />
+    }
     return <Navigate to="/dashboard/admin" replace />
   }
 
