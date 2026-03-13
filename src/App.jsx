@@ -21,32 +21,34 @@ import TrainingVideoPage from "./pages/admin/TrainingVideoPage"
 import CalendarPage from "./pages/admin/CalendarPage"
 import HolidayManagementPage from "./pages/admin/HolidayManagementPage"
 import RealtimeLogoutListener from "./components/RealtimeLogoutListener"   // ✅ Added listener
+import { hasPageAccess } from "./utils/permissionUtils"
 
 // Auth wrapper component to protect routes
-const ProtectedRoute = ({ children, allowedRoles = [] }) => {
+const ProtectedRoute = ({ children, page }) => {
   const username = localStorage.getItem("user-name")
-  const userRole = localStorage.getItem("role")
 
   // If no user is logged in, redirect to login
   if (!username) {
     return <Navigate to="/login" replace />
   }
 
-  // If this is an admin-only route and user is not admin, redirect to tasks
-  if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+  // Permission check
+  if (page && !hasPageAccess(page)) {
     return <Navigate to="/dashboard/admin" replace />
   }
 
   return children
 }
 
-// Reactive role-based component selector for Assign Task
 const AssignTaskRouter = () => {
   const reduxUserData = useSelector((state) => state.login.userData);
   const role = (reduxUserData && !Array.isArray(reduxUserData))
     ? reduxUserData.role
     : localStorage.getItem('role');
-  return role === 'user' ? <UserAssignTask /> : <AdminAssignTask />;
+
+  return (role === 'admin' || role === 'super_admin') 
+    ? <AdminAssignTask /> 
+    : <UserAssignTask />;
 }
 
 function App() {
@@ -70,7 +72,7 @@ function App() {
         <Route
           path="/dashboard/admin"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="dashboard">
               <AdminDashboard />
             </ProtectedRoute>
           }
@@ -78,7 +80,7 @@ function App() {
         <Route
           path="/dashboard/quick-task"
           element={
-            <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
+            <ProtectedRoute page="quick_task">
               <QuickTask />
             </ProtectedRoute>
           }
@@ -88,7 +90,7 @@ function App() {
         <Route
           path="/dashboard/assign-task"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="assign_task">
               <AssignTaskRouter />
             </ProtectedRoute>
           }
@@ -96,7 +98,7 @@ function App() {
         <Route
           path="/dashboard/delegation-task"
           element={
-            <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
+            <ProtectedRoute page="delegation_task">
               <AdminDelegationTask />
             </ProtectedRoute>
           }
@@ -106,7 +108,7 @@ function App() {
         <Route
           path="/dashboard/delegation"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="delegation">
               <AccountDataPage />
             </ProtectedRoute>
           }
@@ -115,7 +117,7 @@ function App() {
         <Route
           path="/dashboard/setting"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="settings">
               <Setting />
             </ProtectedRoute>
           }
@@ -124,7 +126,7 @@ function App() {
         <Route
           path="/dashboard/mis-report"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="mis_report">
               <MisReport />
             </ProtectedRoute>
           }
@@ -134,7 +136,7 @@ function App() {
         <Route
           path="/dashboard/training-video"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="training_video">
               <TrainingVideoPage />
             </ProtectedRoute>
           }
@@ -144,7 +146,7 @@ function App() {
         <Route
           path="/dashboard/history"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="admin_approval">
               <HistoryPage />
             </ProtectedRoute>
           }
@@ -154,7 +156,7 @@ function App() {
         <Route
           path="/dashboard/calendar"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="calendar">
               <CalendarPage />
             </ProtectedRoute>
           }
@@ -164,7 +166,7 @@ function App() {
         <Route
           path="/dashboard/holidays"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="holiday_management">
               <HolidayManagementPage />
             </ProtectedRoute>
           }
@@ -174,7 +176,7 @@ function App() {
         <Route
           path="/dashboard/data/:category"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute page="pending_task">
               <DataPage />
             </ProtectedRoute>
           }
@@ -184,7 +186,7 @@ function App() {
         <Route
           path="/dashboard/data/admin"
           element={
-            <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
+            <ProtectedRoute page="admin_data">
               <AdminDataPage />
             </ProtectedRoute>
           }

@@ -23,6 +23,7 @@ import {
   Video,
   Calendar,
 } from "lucide-react";
+import { hasPageAccess } from "../../utils/permissionUtils";
 
 export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
   const location = useLocation();
@@ -77,81 +78,64 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       label: "Dashboard",
       icon: Database,
       active: location.pathname === "/dashboard/admin",
-      showFor: ["admin", "user", "super_admin"],
+      page: "dashboard",
     },
     {
       href: "/dashboard/quick-task",
       label: "Quick Task",
       icon: Zap,
       active: location.pathname === "/dashboard/quick-task",
-      // Show for all admins
-      showFor: ["admin", "super_admin"],
+      page: "quick_task",
     },
     {
       href: "/dashboard/assign-task",
       label: "Assign Task",
       icon: CheckSquare,
       active: location.pathname === "/dashboard/assign-task",
-      showFor: ["admin", "super_admin", "user"],
+      page: "assign_task",
     },
     {
       href: "/dashboard/delegation",
       label: "Delegation",
       icon: ClipboardList,
       active: location.pathname === "/dashboard/delegation",
-      showFor: ["admin", "user", "super_admin"],
+      page: "delegation",
     },
     {
       href: "/dashboard/data/sales",
       label: "Pending Task",
       icon: CalendarCheck,
       active: location.pathname === "/dashboard/data/sales",
-      showFor: ["admin", "user", "super_admin"],
+      page: "pending_task",
     },
     {
       href: "/dashboard/history",
       label: "Admin Approval",
       icon: History,
       active: location.pathname === "/dashboard/history",
-      showFor: ["admin", "user", "super_admin"],
+      page: "admin_approval",
     },
     {
       href: "/dashboard/calendar",
       label: "Calendar",
       icon: Calendar,
       active: location.pathname === "/dashboard/calendar",
-      showFor: ["admin", "user", "super_admin"],
+      page: "calendar",
     },
     {
       href: "/dashboard/holidays",
       label: "Holiday List",
       icon: CalendarCheck,
       active: location.pathname === "/dashboard/holidays",
-      showFor: ["admin", "super_admin"],
+      page: "holiday_management",
     },
-    // {
-    //   href: "/dashboard/mis-report",
-    //   label: "MIS Report",
-    //   icon: CheckSquare,
-    //   active: location.pathname.includes("/dashboard/mis-report"),
-    //   // Only show for super admin (username = 'admin')
-    //   showFor: isSuperAdmin ? ["admin"] : [],
-    // },
     {
       href: "/dashboard/setting",
       label: "Settings",
       icon: Settings,
       active: location.pathname.includes("/dashboard/setting"),
-      // Show for all admins
-      showFor: ["admin", "super_admin"],
+      page: "settings",
     },
-    // {
-    //   href: "/dashboard/training-video",
-    //   label: "Training Video",
-    //   icon: Video,
-    //   active: location.pathname === "/dashboard/training-video",
-    //   showFor: ["admin", "user", "super_admin"],
-    // },
   ];
 
   const getAccessibleDepartments = () => {
@@ -161,10 +145,9 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
     );
   };
 
-  // Filter routes based on user role and super admin status
+  // Filter routes based on permissions
   const getAccessibleRoutes = () => {
-    const userRole = localStorage.getItem("role") || "user";
-    return routes.filter((route) => route.showFor.includes(userRole));
+    return routes.filter((route) => hasPageAccess(route.page));
   };
 
   // Check if the current path is a data category page

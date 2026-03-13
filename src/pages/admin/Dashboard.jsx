@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import AdminLayout from "../../components/layout/AdminLayout.jsx"
+import { hasPageAccess } from "../../utils/permissionUtils"
 
 import DashboardHeader from "./dashboard/DashboardHeader.jsx"
 import StatisticsCards from "./dashboard/StaticsCard.jsx"
@@ -98,7 +99,8 @@ useEffect(() => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
 
-  if (role === "user") {
+  // Check if user has admin dashboard access. If not, restrict to their own name.
+  if (!hasPageAccess("dashboard_admin") && role === "user") {
     setDashboardStaffFilter(username);
     setFilterStaff(username);
     setDepartmentFilter("all");        // user cannot filter department

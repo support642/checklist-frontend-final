@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
+import { hasPageAccess } from "../utils/permissionUtils";
 import { useDispatch, useSelector } from "react-redux";
 import {
   delegationDoneData,
@@ -248,8 +249,7 @@ function DelegationDataPage() {
     return delegation_done
       .filter((item) => {
         const userMatch =
-          userRole === "admin" ||
-          userRole === "super_admin" ||
+          hasPageAccess("delegation_admin") ||
           (item.name && item.name.toLowerCase() === username.toLowerCase());
         if (!userMatch) return false;
 

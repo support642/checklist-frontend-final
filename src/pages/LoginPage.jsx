@@ -42,6 +42,8 @@ const LoginPage = () => {
       localStorage.setItem('unit', userData.unit || "");
       localStorage.setItem('division', userData.division || "");
       localStorage.setItem('department', userData.department || "");
+      localStorage.setItem('system_access', JSON.stringify(userData.system_access || []));
+      localStorage.setItem('page_access', JSON.stringify(userData.page_access || []));
 
       console.log("Stored email:", userData.email_id || userData.email);
 

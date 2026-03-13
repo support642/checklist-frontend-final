@@ -48,6 +48,7 @@ function AccountDataPage() {
   const [username, setUsername] = useState("")
   const [currentPagePending, setCurrentPagePending] = useState(1);
   const [currentPageHistory, setCurrentPageHistory] = useState(1);
+  const [userDept, setUserDept] = useState("");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [initialHistoryLoading, setInitialHistoryLoading] = useState(false)
@@ -234,9 +235,11 @@ function AccountDataPage() {
 
   useEffect(() => {
     const role = localStorage.getItem("role")
-    const user = localStorage.getItem("username")
+    const user = localStorage.getItem("username") || localStorage.getItem("user-name")
+    const dept = localStorage.getItem("department")
     setUserRole(role || "")
     setUsername(user || "")
+    setUserDept(dept || "")
   }, [])
 
   // Load initial history data when showing history
@@ -474,7 +477,7 @@ function AccountDataPage() {
   // Filtered data for pending tasks
   const filteredAccountData = useMemo(() => {
     if (!Array.isArray(checklist)) return [];
-
+    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -582,7 +585,7 @@ function AccountDataPage() {
 
       return dateA.getTime() - dateB.getTime();
     });
-  }, [checklist, searchTerm, statusFilter, frequencyFilter]);
+  }, [checklist, searchTerm, statusFilter, frequencyFilter, userRole, userDept]);
 
   const filteredMaintenanceData = useMemo(() => {
     if (!Array.isArray(maintenance)) return [];
@@ -621,7 +624,7 @@ function AccountDataPage() {
     }
 
     return filtered;
-  }, [maintenance, searchTerm, statusFilter, frequencyFilter]);
+  }, [maintenance, searchTerm, statusFilter, frequencyFilter, userRole, userDept]);
 
   // Helper function to determine task status (Today, Upcoming, Overdue)
   const getTaskStatus = (taskStartDate) => {
@@ -693,9 +696,7 @@ function AccountDataPage() {
           // Compare dates
           if (start && itemDateOnly < start) matchesDateRange = false
           if (end && itemDateOnly > end) matchesDateRange = false
-        }
-
-        return matchesSearch && matchesMember && matchesDateRange
+        }        return matchesSearch && matchesMember && matchesDateRange
       })
       .sort((a, b) => {
         const dateA = parseSupabaseDate(a.task_start_date)
@@ -703,11 +704,9 @@ function AccountDataPage() {
         if (!dateA) return 1
         if (!dateB) return -1
         return dateB - dateA // Sort newest first
-      })
-
-    // Return only the items for current page
+      })    // Return only the items for current page
     return filtered.slice(0, currentPageHistory * 50) // 50 items per page
-  }, [history, searchTerm, selectedMembers, startDate, endDate, currentPageHistory])
+  }, [history, searchTerm, selectedMembers, startDate, endDate, currentPageHistory, userRole, userDept])
 
 
   const getTaskStatistics = () => {
@@ -1131,7 +1130,6 @@ const submissionData = await Promise.all(
 
   return (
     <AdminLayout>
-      <div className="space-y-4 sm:space-y-6 p-2 sm:p-0">
         <div className="flex flex-col gap-3 sm:gap-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700">
@@ -1519,11 +1517,11 @@ const submissionData = await Promise.all(
                                   )}
                                 </td>
                               )}
-                             <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50">
-  <div className="text-xs sm:text-sm text-gray-900 break-words">
-    {account.task_start_date || "—"}
-  </div>
-</td>
+                              <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50">
+                                <div className="text-xs sm:text-sm text-gray-900 break-words">
+                                  {account.task_start_date || "—"}
+                                </div>
+                              </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-4">
                                 <div className="text-xs sm:text-sm text-gray-900 break-words">{history.frequency || "—"}</div>
                               </td>
@@ -2338,7 +2336,6 @@ const submissionData = await Promise.all(
             </div>
           )}
         </div>
-      </div>
     </AdminLayout>
   );
 }

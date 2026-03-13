@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
+import { hasPageAccess } from "../../utils/permissionUtils";
 import { fetchUniqueDepartmentDataApi, fetchUniqueDoerNameDataApi, fetchUniqueGivenByDataApi, pushAssignTaskApi } from "../../redux/api/assignTaskApi";
 import { useDispatch, useSelector } from "react-redux";
 import { assignTaskInTable, uniqueDepartmentData, uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
@@ -266,10 +267,13 @@ export default function AssignTask() {
   // Returns [] when no department is selected, fixing stale doer names on cascading resets
   const filteredDoerNames = useMemo(() => {
     if (!formData.department) return [];
-    return (userRole === 'admin' || userRole === 'super_admin')
+    // User can assign to any doer if they have 'assign_task_admin' permission or are an admin
+    const canAssignToOthers = hasPageAccess("assign_task_admin") || userRole === "admin" || userRole === "super_admin";
+    
+    return canAssignToOthers
       ? doerName
       : doerName.filter(doer => doer?.trim().toLowerCase() === username?.trim().toLowerCase());
-  }, [doerName, userRole, username, formData.department]);
+  }, [doerName, username, formData.department, userRole]);
 
   // Cascading dropdown data
   const availableUnits = useMemo(() => {
@@ -380,6 +384,13 @@ export default function AssignTask() {
 
   const handleDepartmentChange = (value) => {
     setFormData(prev => ({ ...prev, department: value, doer: '' }));
+    if (value) {
+      dispatch(uniqueDoerNameData({ 
+        department: value, 
+        unit: formData.unit, 
+        division: formData.division 
+      }));
+    }
   };
 
 

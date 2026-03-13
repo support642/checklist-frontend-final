@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Calendar, Plus, Trash2, X, CalendarDays, AlertCircle } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
+import { hasPageAccess } from "../../utils/permissionUtils";
 import {
   fetchHolidays,
   addHoliday,
@@ -20,7 +21,8 @@ export default function HolidayManagementPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
-  const userRole = localStorage.getItem("role");
+  // const userRole = localStorage.getItem("role");
+  const canManageHolidays = hasPageAccess("holiday_management_admin");
 
   // Form states
   const [holidayForm, setHolidayForm] = useState({ holiday_date: "", remarks: "" });
@@ -156,7 +158,7 @@ export default function HolidayManagementPage() {
             <h1 className="text-xl font-bold text-gray-800">Holiday & Working Day Management</h1>
             <p className="text-sm text-gray-500">Manage holidays and working days</p>
           </div>
-          {userRole === "super_admin" && (
+          {canManageHolidays && (
           <button
             onClick={() => setShowAddForm(true)}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -266,7 +268,7 @@ export default function HolidayManagementPage() {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">{holiday.remarks || "-"}</td>
                           <td className="px-4 py-3 text-center">
-                            {userRole === "super_admin" && (
+                            {canManageHolidays && (
                             <button
                               onClick={() => handleDeleteHoliday(holiday.id)}
                               className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -310,7 +312,7 @@ export default function HolidayManagementPage() {
                           <td className="px-4 py-3 text-sm text-gray-600">{day.day}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">Week {day.week_num}</td>
                           <td className="px-4 py-3 text-center">
-                            {userRole === "super_admin" && (
+                            {canManageHolidays && (
                             <button
                               onClick={() => handleDeleteWorkingDay(day.id)}
                               className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"

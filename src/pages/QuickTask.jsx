@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { format } from 'date-fns';
 import { Search, ChevronDown, Filter, Trash2, Edit, Save, X } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
+import { hasPageAccess } from "../utils/permissionUtils";
 import DelegationPage from "./delegation-data";
 import MaintenanceQuickTaskPage from "./maintenance-quick-task";
 import { useDispatch, useSelector } from "react-redux";
@@ -89,7 +90,8 @@ useEffect(() => {
   }
 }, [handleScroll]);
 
-  const userRole = localStorage.getItem("role");
+  // const userRole = localStorage.getItem("role");
+  const canModifyTasks = hasPageAccess("quick_task_admin");
 
   // Edit functionality
   const handleEditClick = (task) => {
@@ -604,7 +606,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                 )}
               </div>
             </div>
-            {selectedTasks.length > 0 && activeTab === 'checklist' && userRole === "super_admin" && (
+            {selectedTasks.length > 0 && activeTab === 'checklist' && canModifyTasks && (
               <button
                 onClick={handleDeleteSelected}
                 disabled={isDeleting}
@@ -684,7 +686,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                               {task.frequency}
                             </span>
                           </div>
-                          {userRole === "super_admin" && (
+                          {canModifyTasks && (
                             editingTaskId === task.task_id ? (
                               <div className="flex gap-2">
                                 <button
@@ -1083,7 +1085,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
                               </div>
                             ) : (
                               // REMOVED THE submission_date CHECK - ALWAYS SHOW EDIT BUTTON
-                              userRole === "super_admin" && (
+                              canModifyTasks && (
                               <button
                                 onClick={() => handleEditClick(task)}
                                 className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"

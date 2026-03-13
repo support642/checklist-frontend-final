@@ -6,7 +6,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, machineDetails, createMachineThunk, updateMachineThunk, deleteMachineThunk } from '../redux/slice/settingSlice';
 import { extendTaskApi } from '../redux/api/settingApi';
 import { uniqueDoerNameData } from '../redux/slice/assignTaskSlice';
+import { hasPageAccess } from '../utils/permissionUtils';
 // import supabase from '../SupabaseClient';
+import { SYSTEM_PERMISSIONS, PAGE_PERMISSIONS } from '../constants/permissions';
+
 
 const Setting = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -72,6 +75,27 @@ const Setting = () => {
   const [isEditingMachine, setIsEditingMachine] = useState(false);
   const [currentMachineId, setCurrentMachineId] = useState(null);
   const [partInput, setPartInput] = useState('');
+  
+  // Permission State
+  const [systemAccess, setSystemAccess] = useState([]);
+  const [pageAccess, setPageAccess] = useState([]);
+
+  const togglePermission = (type, permission) => {
+    if (type === 'system') {
+      setSystemAccess(prev =>
+        prev.includes(permission)
+          ? prev.filter(p => p !== permission)
+          : [...prev, permission]
+      );
+    }
+    if (type === 'page') {
+      setPageAccess(prev =>
+        prev.includes(permission)
+          ? prev.filter(p => p !== permission)
+          : [...prev, permission]
+      );
+    }
+  };
 
   
   
@@ -79,7 +103,12 @@ const Setting = () => {
   const { doerName } = useSelector((state) => state.assignTask);
   // Get current logged-in user to check for super_admin role
   const { userData: currentUser } = useSelector((state) => state.login);
+  // Fallback to localStorage when Redux resets after page reload
+  const currentUserRole = (currentUser && !Array.isArray(currentUser))
+    ? currentUser.role
+    : localStorage.getItem('role');
   const dispatch = useDispatch();
+  const canManageSettings = hasPageAccess('settings_admin');
 
   const togglePasswordVisibility = (userId) => {
   setShowPasswords(prev => ({
@@ -319,7 +348,7 @@ const handleConfirmDelegation = async () => {
     setRemark('');
 
     // Refresh data
-    setTimeout(() => window.location.reload(), 1000);
+    // setTimeout(() => window.location.reload(), 1000);
     alert('Tasks transferred successfully to delegation');
   } catch (error) {
     console.error('Error submitting delegation:', error);
@@ -456,7 +485,7 @@ const handleConfirmDelegation = async () => {
         alert(`Successfully transferred ${result.tasksTransferred || 0} tasks with individual assignments!`);
         
         // Refresh data
-        setTimeout(() => window.location.reload(), 1000);
+        // setTimeout(() => window.location.reload(), 1000);
       } catch (error) {
         console.error('Error assigning tasks:', error);
         alert(`Error: ${error.message}`);
@@ -604,7 +633,7 @@ const handleConfirmDelegation = async () => {
       setGivenByInput('');
       setShowGivenByModal(false);
       dispatch(departmentDetails());
-      setTimeout(() => window.location.reload(), 1000);
+      // setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error('Error adding given by:', error);
     }
@@ -684,14 +713,16 @@ const handleAddUser = async (e) => {
     user_access: userForm.department, // Department name for user access
     department: userForm.department,
     unit: userForm.unit,
-    division: userForm.division
+    division: userForm.division,
+    system_access: systemAccess,
+    page_access: pageAccess
   };
 
   try {
     await dispatch(createUser(newUser)).unwrap();
     resetUserForm();
     setShowUserModal(false);
-    setTimeout(() => window.location.reload(), 1000);
+    // setTimeout(() => window.location.reload(), 1000);
   } catch (error) {
     console.error('Error adding user:', error);
   }
@@ -711,8 +742,14 @@ const handleUpdateUser = async (e) => {
     user_access: userForm.department, // Department name for user access
     department: userForm.department,
     unit: userForm.unit,
-    division: userForm.division
+    division: userForm.division,
+    system_access: systemAccess,
+    page_access: pageAccess
   };
+
+  console.log('DEBUG: handleUpdateUser payload:', { id: currentUserId, updatedUser });
+
+
 
   // Only include password if it's not empty
   if (userForm.password.trim() !== '') {
@@ -723,7 +760,7 @@ const handleUpdateUser = async (e) => {
     await dispatch(updateUser({ id: currentUserId, updatedUser })).unwrap();
     resetUserForm();
     setShowUserModal(false);
-    setTimeout(() => window.location.reload(), 1000);
+    // setTimeout(() => window.location.reload(), 1000);
   } catch (error) {
     console.error('Error updating user:', error);
   }
@@ -756,7 +793,7 @@ const handleUpdateUser = async (e) => {
       }
       resetDeptForm();
       setShowDeptModal(false);
-      setTimeout(() => window.location.reload(), 1000);
+      // setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error('Error adding department:', error);
     }
@@ -774,7 +811,7 @@ const handleUpdateUser = async (e) => {
       await dispatch(updateDepartment({ id: currentDeptId, updatedDept })).unwrap();
       resetDeptForm();
       setShowDeptModal(false);
-      setTimeout(() => window.location.reload(), 1000);
+      // setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error('Error updating department:', error);
     }
@@ -784,7 +821,7 @@ const handleUpdateUser = async (e) => {
   const handleDeleteUser = async (userId) => {
     try {
       await dispatch(deleteUser(userId)).unwrap();
-      setTimeout(() => window.location.reload(), 1000);
+      // setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error('Error deleting user:', error);
     }
@@ -872,21 +909,34 @@ useEffect(() => {
   // };
 const handleEditUser = (userId) => {
   const user = userData.find(u => u.id === userId);
-  // Try to find the department record to pre-fill unit and division
+  console.log('DEBUG: handleEditUser source user:', user);
   const deptName = (user?.user_access || user?.department)?.split(',')[0]?.trim();
   const deptRecord = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
   
   setUserForm({
-    username: user.user_name,
-    email: user.email_id,
+    username: user.user_name || '',
+    email: user.email_id || '',
     password: user.password || '',
-    phone: user.number,
+    phone: user.number || '',
     unit: user?.unit || deptRecord?.unit || '',
     division: user?.division || deptRecord?.division || '',
     department: user?.department || user?.user_access || '',
-    role: user.role,
-    status: user.status
+    role: user.role || 'user',
+    status: user.status || 'active'
   });
+  
+  // Load existing permissions
+  try {
+    const sAccess = typeof user.system_access === 'string' ? JSON.parse(user.system_access) : (user.system_access || []);
+    const pAccess = typeof user.page_access === 'string' ? JSON.parse(user.page_access) : (user.page_access || []);
+    setSystemAccess(sAccess);
+    setPageAccess(pAccess);
+  } catch (e) {
+    console.error("Error parsing user permissions:", e);
+    setSystemAccess([]);
+    setPageAccess([]);
+  }
+
   setCurrentUserId(userId);
   setIsEditing(true);
   setShowUserModal(true);
@@ -927,7 +977,10 @@ const resetUserForm = () => {
     role: 'user',
     status: 'active'
   });
+  setSystemAccess([]);
+  setPageAccess([]);
   setIsEditing(false);
+
   setCurrentUserId(null);
 };
 
@@ -1092,7 +1145,7 @@ const resetUserForm = () => {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
-
+  
   return (
     <AdminLayout>
       <div className="space-y-2">
@@ -1115,7 +1168,7 @@ const resetUserForm = () => {
                 <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
               
-              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && localStorage.getItem('role') === 'super_admin' && (
+              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && canManageSettings && (
                 <>
                   <button
                     onClick={handleAddButtonClick}
@@ -1266,7 +1319,7 @@ const resetUserForm = () => {
                 {/* Submit Button */}
                 {/* Submit Button */}
                 {/* Submit Button */}
-                {localStorage.getItem('role') === 'super_admin' && (
+                {canManageSettings && (
                 <button
                   onClick={handleSubmitLeave}
                   className="rounded-md bg-green-600 py-2 px-4 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
@@ -1294,7 +1347,7 @@ const resetUserForm = () => {
             />
             <p className="text-sm font-medium text-gray-900">{user.user_name}</p>
           </div>
-          {localStorage.getItem('role') === 'super_admin' && (
+          {canManageSettings && (
             <button
               onClick={() => {
                 if(window.confirm(`Are you sure you want to clear leave for ${user.user_name}?`)) {
@@ -1368,7 +1421,7 @@ const resetUserForm = () => {
             <div className="text-sm text-gray-900">{user.remark || 'No remarks'}</div>
           </td>
           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-            {localStorage.getItem('role') === 'super_admin' && (
+            {canManageSettings && (
               <button
                 onClick={() => {
                   if(window.confirm(`Are you sure you want to clear leave for ${user.user_name}?`)) {
@@ -1422,8 +1475,8 @@ const resetUserForm = () => {
               className="w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
             />
             <datalist id="usernameOptions">
-              {userData?.map(user => (
-                <option key={user.id} value={user.user_name} />
+              {userData?.map((user, idx) => (
+                <option key={`${user.id}-${idx}`} value={user.user_name} />
               ))}
             </datalist>
 
@@ -1502,7 +1555,7 @@ const resetUserForm = () => {
                   </span>
                 </div>
                 <div className="flex space-x-2">
-                  {localStorage.getItem('role') === 'super_admin' && (
+                  {canManageSettings && (
                     <>
                       <button onClick={() => handleEditUser(user?.id)} className="text-blue-600" title="Edit">
                         <Edit size={16} />
@@ -1673,7 +1726,7 @@ const resetUserForm = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {localStorage.getItem('role') === 'super_admin' && (
+                  {canManageSettings && (
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleEditUser(user?.id)}
@@ -1755,7 +1808,7 @@ const resetUserForm = () => {
                 <div key={dept.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                   <div className="flex justify-between items-start mb-2">
                     <p className="text-sm font-medium text-gray-900">#{index + 1} {dept.department}</p>
-                    {localStorage.getItem('role') === 'super_admin' && (
+                    {canManageSettings && (
                       <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600" title="Edit">
                         <Edit size={16} />
                       </button>
@@ -1795,7 +1848,7 @@ const resetUserForm = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dept.division || '—'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
-                        {localStorage.getItem('role') === 'super_admin' && (
+                        {canManageSettings && (
                         <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600 hover:text-blue-900">
                           <Edit size={18} />
                         </button>
@@ -1826,7 +1879,7 @@ const resetUserForm = () => {
                 <div key={dept.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                   <div className="flex justify-between items-center">
                     <p className="text-sm font-medium text-gray-900">#{index + 1} {dept.given_by}</p>
-                    {localStorage.getItem('role') === 'super_admin' && (
+                    {canManageSettings && (
                       <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600" title="Edit">
                         <Edit size={16} />
                       </button>
@@ -1858,7 +1911,7 @@ const resetUserForm = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept.given_by}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
-                        {localStorage.getItem('role') === 'super_admin' && (
+                        {canManageSettings && (
                         <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600 hover:text-blue-900">
                           <Edit size={18} />
                         </button>
@@ -2060,7 +2113,7 @@ const resetUserForm = () => {
                       <div key={machine.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                         <div className="flex justify-between items-start mb-2">
                           <p className="text-sm font-medium text-gray-900">#{index + 1} {machine.machine_name || '—'}</p>
-                          {localStorage.getItem('role') === 'super_admin' && (
+                          {canManageSettings && (
                             <div className="flex gap-2">
                               <button onClick={() => handleEditMachine(machine.id)} className="text-blue-600" title="Edit">
                                 <Edit size={16} />
@@ -2478,6 +2531,7 @@ const resetUserForm = () => {
                             name="username"
                             id="username"
                             value={userForm.username}
+
                             onChange={handleUserInputChange}
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           />
@@ -2494,6 +2548,7 @@ const resetUserForm = () => {
       name="password"
       id="password"
       value={userForm.password}
+
       onChange={handleUserInputChange}
       className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-10"
       placeholder={isEditing ? "Leave empty to keep current password" : "Enter password"}
@@ -2526,6 +2581,7 @@ const resetUserForm = () => {
                             name="email"
                             id="email"
                             value={userForm.email}
+
                             onChange={handleUserInputChange}
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           />
@@ -2541,6 +2597,7 @@ const resetUserForm = () => {
                               name="password"
                               id="password"
                               value={userForm.password}
+
                               onChange={handleUserInputChange}
                               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             />
@@ -2555,7 +2612,8 @@ const resetUserForm = () => {
                             type="tel"
                             name="phone"
                             id="phone"
-                            value={userForm.phone}
+                             value={userForm.phone}
+
                             onChange={handleUserInputChange}
                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           />
@@ -2573,13 +2631,14 @@ const resetUserForm = () => {
                             id="role"
                             name="role"
                             value={userForm.role}
+
                             onChange={handleUserInputChange}
                             className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           >
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
                             {/* Only show/allow super_admin option if current user is super_admin (or you can decide policy) */}
-                            {localStorage.getItem('role') === 'super_admin' && <option value="super_admin">Super Admin</option>}
+                            {canManageSettings && <option value="super_admin">Super Admin</option>}
                           </select>
                         </div>
 
@@ -2589,7 +2648,8 @@ const resetUserForm = () => {
                             Unit
                           </label>
                           <select
-                            value={userForm.unit}
+                             value={userForm.unit}
+
                             onChange={(e) => handleUnitChange(e.target.value)}
                             className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           >
@@ -2605,7 +2665,8 @@ const resetUserForm = () => {
                             Division
                           </label>
                           <select
-                            value={userForm.division}
+                             value={userForm.division}
+
                             onChange={(e) => handleDivisionChange(e.target.value)}
                             className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           >
@@ -2621,7 +2682,8 @@ const resetUserForm = () => {
                             Department
                           </label>
                           <select
-                            value={userForm.department}
+                             value={userForm.department}
+
                             onChange={(e) => handleDepartmentChange(e.target.value)}
                             className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           >
@@ -2639,7 +2701,8 @@ const resetUserForm = () => {
                           <select
                             id="status"
                             name="status"
-                            value={userForm.status}
+                             value={userForm.status}
+
                             onChange={handleUserInputChange}
                             className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                           >
@@ -2647,7 +2710,64 @@ const resetUserForm = () => {
                             <option value="inactive">Inactive</option>
                           </select>
                         </div>
+
+                        {/* Manual Permission Selection for super_admin */}
+                        {currentUserRole === 'super_admin' && (
+                          <div className="sm:col-span-6 mt-4 pt-4 border-t border-gray-200">
+                            <h4 className="text-sm font-bold text-gray-800 mb-4">Manual Permission Selection</h4>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                              {/* System Access Section */}
+                              <div className="space-y-3">
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                  System Access
+                                </label>
+                                <div className="space-y-2 bg-gray-50 p-3 rounded-md border border-gray-200">
+                                  {SYSTEM_PERMISSIONS.map(permission => (
+                                    <label key={permission} className="flex items-center gap-2 cursor-pointer group">
+                                      <input
+                                        type="checkbox"
+                                        checked={systemAccess.includes(permission)}
+                                        onChange={() => togglePermission('system', permission)}
+                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                                      />
+                                      <span className="text-sm text-gray-700 group-hover:text-purple-700 transition-colors">
+                                        {permission.charAt(0).toUpperCase() + permission.slice(1).replace('_', ' ')}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Page Access Section */}
+                              <div className="space-y-3">
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                  Page Access
+                                </label>
+                                <div className="space-y-2 bg-gray-50 p-3 rounded-md border border-gray-200">
+                                  {PAGE_PERMISSIONS.map(permission => (
+                                    <label key={permission} className="flex items-center gap-2 cursor-pointer group">
+                                      <input
+                                        type="checkbox"
+                                        checked={pageAccess.includes(permission)}
+                                        onChange={() => togglePermission('page', permission)}
+                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                                      />
+                                      <span className="text-sm text-gray-700 group-hover:text-purple-700 transition-colors">
+                                        {permission.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                      </span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500 italic">
+                              * Manual selections will override default role-based permissions.
+                            </p>
+                          </div>
+                        )}
                       </div>
+
 
                       <div className="mt-6 flex justify-end space-x-3">
                         <button

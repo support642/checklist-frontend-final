@@ -173,10 +173,17 @@ export const createUserApi = async (newUser) => {
       body: JSON.stringify(newUser),
     });
 
-    return await response.json();
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ createUserApi server error:", data);
+      throw new Error(data.message || data.detail || data.error || `Server error ${response.status}`);
+    }
+
+    return data;
   } catch (error) {
-    console.log("Error creating user", error);
-    return null;
+    console.error("Error creating user:", error.message);
+    throw error;
   }
 };
 
@@ -191,10 +198,15 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
       body: JSON.stringify(updatedUser),
     });
 
-    return await response.json();
+    const data = await response.json();
+    if (!response.ok) {
+      console.error("❌ updateUserDataApi server error:", data);
+      throw new Error(data.message || data.detail || data.error || `Server error ${response.status}`);
+    }
+    return data;
   } catch (error) {
-    console.log("Error updating user", error);
-    return null;
+    console.error("Error updating user:", error.message);
+    throw error;
   }
 };
 

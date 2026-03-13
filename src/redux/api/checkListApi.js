@@ -8,9 +8,10 @@ const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/checklist`;
 export const fetchChechListDataSortByDate = async (page = 1, search = '') => {
   const username = localStorage.getItem("user-name");
   const role = localStorage.getItem("role");
+  const department = localStorage.getItem("department");
 
   const response = await fetch(
-    `${BASE_URL}/pending?page=${page}&username=${username}&role=${role}&search=${encodeURIComponent(search)}`
+    `${BASE_URL}/pending?page=${page}&username=${username}&role=${role}&department=${department}&search=${encodeURIComponent(search)}`
   );
 
   return await response.json();
@@ -23,13 +24,14 @@ export const fetchChechListDataSortByDate = async (page = 1, search = '') => {
 export const fetchChechListDataForHistory = async (search = "") => {
   const username = localStorage.getItem("user-name");
   const role = localStorage.getItem("role");
+  const department = localStorage.getItem("department");
   const PAGE_SIZE = 50;
 
   const encodedSearch = encodeURIComponent(search);
 
   // Fetch page 1 to get totalCount
   const firstRes = await fetch(
-    `${BASE_URL}/history?page=1&username=${username}&role=${role}&search=${encodedSearch}`
+    `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&search=${encodedSearch}`
   );
   const firstJson = await firstRes.json();
   const totalCount = firstJson.totalCount || 0;
@@ -41,7 +43,7 @@ export const fetchChechListDataForHistory = async (search = "") => {
   if (totalPages > 1) {
     const remaining = await Promise.all(
       Array.from({ length: totalPages - 1 }, (_, i) =>
-        fetch(`${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&search=${encodedSearch}`)
+        fetch(`${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&department=${department}&search=${encodedSearch}`)
           .then(r => r.json())
           .then(j => j.data || [])
       )

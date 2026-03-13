@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft, Settings } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
+import { hasPageAccess } from "../../utils/permissionUtils";
 import { pushAssignTaskApi } from "../../redux/api/assignTaskApi";
 import { useDispatch, useSelector } from "react-redux";
 import { uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignTaskSlice";
@@ -192,15 +193,22 @@ export default function AssignTaskUser() {
     ? (reduxUserData.user_name || reduxUserData.username || '')
     : (localStorage.getItem('user-name') || '');
 
+  // User role for fallback
+  const userRole = localStorage.getItem('role');
+
   // Derive fields from profile (fetched from DB)
   const userUnit = profile?.unit || '';
   const userDivision = profile?.division || '';
   const userDepartment = profile?.department || '';
 
-  // Filter doer names to only this user
-  const filteredDoerNames = doerName.filter(
-    (doer) => doer?.trim().toLowerCase() === username?.trim().toLowerCase()
-  );
+  // Filter doer names to only this user unless they have admin task permissions or are an admin
+  const canAssignToOthers = hasPageAccess("assign_task_admin") || userRole === "admin" || userRole === "super_admin";
+
+  const filteredDoerNames = canAssignToOthers
+    ? doerName
+    : doerName.filter(
+        (doer) => doer?.trim().toLowerCase() === username?.trim().toLowerCase()
+      );
 
   const dispatch = useDispatch();
 
