@@ -82,11 +82,17 @@ const Setting = () => {
 
   const togglePermission = (type, permission) => {
     if (type === 'system') {
-      setSystemAccess(prev =>
-        prev.includes(permission)
+      setSystemAccess(prev => {
+        const next = prev.includes(permission)
           ? prev.filter(p => p !== permission)
-          : [...prev, permission]
-      );
+          : [...prev, permission];
+        
+        // If all system access is removed, clear page access too
+        if (next.length === 0) {
+          setPageAccess([]);
+        }
+        return next;
+      });
     }
     if (type === 'page_view') {
       // Toggle view; removing view also removes modify
@@ -729,14 +735,15 @@ const [userForm, setUserForm] = useState({
   // Modified handleAddUser
 const handleAddUser = async (e) => {
   e.preventDefault();
+  const isSuperAdminRole = userForm.role === 'super_admin';
   const newUser = {
     ...userForm,
-    user_access: userForm.department, // Department name for user access
+    user_access: isSuperAdminRole ? userForm.department : (systemAccess.length > 0 ? userForm.department : null),
     department: userForm.department,
     unit: userForm.unit,
     division: userForm.division,
-    system_access: systemAccess,
-    page_access: pageAccess
+    system_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? systemAccess : null),
+    page_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? (pageAccess.length > 0 ? pageAccess : null) : null)
   };
 
   try {
@@ -753,6 +760,7 @@ const handleAddUser = async (e) => {
 const handleUpdateUser = async (e) => {
   e.preventDefault();
   
+  const isSuperAdminRole = userForm.role === 'super_admin';
   // Prepare updated user data
   const updatedUser = {
     user_name: userForm.username,
@@ -760,12 +768,12 @@ const handleUpdateUser = async (e) => {
     number: userForm.phone,
     role: userForm.role,
     status: userForm.status,
-    user_access: userForm.department, // Department name for user access
+    user_access: isSuperAdminRole ? userForm.department : (systemAccess.length > 0 ? userForm.department : null),
     department: userForm.department,
     unit: userForm.unit,
     division: userForm.division,
-    system_access: systemAccess,
-    page_access: pageAccess
+    system_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? systemAccess : null),
+    page_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? (pageAccess.length > 0 ? pageAccess : null) : null)
   };
 
   console.log('DEBUG: handleUpdateUser payload:', { id: currentUserId, updatedUser });
@@ -959,10 +967,13 @@ const handleEditUser = (userId) => {
   
   // Load existing permissions
   try {
-    const sAccess = typeof user.system_access === 'string' ? JSON.parse(user.system_access) : (user.system_access || []);
-    const pAccess = typeof user.page_access === 'string' ? JSON.parse(user.page_access) : (user.page_access || []);
-    setSystemAccess(sAccess);
-    setPageAccess(pAccess);
+    const rawSystemAccess = user.system_access;
+    const system_access = Array.isArray(rawSystemAccess) && rawSystemAccess.length > 0 ? rawSystemAccess : [];
+    const rawPageAccess = user.page_access;
+    const page_access = Array.isArray(rawPageAccess) && rawPageAccess.length > 0 ? rawPageAccess : [];
+
+    setSystemAccess(system_access);
+    setPageAccess(page_access);
   } catch (e) {
     console.error("Error parsing user permissions:", e);
     setSystemAccess([]);
@@ -1153,13 +1164,21 @@ const resetUserForm = () => {
     const matchesSearch = !leaveUsernameFilter || user.user_name.toLowerCase().includes(leaveUsernameFilter.toLowerCase());
     
     // Admin department filtering
-    const userRole = localStorage.getItem('role');
+    const userRole = localStorage.getItem('role')?.toLowerCase();
+    const userUnit = localStorage.getItem('unit');
+    const userDivision = localStorage.getItem('division');
     const userAccess = localStorage.getItem('user_access') || '';
     const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
     
+    if (userRole === 'div_admin') {
+      const isSameDivision = user.unit === userUnit && user.division === userDivision;
+      return matchesSearch && isSameDivision;
+    }
+    
     if (userRole === 'admin' && userDepartments.length > 0) {
       const uDept = (user.user_access || user.department || '').split(',')[0].trim().toLowerCase();
-      return matchesSearch && userDepartments.includes(uDept);
+      const isSameDeptScope = user.unit === userUnit && user.division === userDivision && userDepartments.includes(uDept);
+      return matchesSearch && isSameDeptScope;
     }
     
     return matchesSearch;
@@ -1171,7 +1190,9 @@ const resetUserForm = () => {
   };
 
   const getRoleColor = (role) => {
-    switch (role) {
+    switch (role?.toLowerCase()) {
+      case 'super_admin': return 'bg-red-100 text-red-800';
+      case 'div_admin': return 'bg-indigo-100 text-indigo-800';
       case 'admin': return 'bg-blue-100 text-blue-800';
       case 'manager': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -1561,15 +1582,21 @@ const resetUserForm = () => {
       {/* Mobile Card View */}
       <div className="sm:hidden space-y-3 p-3">
         {(() => {
-          const userRole = localStorage.getItem('role');
+          const userRole = localStorage.getItem('role')?.toLowerCase();
+          const userUnit = localStorage.getItem('unit');
+          const userDivision = localStorage.getItem('division');
           const userAccess = localStorage.getItem('user_access') || '';
           const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
           
           let displayedUsers = userData;
-          if (userRole === 'admin' && userDepartments.length > 0) {
+          if (userRole === 'div_admin') {
+            displayedUsers = userData?.filter(u => 
+              u.unit === userUnit && u.division === userDivision
+            );
+          } else if (userRole === 'admin' && userDepartments.length > 0) {
             displayedUsers = userData?.filter(u => {
               const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
-              return userDepartments.includes(uDept);
+              return u.unit === userUnit && u.division === userDivision && userDepartments.includes(uDept);
             });
           }
           
@@ -1661,15 +1688,21 @@ const resetUserForm = () => {
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
              {(() => {
-                const userRole = localStorage.getItem('role');
+                const userRole = localStorage.getItem('role')?.toLowerCase();
+                const userUnit = localStorage.getItem('unit');
+                const userDivision = localStorage.getItem('division');
                 const userAccess = localStorage.getItem('user_access') || '';
                 const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
                 
                 let displayedUsers = userData;
-                if (userRole === 'admin' && userDepartments.length > 0) {
+                if (userRole === 'div_admin') {
+                  displayedUsers = userData?.filter(u => 
+                    u.unit === userUnit && u.division === userDivision
+                  );
+                } else if (userRole === 'admin' && userDepartments.length > 0) {
                   displayedUsers = userData?.filter(u => {
                     const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
-                    return userDepartments.includes(uDept);
+                    return u.unit === userUnit && u.division === userDivision && userDepartments.includes(uDept);
                   });
                 }
                 
@@ -2669,8 +2702,9 @@ const resetUserForm = () => {
                           >
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
+                            <option value="div_admin">Division Admin</option>
                             {/* Only show/allow super_admin option if current user is super_admin (or you can decide policy) */}
-                            {canManageSettings && <option value="super_admin">Super Admin</option>}
+                            {currentUserRole?.toLowerCase() === 'super_admin' && <option value="super_admin">Super Admin</option>}
                           </select>
                         </div>
 
@@ -2743,8 +2777,8 @@ const resetUserForm = () => {
                           </select>
                         </div>
 
-                        {/* Manual Permission Selection for super_admin */}
-                        {currentUserRole === 'super_admin' && (
+                        {/* Manual Permission Selection for non-super_admin roles */}
+                        {currentUserRole === 'super_admin' && userForm.role !== 'super_admin' && (
                           <div className="sm:col-span-6 mt-4 pt-4 border-t border-gray-200">
                             <h4 className="text-sm font-bold text-gray-800 mb-1">Manual Permission Selection</h4>
                             <p className="text-xs text-gray-500 italic mb-4">
@@ -3164,15 +3198,21 @@ const resetUserForm = () => {
                           {doerName && doerName.length > 0 ? (
                             doerName
                               .filter(name => {
-                                const userRole = localStorage.getItem('role');
+                                const userRole = localStorage.getItem('role')?.toLowerCase();
+                                const userUnit = localStorage.getItem('unit');
+                                const userDivision = localStorage.getItem('division');
                                 const userAccess = localStorage.getItem('user_access') || '';
                                 const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+                                if (userRole === 'div_admin') {
+                                  const user = userData?.find(u => u.user_name === name);
+                                  return user && user.unit === userUnit && user.division === userDivision;
+                                }
                                 if (userRole === 'admin' && userDepartments.length > 0) {
                                   // find user object by name to check department
                                   const user = userData?.find(u => u.user_name === name);
                                   if (user) {
                                     const uDept = (user.user_access || user.department || '').split(',')[0].trim().toLowerCase();
-                                    return userDepartments.includes(uDept);
+                                    return user.unit === userUnit && user.division === userDivision && userDepartments.includes(uDept);
                                   }
                                   return false;
                                 }
@@ -3326,12 +3366,18 @@ const resetUserForm = () => {
                                                {userData && userData.length > 0 ? (
                                                 userData
                                                   .filter(u => {
-                                                    const userRole = localStorage.getItem('role');
+                                                    const userRole = localStorage.getItem('role')?.toLowerCase();
+                                                    const userUnit = localStorage.getItem('unit');
+                                                    const userDivision = localStorage.getItem('division');
                                                     const userAccess = localStorage.getItem('user_access') || '';
                                                     const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+                                                    if (userRole === 'div_admin') {
+                                                      const uDeptScope = u.unit === userUnit && u.division === userDivision;
+                                                      return uDeptScope;
+                                                    }
                                                     if (userRole === 'admin' && userDepartments.length > 0) {
                                                       const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
-                                                      return userDepartments.includes(uDept);
+                                                      return u.unit === userUnit && u.division === userDivision && userDepartments.includes(uDept);
                                                     }
                                                     return true;
                                                   })

@@ -8,9 +8,11 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, search = '') => {
     const username = localStorage.getItem("user-name");
     const role = localStorage.getItem("role");
     const department = localStorage.getItem("department");
+    const unit = localStorage.getItem("unit");
+    const division = localStorage.getItem("division");
 
     const response = await fetch(
-        `${BASE_URL}/?page=${page}&username=${username}&role=${role}&department=${department}&search=${encodeURIComponent(search)}`
+        `${BASE_URL}/?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
     );
 
     if (!response.ok) {
@@ -28,13 +30,15 @@ export const fetchMaintenanceDataForHistory = async (search = "") => {
     const username = localStorage.getItem("user-name");
     const role = localStorage.getItem("role");
     const department = localStorage.getItem("department");
+    const unit = localStorage.getItem("unit");
+    const division = localStorage.getItem("division");
     const PAGE_SIZE = 50;
 
     const encodedSearch = encodeURIComponent(search);
 
     // Fetch page 1 to get totalCount
     const firstRes = await fetch(
-        `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&search=${encodedSearch}`
+        `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`
     );
     const firstJson = await firstRes.json();
     const totalCount = firstJson.totalCount || 0;
@@ -46,7 +50,7 @@ export const fetchMaintenanceDataForHistory = async (search = "") => {
     if (totalPages > 1) {
         const remaining = await Promise.all(
             Array.from({ length: totalPages - 1 }, (_, i) =>
-                fetch(`${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&department=${department}&search=${encodedSearch}`)
+                fetch(`${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`)
                     .then(r => r.json())
                     .then(j => j.data || [])
             )

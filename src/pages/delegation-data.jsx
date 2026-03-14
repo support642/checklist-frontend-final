@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { CheckCircle2, Trash2, X } from "lucide-react"
 import { useDispatch, useSelector } from "react-redux"
 import { deleteDelegationTask, uniqueDelegationTaskData } from "../redux/slice/quickTaskSlice"
+import { hasModifyAccess } from "../utils/permissionUtils"
 
 const CONFIG = {
   APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzXzqnKmbeXw3i6kySQcBOwxHQA7y8WBFfEe69MPbCR-jux0Zte7-TeSKi8P4CIFkhE/exec",
@@ -202,7 +203,7 @@ useEffect(()=>{
             </div>
             
             {/* Delete selected button */}
-            {selectedTasks.length > 0 && (
+            {selectedTasks.length > 0 && hasModifyAccess("quick_task") && (
               <button
                 onClick={handleDeleteSelected}
                 disabled={isDeleting}

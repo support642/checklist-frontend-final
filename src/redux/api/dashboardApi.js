@@ -34,6 +34,9 @@ export const fetchDashboardDataApi = async (
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
   // 👇 Force user filter
   staffFilter = getFinalStaffFilter(staffFilter);
@@ -48,7 +51,10 @@ export const fetchDashboardDataApi = async (
     unitFilter,
     divisionFilter,
     role,
-    username
+    username,
+    unit,
+    division,
+    department
   });
 
   const res = await fetch(`${BASE_URL}?${params.toString()}`);
@@ -62,6 +68,9 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = "all", 
   try {
     const role = localStorage.getItem("role");
     const username = localStorage.getItem("user-name");
+    const unit = localStorage.getItem("unit");
+    const division = localStorage.getItem("division");
+    const department = localStorage.getItem("department");
 
     staffFilter = getFinalStaffFilter(staffFilter);
 
@@ -73,7 +82,10 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = "all", 
       unitFilter,
       divisionFilter,
       role,
-      username
+      username,
+      unit,
+      division,
+      department
     });
 
     const url = `${BASE_URL}/count?${params.toString()}`;
@@ -99,8 +111,11 @@ export const countTotalTaskApi = async (dashboardType, staffFilter = "all", depa
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
-  const url = `${BASE_URL}/total?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/total?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`;
 
   const res = await fetch(url);
   return res.json();
@@ -111,8 +126,11 @@ export const countCompleteTaskApi = async (dashboardType, staffFilter = "all", d
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
-  const url = `${BASE_URL}/completed?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/completed?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`;
 
   const res = await fetch(url);
   return res.json();
@@ -123,8 +141,11 @@ export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = "a
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
-  const url = `${BASE_URL}/pending?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/pending?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`;
 
   const res = await fetch(url);
   return res.json();
@@ -135,8 +156,13 @@ export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter =
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
-  const url = `${BASE_URL}/overdue?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
+  const commonParams = `&unit=${unit}&division=${division}&department=${department}&role=${role}&username=${username}`;
+
+  const url = `${BASE_URL}/overdue?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}${commonParams}`;
 
   const res = await fetch(url);
   return res.json();
@@ -337,8 +363,11 @@ export const countNotDoneTaskApi = async (dashboardType, staffFilter = "all", de
 
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
-  const url = `${BASE_URL}/not-done?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}`;
+  const url = `${BASE_URL}/not-done?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`;
 
   const res = await fetch(url);
   return res.json();

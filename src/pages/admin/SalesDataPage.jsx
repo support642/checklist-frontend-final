@@ -590,7 +590,7 @@ function AccountDataPage() {
       });
     }
 
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const dateA = new Date(a.task_start_date || "");
       const dateB = new Date(b.task_start_date || "");
 
@@ -634,8 +634,19 @@ function AccountDataPage() {
       });
     }
 
-    return filtered;
-  }, [maintenance, searchTerm, statusFilter, frequencyFilter, userRole, userDept]);
+    // Member filter
+    if (selectedMembers.length > 0) {
+      filtered = filtered.filter((item) => {
+        return selectedMembers.includes(item.name);
+      });
+    }
+
+    return [...filtered].sort((a, b) => {
+      const dateA = new Date(a.task_start_date || "");
+      const dateB = new Date(b.task_start_date || "");
+      return dateA.getTime() - dateB.getTime();
+    });
+  }, [maintenance, searchTerm, statusFilter, frequencyFilter, selectedMembers, userRole, userDept]);
 
   // Helper function to determine task status (Today, Upcoming, Overdue)
   const getTaskStatus = (taskStartDate) => {
@@ -751,7 +762,7 @@ function AccountDataPage() {
   }
 
   const getFilteredMembersList = () => {
-    if (userRole === "admin") {
+    if ((userRole === "admin" || userRole === "div_admin")) {
       return doerName
     } else {
       return doerName.filter((member) => member.toLowerCase() === username.toLowerCase())
@@ -1230,7 +1241,7 @@ const submissionData = await Promise.all(
                 </div>
               </button>
               {/* Submit Selected Button - Only for Users with Modify Access */}
-              {!showHistory && (userRole === "user" || userRole === "admin" || userRole === "super_admin") && hasModifyAccess('pending_task') && (
+              {!showHistory && (userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && hasModifyAccess('pending_task') && (
                 <button
                   onClick={activeView === 'checklist' ? handleSubmit : handleMaintSubmit}
                   disabled={(activeView === 'checklist' ? selectedItemsCount === 0 : maintSelectedItems.size === 0) || isSubmitting}
@@ -1245,7 +1256,7 @@ const submissionData = await Promise.all(
                 </button>
               )}
               {/* WhatsApp Button - For Admin and Super Admin */}
-              {/* {!showHistory && (userRole === "admin" || userRole === "super_admin") && selectedItems.size > 0 && (
+              {/* {!showHistory && ((userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && selectedItems.size > 0 && (
                 <button
                   onClick={handleSendWhatsApp}
                   disabled={sendingWhatsApp}
@@ -1262,7 +1273,7 @@ const submissionData = await Promise.all(
             </div>
 
             {/* Admin Submit Button for History View */}
-            {showHistory && userRole === "admin" && selectedHistoryItems.length > 0 && (
+            {showHistory && (userRole === "admin" || userRole === "div_admin") && selectedHistoryItems.length > 0 && (
               <div className="fixed bottom-4 right-4 sm:top-40 sm:bottom-auto sm:right-10 z-50">
                 <button
                   onClick={handleMarkMultipleDone}
@@ -1300,7 +1311,7 @@ const submissionData = await Promise.all(
             </h2>
             <p className="text-purple-600 text-xs sm:text-sm mt-1">
               {showHistory
-                ? `${CONFIG[activeView].historyDescription} for ${userRole === "admin" ? "all" : "your"} tasks`
+                ? `${CONFIG[activeView].historyDescription} for ${(userRole === "admin" || userRole === "div_admin") ? "all" : "your"} tasks`
                 : CONFIG[activeView].description}
             </p>
           </div>
@@ -1458,7 +1469,7 @@ const submissionData = await Promise.all(
                           <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
                             Task Description
                           </th>
-                          {userRole === "admin" && (
+                          {(userRole === "admin" || userRole === "div_admin") && (
                             <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 whitespace-nowrap">
                               Admin Remarks
                             </th>
@@ -1519,7 +1530,7 @@ const submissionData = await Promise.all(
                                   {history.task_description || "—"}
                                 </div>
                               </td>
-                              {userRole === "admin" && (
+                              {(userRole === "admin" || userRole === "div_admin") && (
                                 <td className="px-2 sm:px-3 py-2 sm:py-4 bg-purple-50">
                                   {history.admin_done !== 'Done' ? (
                                     <input
@@ -1616,7 +1627,7 @@ const submissionData = await Promise.all(
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={userRole === "admin" ? 17 : 15} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                            <td colSpan={(userRole === "admin" || userRole === "div_admin") ? 17 : 15} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
                               {searchTerm || selectedMembers.length > 0 || startDate || endDate
                                 ? "No historical records matching your filters"
                                 : "No completed records found"}
@@ -1659,7 +1670,7 @@ const submissionData = await Promise.all(
                       <div key={index} className={`bg-white border rounded-lg p-3 shadow-sm border-gray-200`}>
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
-                            {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                            {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
                               <input
                                 type="checkbox"
                                 className={`h-4 w-4 rounded border-gray-300 text-purple-600`}
@@ -1685,7 +1696,7 @@ const submissionData = await Promise.all(
                           <div><span className="text-gray-500">Planned Date:</span> <span className="font-medium">{item.planned_date || "—"}</span></div>
                           <div><span className="text-gray-500">Frequency:</span> <span className="font-medium">{item.frequency || "—"}</span></div>
                         </div>
-                        {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && isSelected && (
+                        {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && isSelected && (
                           <div className="border-t pt-2 mt-2 space-y-2">
                             <select
                               value={maintAdditionalData[item.task_id] || ""}
@@ -1779,7 +1790,7 @@ const submissionData = await Promise.all(
               <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
-                    {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                    {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
                       <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 border-b">
                         <input
                           type="checkbox"
@@ -1830,7 +1841,7 @@ const submissionData = await Promise.all(
                       const isSelected = maintSelectedItems.has(item.task_id);
                       return (
                         <tr key={index} className={`${isSelected ? "bg-purple-50" : ""} hover:bg-gray-50`}>
-                          {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                          {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
                             <td className="px-2 sm:px-3 py-2 sm:py-4 w-12 border-b">
                               <input
                                 type="checkbox"
@@ -1962,7 +1973,7 @@ const submissionData = await Promise.all(
                       <div key={index} className={`bg-white border rounded-lg p-3 shadow-sm ${taskStatus === 'upcoming' ? "border-blue-300 bg-blue-50" : taskStatus === 'overdue' ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
-                            {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                            {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
                               <input
                                 type="checkbox"
                                 className={`h-4 w-4 rounded border-gray-300 text-purple-600 ${!checkboxEnabled ? 'opacity-50' : ''}`}
@@ -1992,7 +2003,7 @@ const submissionData = await Promise.all(
                           <div><span className="text-gray-500">Frequency:</span> <span className="font-medium">{account.frequency || "—"}</span></div>
                           <div><span className="text-gray-500">Date:</span> <span className="font-medium">{account.task_start_date || "—"}</span></div>
                         </div>
-                        {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && isSelected && (
+                        {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && isSelected && (
                           <div className="border-t pt-2 mt-2 space-y-2">
                             <select
                               value={additionalData[account.task_id] || ""}
@@ -2093,7 +2104,7 @@ const submissionData = await Promise.all(
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                       Task Status
                     </th>
-                    {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                    {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
                       <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                         <input
                           type="checkbox"
@@ -2190,7 +2201,7 @@ const submissionData = await Promise.all(
                               {taskStatus === 'today' ? 'Today' : taskStatus === 'upcoming' ? 'Upcoming' : taskStatus === 'overdue' ? 'Overdue' : '—'}
                             </span>
                           </td>
-                          {(userRole === "user" || userRole === "admin" || userRole === "super_admin") && (
+                          {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
                             <td className="px-2 sm:px-3 py-2 sm:py-4 w-12">
                               <input
                                 type="checkbox"

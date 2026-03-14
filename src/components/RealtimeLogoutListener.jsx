@@ -55,7 +55,7 @@ const RealtimeLogoutListener = () => {
   // ✅ Admin listener to see logout notifications
 useEffect(() => {
   const role = localStorage.getItem("role");
-  if (role !== "admin") return;
+  if ((role !== "admin" && role !== "div_admin")) return;
 
   const adminSubscription = supabase
     .channel("admin-user-status-watch")

@@ -8,7 +8,7 @@ import { checklistHistoryData } from "../../redux/slice/checklistSlice"
 import { postChecklistAdminDoneAPI } from "../../redux/api/checkListApi"
 import { postDelegationAdminDoneAPI } from "../../redux/api/delegationApi"
 import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice"
-import { hasPageAccess, canAccessModule } from "../../utils/permissionUtils"
+import { hasPageAccess, canAccessModule, hasModifyAccess } from "../../utils/permissionUtils"
 import { delegationDoneData } from "../../redux/slice/delegationSlice"
 import { maintenanceHistoryData, maintenanceAdminDone } from "../../redux/slice/maintenanceSlice"
 import { postMaintenanceAdminDoneAPI } from "../../redux/api/maintenanceApi"
@@ -68,7 +68,7 @@ function HistoryPage() {
     const user = localStorage.getItem("user-name")
     setUserRole(role || "")
     setUsername(user || "")
-    setIsSuperAdmin(role === "super_admin" || role === "admin")
+    setIsSuperAdmin(role === "super_admin" || role === "admin" || role === "div_admin")
 
     const tab = searchParams.get('tab')
     if (tab === 'maintenance') {
@@ -407,7 +407,7 @@ function HistoryPage() {
     return delegation_done
       .filter((item) => {
         const userMatch =
-          userRole === "admin" ||
+          userRole === "admin" || userRole === "div_admin" ||
           userRole === "super_admin" ||
           (item.name && item.name.toLowerCase() === username.toLowerCase())
         if (!userMatch) return false
@@ -469,7 +469,7 @@ function HistoryPage() {
   }
 
   const getFilteredMembersList = () => {
-    if (userRole === "admin") {
+    if (userRole === "admin" || userRole === "div_admin") {
       return doerName
     } else {
       return doerName.filter((member) => member.toLowerCase() === username.toLowerCase())
@@ -651,7 +651,7 @@ function HistoryPage() {
             </div>
 
             {/* Member Filter Dropdown - Only for Checklist */}
-            {activeTab === "checklist" && userRole === "admin" && doerName && doerName.length > 0 && (
+            {activeTab === "checklist" && (userRole === "admin" || userRole === "div_admin") && doerName && doerName.length > 0 && (
               <select
                 value={selectedMembers[0] || ""}
                 onChange={(e) => {
@@ -707,7 +707,7 @@ function HistoryPage() {
             </div>
 
             {/* Admin Approval Button */}
-            {isSuperAdmin && activeTab === "checklist" && selectedHistoryItems.length > 0 && (
+            {hasModifyAccess("admin_approval") && activeTab === "checklist" && selectedHistoryItems.length > 0 && (
               <button
                 onClick={() => handleMarkDone("checklist")}
                 disabled={markingAsDone}
@@ -719,7 +719,7 @@ function HistoryPage() {
             )}
 
             {/* Maintenance Approval Button */}
-            {isSuperAdmin && activeTab === "maintenance" && selectedMaintenanceItems.length > 0 && (
+            {hasModifyAccess("admin_approval") && activeTab === "maintenance" && selectedMaintenanceItems.length > 0 && (
               <button
                 onClick={() => handleMarkDone("maintenance")}
                 disabled={markingAsDone}

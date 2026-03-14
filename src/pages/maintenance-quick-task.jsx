@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { CheckCircle2, Trash2, X, Edit, Save } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { deleteUniqueMaintenanceTask, uniqueMaintenanceTaskData, updateUniqueMaintenanceTask, resetUniqueMaintenancePagination } from "../redux/slice/maintenanceSlice";
+import { hasModifyAccess } from "../utils/permissionUtils";
 
 const CONFIG = {
   PAGE_CONFIG: {
@@ -231,7 +232,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
                 {CONFIG.PAGE_CONFIG.description} ({uniqueMaintenanceTotal} tasks)
               </p>
             </div>
-            {selectedTasks.length > 0 && userRole === "super_admin" && (
+            {selectedTasks.length > 0 && hasModifyAccess("quick_task") && (
               <div className="flex items-center gap-4">
                 <span className="text-sm text-purple-600">{selectedTasks.length} task(s) selected</span>
                 <button
@@ -268,7 +269,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
                             {task.frequency || "—"}
                           </span>
                        </div>
-                       {userRole === "super_admin" && (
+                       {hasModifyAccess("quick_task") && (
                          editingTaskId === task.task_id ? (
                            <div className="flex gap-2">
                              <button
@@ -562,7 +563,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
                             </button>
                           </div>
                         ) : (
-                          userRole === "super_admin" && (
+                          hasModifyAccess("quick_task") && (
                           <button onClick={() => handleEditClick(task)} className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 justify-center">
                             <Edit size={14} />
                             Edit

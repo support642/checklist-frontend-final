@@ -201,7 +201,7 @@ function AccountDataPage() {
   }
 
   const getFilteredMembersList = () => {
-    if (userRole === "admin") {
+    if ((userRole === "admin" || userRole === "div_admin")) {
       return membersList
     } else {
       return membersList.filter(member => member.toLowerCase() === username.toLowerCase())
@@ -275,7 +275,7 @@ function AccountDataPage() {
         const assignedTo = rowValues[4] || "Unassigned"
         membersSet.add(assignedTo)
 
-        const isUserMatch = currentUserRole === "admin" || assignedTo.toLowerCase() === currentUsername.toLowerCase()
+        const isUserMatch = current(userRole === "admin" || userRole === "div_admin") || assignedTo.toLowerCase() === currentUsername.toLowerCase()
         if (!isUserMatch && currentUserRole !== "admin") return
 
         const columnGValue = rowValues[6]
@@ -345,7 +345,7 @@ function AccountDataPage() {
             pendingAccounts.push(rowData)
           }
         } else if (hasColumnG && !isColumnKEmpty) {
-          const isUserHistoryMatch = currentUserRole === "admin" || assignedTo.toLowerCase() === currentUsername.toLowerCase()
+          const isUserHistoryMatch = current(userRole === "admin" || userRole === "div_admin") || assignedTo.toLowerCase() === currentUsername.toLowerCase()
           if (isUserHistoryMatch) {
             historyRows.push(rowData)
           }
@@ -638,7 +638,7 @@ function AccountDataPage() {
             <h2 className="text-purple-700 font-medium">{showHistory ? `Completed ${CONFIG.SHEET_NAME} Tasks` : `Pending ${CONFIG.SHEET_NAME} Tasks`}</h2>
             <p className="text-purple-600 text-sm">
               {showHistory
-                ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${userRole === "admin" ? "all" : "your"} tasks`
+                ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${(userRole === "admin" || userRole === "div_admin") ? "all" : "your"} tasks`
                 : CONFIG.PAGE_CONFIG.description}
             </p>
           </div>

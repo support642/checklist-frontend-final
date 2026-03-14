@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const ChecklistView = () => {
   const [taskView, setTaskView] = useState("recent");
   const [activeTab, setActiveTab] = useState("tasks");
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -18,7 +19,10 @@ const ChecklistView = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="card border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all">
+        <div 
+          onClick={() => navigate("/dashboard/data/sales")}
+          className="card border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all cursor-pointer"
+        >
           <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-tr-lg p-4 border-b border-blue-200 dark:border-blue-800">
             <h3 className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Tasks</h3>
             <i className="fas fa-clipboard-list h-4 w-4 text-blue-500"></i>
@@ -29,7 +33,10 @@ const ChecklistView = () => {
           </div>
         </div>
 
-        <div className="card border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all">
+        <div 
+          onClick={() => navigate("/dashboard/data/sales")}
+          className="card border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all cursor-pointer"
+        >
           <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-tr-lg p-4 border-b border-green-200 dark:border-green-800">
             <h3 className="text-sm font-medium text-green-700 dark:text-green-300">Completed</h3>
             <i className="fas fa-check-circle h-4 w-4 text-green-500"></i>
@@ -40,7 +47,10 @@ const ChecklistView = () => {
           </div>
         </div>
 
-        <div className="card border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all">
+        <div 
+          onClick={() => navigate("/dashboard/data/sales")}
+          className="card border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all cursor-pointer"
+        >
           <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 rounded-tr-lg p-4 border-b border-amber-200 dark:border-amber-800">
             <h3 className="text-sm font-medium text-amber-700 dark:text-amber-300">Pending</h3>
             <i className="fas fa-clock h-4 w-4 text-amber-500"></i>
@@ -51,7 +61,10 @@ const ChecklistView = () => {
           </div>
         </div>
 
-        <div className="card border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all">
+        <div 
+          onClick={() => navigate("/dashboard/data/sales")}
+          className="card border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all cursor-pointer"
+        >
           <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 rounded-tr-lg p-4 border-b border-red-200 dark:border-red-800">
             <h3 className="text-sm font-medium text-red-700 dark:text-red-300">Overdue</h3>
             <i className="fas fa-exclamation-triangle h-4 w-4 text-red-500"></i>

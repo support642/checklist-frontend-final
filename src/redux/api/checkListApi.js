@@ -9,9 +9,11 @@ export const fetchChechListDataSortByDate = async (page = 1, search = '') => {
   const username = localStorage.getItem("user-name");
   const role = localStorage.getItem("role");
   const department = localStorage.getItem("department");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
 
   const response = await fetch(
-    `${BASE_URL}/pending?page=${page}&username=${username}&role=${role}&department=${department}&search=${encodeURIComponent(search)}`
+    `${BASE_URL}/pending?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
   );
 
   return await response.json();

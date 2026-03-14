@@ -50,7 +50,7 @@ const AssignTaskRouter = () => {
     ? reduxUserData.role
     : localStorage.getItem('role');
 
-  return (role === 'admin' || role === 'super_admin') 
+  return (role === 'admin' || role === 'super_admin' || role === 'div_admin') 
     ? <AdminAssignTask /> 
     : <UserAssignTask />;
 }

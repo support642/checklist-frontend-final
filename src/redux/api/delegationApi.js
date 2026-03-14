@@ -82,9 +82,12 @@ export const fetchDelegationDataSortByDate = async () => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
   const { data } = await axios.get(`${API}/delegation`, {
-    params: { role, username, user_access: userAccess },
+    params: { role, username, user_access: userAccess, unit, division, department },
   });
 
   return data;
@@ -95,9 +98,12 @@ export const fetchDelegation_DoneDataSortByDate = async (search = "") => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
 
   const { data } = await axios.get(`${API}/delegation-done`, {
-    params: { role, username, user_access: userAccess, search },
+    params: { role, username, user_access: userAccess, search, unit, division, department },
   });
 
   return data;

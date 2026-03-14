@@ -202,7 +202,7 @@ export default function AssignTaskUser() {
   const userDepartment = profile?.department || '';
 
   // Filter doer names to only this user unless they have admin task permissions or are an admin
-  const canAssignToOthers = hasPageAccess("assign_task_admin") || userRole === "admin" || userRole === "super_admin";
+  const canAssignToOthers = hasPageAccess("assign_task_admin") || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin";
 
   const filteredDoerNames = canAssignToOthers
     ? doerName

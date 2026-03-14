@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { format } from 'date-fns';
 import { Search, ChevronDown, Filter, Trash2, Edit, Save, X } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
-import { hasPageAccess, canAccessModule } from "../utils/permissionUtils";
+import { hasPageAccess, canAccessModule, hasModifyAccess } from "../utils/permissionUtils";
 import DelegationPage from "./delegation-data";
 import MaintenanceQuickTaskPage from "./maintenance-quick-task";
 import { useDispatch, useSelector } from "react-redux";
@@ -96,7 +96,7 @@ useEffect(() => {
 }, [handleScroll]);
 
   // const userRole = localStorage.getItem("role");
-  const canModifyTasks = hasPageAccess("quick_task_admin");
+  const canModifyTasks = hasModifyAccess("quick_task");
 
   // Edit functionality
   const handleEditClick = (task) => {

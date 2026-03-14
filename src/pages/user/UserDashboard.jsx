@@ -23,7 +23,7 @@ const UserDashboard = () => {
       : [];
     setUserDepartments(depts);
 
-    if (userRole === "admin" && depts.length > 0) {
+    if ((userRole === "admin" || userRole === "div_admin") && depts.length > 0) {
       // Prefill with the first assigned department if not already set or if 'all' isn't explicitly wanted
       // In User dashboard, restricted admins should focus on their dept
       setDepartmentFilter(depts[0]);
@@ -96,7 +96,7 @@ const UserDashboard = () => {
       )}
 
       {/* Dynamic Department Indicator for Admins */}
-      {userRole === "admin" && (
+      {(userRole === "admin" || userRole === "div_admin") && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-full w-fit">
           <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase">Dept:</span>
           <span className="text-xs font-medium text-amber-800 dark:text-amber-300">{departmentFilter}</span>

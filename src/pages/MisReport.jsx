@@ -196,7 +196,7 @@ function StaffTasksPage() {
                 const combinedData = combineStaffData(checklistData, delegationData)
                 const uniqueStaff = [...new Set(combinedData.map(staff => staff.name).filter(Boolean))]
 
-                if (userRole !== "admin" && username) {
+                if ((userRole !== "admin" && userRole !== "div_admin") && username) {
                     if (!uniqueStaff.some(staff => staff.toLowerCase() === username.toLowerCase())) {
                         uniqueStaff.push(username)
                     }

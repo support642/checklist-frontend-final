@@ -12,7 +12,8 @@ export const PAGE_PERMISSIONS = [
   "holiday_management",
   "admin_data",
   "pending_task",
-  "calendar"
+  "calendar",
+  "admin_approval"
 ];
 
 // Used by the manual View/Modify permission UI (super_admin only)
@@ -26,6 +27,7 @@ export const PAGE_PERMISSION_GROUPS = [
   { key: "calendar",          label: "Calendar" },
   { key: "holiday_management",label: "Holiday Management" },
   { key: "admin_data",        label: "Admin Data" },
+  { key: "admin_approval",    label: "Admin Approval" },
 ];
 
 // Maps UI modules (checklist, maintenance, etc.) to system_access features
@@ -45,5 +47,6 @@ export const PAGE_SYSTEM_MAP = {
   "pending_task": ["checklist", "maintenance"],
   "calendar": ["checklist", "maintenance"],
   "holiday_management": ["checklist", "maintenance"],
-  "admin_data": ["checklist", "maintenance"]
+  "admin_data": ["checklist", "maintenance"],
+  "admin_approval": ["checklist", "maintenance"]
 };

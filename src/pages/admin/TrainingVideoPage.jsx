@@ -29,7 +29,7 @@ function TrainingVideoPage() {
   }
 
   // Get video based on role - admin sees admin video, user sees user video
-  const currentVideo = userRole === "admin" ? videoConfig.admin : videoConfig.user
+  const currentVideo = (userRole === "admin" || userRole === "div_admin") ? videoConfig.admin : videoConfig.user
 
   return (
     <AdminLayout>

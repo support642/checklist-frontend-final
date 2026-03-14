@@ -268,7 +268,7 @@ export default function AssignTask() {
   const filteredDoerNames = useMemo(() => {
     if (!formData.department) return [];
     // User can assign to any doer if they have 'assign_task_admin' permission or are an admin
-    const canAssignToOthers = hasPageAccess("assign_task_admin") || userRole === "admin" || userRole === "super_admin";
+    const canAssignToOthers = hasPageAccess("assign_task_admin") || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin";
     
     return canAssignToOthers
       ? doerName

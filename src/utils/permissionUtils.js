@@ -53,19 +53,9 @@ export const hasPageAccess = (page) => {
 
   // Fallback to role-based logic if page_access is empty
   if (!pageAccess || pageAccess.length === 0) {
-    const adminRoles = ["admin", "super_admin"];
-    const superAdminRoles = ["super_admin"];
-    const adminOnlyPages = ["quick_task", "settings", "holiday_management", "admin_data", "delegation", "delegation_task"];
-    const superAdminOnlyPages = ["settings_admin", "holiday_management_admin"];
-    
-    if (superAdminOnlyPages.includes(page)) {
-      return ["super_admin"].includes(role);
-    }
-    
-    if (adminOnlyPages.includes(page)) {
-      return ["admin", "super_admin"].includes(role);
-    }
-    return true; // Default to public access for non-admin pages
+    // STRICT FALLBACK: If no explicit permissions are granted, 
+    // ONLY the base dashboard is accessible, regardless of role.
+    return page === "dashboard";
   }
 
   return false;
@@ -99,10 +89,9 @@ export const hasSystemAccess = (system) => {
 
   // Fallback to role-based logic
   if (systemAccess.length === 0) {
-    if (system === "maintenance" || system === "settings") {
-      return ["admin", "super_admin"].includes(role);
-    }
-    return true; // Checklist is usually default
+    // STRICT FALLBACK: If no explicit system access is granted,
+    // deny all system modules by default.
+    return false;
   }
 
   return false;

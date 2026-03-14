@@ -112,6 +112,7 @@ const MachineModal = ({ isOpen, onClose, machines }) => {
 const MaintenanceView = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const userRole = localStorage.getItem("role");
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
   
   const { 
@@ -191,7 +192,11 @@ const MaintenanceView = () => {
         navigate('/dashboard/data/sales?view=maintenance');
         break;
       case 'completed':
-        navigate('/dashboard/history?tab=maintenance');
+        if (userRole === 'user') {
+          navigate('/dashboard/data/sales?view=maintenance');
+        } else {
+          navigate('/dashboard/history?tab=maintenance');
+        }
         break;
       default:
         break;

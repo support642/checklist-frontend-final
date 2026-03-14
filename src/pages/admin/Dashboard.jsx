@@ -100,12 +100,20 @@ useEffect(() => {
   const username = localStorage.getItem("user-name");
 
   // Check if user has admin dashboard access. If not, restrict to their own name.
-  if (!hasPageAccess("dashboard_admin") && role === "user") {
+  if (!hasPageAccess("dashboard_admin")) {
     setDashboardStaffFilter(username);
     setFilterStaff(username);
     setDepartmentFilter("all");        // user cannot filter department
     setUnitFilter("all");
     setDivisionFilter("all");
+  }
+
+  // DIV_ADMIN: Default division filter to their own division on mount
+  if (role === "div_admin") {
+    const userDivision = localStorage.getItem("division");
+    if (userDivision) {
+      setDivisionFilter(userDivision);
+    }
   }
 }, []);
 
@@ -242,8 +250,8 @@ useEffect(() => {
     // Process tasks
     const processedTasks = filteredData
       .map((task) => {
-        // Skip if not assigned to current user (for non-admin)
-        if ((userRole !== "admin" && userRole !== "super_admin") && task.name?.toLowerCase() !== username?.toLowerCase()) {
+        // Skip if not assigned to current user (for standard users)
+        if (userRole === "user" && task.name?.toLowerCase() !== username?.toLowerCase()) {
           return null;
         }
 
@@ -635,8 +643,8 @@ useEffect(() => {
         uniqueStaff = [...new Set(filteredData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
       }
 
-      // For non-admin users, always ensure current user appears in staff dropdown
-      if ((userRole !== "admin" && userRole !== "super_admin") && username) {
+      // For standard users, always ensure current user appears in staff dropdown
+      if (userRole === "user" && username) {
         if (!uniqueStaff.some(staff => staff.toLowerCase() === username.toLowerCase())) {
           uniqueStaff.push(username)
         }
@@ -654,8 +662,8 @@ useEffect(() => {
       // Process tasks with your field names
       const processedTasks = filteredData
         .map((task) => {
-          // Skip if not assigned to current user (for non-admin)
-          if ((userRole !== "admin" && userRole !== "super_admin") && task.name?.toLowerCase() !== username?.toLowerCase()) {
+          // Skip if not assigned to current user (for standard users)
+          if (userRole === "user" && task.name?.toLowerCase() !== username?.toLowerCase()) {
             return null;
           }
 
@@ -816,9 +824,9 @@ useEffect(() => {
           ? userAccess.split(',').map(dept => dept.trim().toLowerCase())
           : [];
 
-        // Filter departments based on user access for admin users
+        // Filter departments based on user access for standard admin users
         let filteredDepartments = departments;
-        if ((userRole === "admin" || userRole === "super_admin") && userDepartments.length > 0) {
+        if (userRole === "admin" && userDepartments.length > 0) {
           filteredDepartments = departments.filter(dept =>
             userDepartments.includes(dept.toLowerCase())
           );
@@ -875,12 +883,30 @@ useEffect(() => {
     const userDepartments = userAccess ? userAccess.split(',').map(dept => dept.trim().toLowerCase()) : [];
     
     let finalDepartments = depts;
-    if ((userRole === "admin" || userRole === "super_admin") && userDepartments.length > 0) {
+    if (userRole === "admin" && userDepartments.length > 0) {
       finalDepartments = depts.filter(dept => userDepartments.includes(dept.toLowerCase()));
     }
     setAvailableDepartments(finalDepartments);
 
   }, [unitFilter, divisionFilter, rawDepartmentList, userRole]);
+ 
+  // DIV_ADMIN: Robust auto-select division from available options (handles case mismatches)
+  useEffect(() => {
+    if (userRole === "div_admin" && availableDivisions.length > 0) {
+      const userDivision = localStorage.getItem("division");
+      if (userDivision) {
+        // If current filter doesn't exactly match any available option (e.g. case mismatch or still 'all'),
+        // try to find a case-insensitive match.
+        const isExactMatch = availableDivisions.includes(divisionFilter);
+        if (!isExactMatch) {
+          const match = availableDivisions.find(d => d.toLowerCase() === userDivision.toLowerCase());
+          if (match && divisionFilter !== match) {
+            setDivisionFilter(match);
+          }
+        }
+      }
+    }
+  }, [availableDivisions, userRole, divisionFilter]);
 
 
   // Reset staff filter when department filter changes
@@ -1005,7 +1031,12 @@ useEffect(() => {
     setDashboardStaffFilter("all")
     setDepartmentFilter("all")
     setUnitFilter("all")
-    setDivisionFilter("all")
+    if (userRole === "div_admin") {
+      const userDivision = localStorage.getItem("division");
+      setDivisionFilter(userDivision || "all")
+    } else {
+      setDivisionFilter("all")
+    }
     setCurrentPage(1)
     setHasMoreData(true)
     // Clear date range when dashboard type changes
