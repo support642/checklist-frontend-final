@@ -16,7 +16,7 @@ export default function StaffTasksTable({
   const [totalStaffCount, setTotalStaffCount] = useState(0)
   const [totalUsersCount, setTotalUsersCount] = useState(0)
   const [selectedMonthYear, setSelectedMonthYear] = useState("")
-  const [tillDate, setTillDate] = useState("")
+  const [tillDate, setTillDate] = useState(new Date().toLocaleDateString('en-CA'))
   const [monthYearOptions, setMonthYearOptions] = useState([])
   const itemsPerPage = 20
 
@@ -331,7 +331,7 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {renderOnTimeScore(staff.onTimeScore || 0)}
+                    {renderOnTimeScore(staff.completedTasks > 0 ? Math.round((staff.doneOnTime / staff.completedTasks) * 100) : 0)}
                   </td>
                 </tr>
               ))}
@@ -347,7 +347,7 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
                      <span className="text-xs font-bold text-gray-400">#{index + 1}</span>
                    </div>
                    <div>
-                     {renderOnTimeScore(staff.onTimeScore || 0)}
+                     {renderOnTimeScore(staff.completedTasks > 0 ? Math.round((staff.doneOnTime / staff.completedTasks) * 100) : 0)}
                    </div>
                 </div>
                 
