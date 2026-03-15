@@ -16,7 +16,22 @@ export const fetchChechListDataSortByDate = async (page = 1, search = '') => {
     `${BASE_URL}/pending?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
   );
 
-  return await response.json();
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      const errJson = await response.json();
+      throw new Error(errJson.error || `Server error ${response.status}`);
+    } else {
+      throw new Error(`Server returned non-JSON response (${response.status}). This often means the API URL or Port is incorrect.`);
+    }
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    return await response.json();
+  } else {
+    throw new Error("Expected JSON response but received HTML/Text. Check your API configuration.");
+  }
 };
 
 
@@ -35,6 +50,22 @@ export const fetchChechListDataForHistory = async (search = "") => {
   const firstRes = await fetch(
     `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&search=${encodedSearch}`
   );
+
+  if (!firstRes.ok) {
+    const contentType = firstRes.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      const errJson = await firstRes.json();
+      throw new Error(errJson.error || `Server error ${firstRes.status}`);
+    } else {
+      throw new Error(`Server returned non-JSON response (${firstRes.status}). Check API URL/Port.`);
+    }
+  }
+
+  const contentType = firstRes.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    throw new Error("Expected JSON response but received HTML/Text. Check API configuration.");
+  }
+
   const firstJson = await firstRes.json();
   const totalCount = firstJson.totalCount || 0;
   const approvedCount = firstJson.approvedCount || 0;

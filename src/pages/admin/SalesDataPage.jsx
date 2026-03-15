@@ -1550,7 +1550,7 @@ const submissionData = await Promise.all(
                               )}
                               <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50">
                                 <div className="text-xs sm:text-sm text-gray-900 break-words">
-                                  {account.task_start_date || "—"}
+                                  {history.task_start_date || "—"}
                                 </div>
                               </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-4">
