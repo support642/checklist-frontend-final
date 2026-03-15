@@ -47,8 +47,6 @@ function AccountDataPage() {
   const [endDate, setEndDate] = useState("")
   const [userRole, setUserRole] = useState("")
   const [username, setUsername] = useState("")
-  const [currentPagePending, setCurrentPagePending] = useState(1);
-  const [currentPageHistory, setCurrentPageHistory] = useState(1);
   const [userDept, setUserDept] = useState("");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
@@ -137,79 +135,7 @@ function AccountDataPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const handleScrollPending = useCallback(() => {
-    if (!tableContainerRef.current || loading || isFetchingMore || !hasMore || checklist.length === 0) return
-
-    const { scrollTop, scrollHeight, clientHeight } = tableContainerRef.current
-    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100
-
-    if (isNearBottom) {
-      setIsFetchingMore(true)
-      dispatch(checklistData({ page: currentPage + 1, search: debouncedSearch }))
-        .finally(() => setIsFetchingMore(false))
-    }
-  }, [loading, isFetchingMore, hasMore, currentPage, dispatch, checklist.length, debouncedSearch])
-
-  // Handle scroll for history
-  const handleScrollHistory = useCallback(() => {
-    if (!historyTableContainerRef.current || isLoadingMoreHistory || !hasMoreHistory || history.length === 0) return
-
-    const { scrollTop, scrollHeight, clientHeight } = historyTableContainerRef.current
-    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100
-
-    if (isNearBottom) {
-      setIsLoadingMoreHistory(true)
-      dispatch(checklistHistoryData(currentPageHistory + 1))
-        .then((result) => {
-          if (result.payload && result.payload.length < 50) {
-            setHasMoreHistory(false)
-          }
-          setCurrentPageHistory(prev => prev + 1)
-        })
-        .finally(() => setIsLoadingMoreHistory(false))
-    }
-  }, [isLoadingMoreHistory, hasMoreHistory, currentPageHistory, dispatch, history.length])
-
-  // Add scroll event listener
-  useEffect(() => {
-    const tableElement = tableContainerRef.current
-    if (tableElement && !showHistory) {
-      tableElement.addEventListener('scroll', handleScrollPending)
-      return () => tableElement.removeEventListener('scroll', handleScrollPending)
-    }
-  }, [handleScrollPending, showHistory])
-
-  useEffect(() => {
-    const historyTableElement = historyTableContainerRef.current
-    if (historyTableElement && showHistory) {
-      historyTableElement.addEventListener('scroll', handleScrollHistory)
-      return () => historyTableElement.removeEventListener('scroll', handleScrollHistory)
-    }
-  }, [handleScrollHistory, showHistory])
-
-  const handleMaintScroll = useCallback(() => {
-    if (!maintTableContainerRef.current || maintLoading || maintIsFetchingMore || !maintHasMore || maintenance?.length === 0) return
-
-    const { scrollTop, scrollHeight, clientHeight } = maintTableContainerRef.current
-    const isNearBottom = scrollTop + clientHeight >= scrollHeight - 100
-
-    if (isNearBottom) {
-      setMaintIsFetchingMore(true)
-      dispatch(maintenanceData({ page: maintCurrentPage + 1, search: debouncedSearch }))
-        .finally(() => setMaintIsFetchingMore(false))
-    }
-  }, [maintLoading, maintIsFetchingMore, maintHasMore, maintCurrentPage, dispatch, maintenance?.length, debouncedSearch])
-
-  useEffect(() => {
-    const tableElement = maintTableContainerRef.current
-    if (tableElement && activeView === 'maintenance' && !showHistory) {
-      tableElement.addEventListener('scroll', handleMaintScroll)
-      return () => tableElement.removeEventListener('scroll', handleMaintScroll)
-    }
-  }, [handleMaintScroll, activeView, showHistory])
-
-
-  const ITEMS_PER_PAGE = 100;
+  // Removed infinite scroll and pagination state handlers since all tasks render on a single page.
 
   // NEW: Admin history selection states
   const [selectedHistoryItems, setSelectedHistoryItems] = useState([])
@@ -723,12 +649,11 @@ function AccountDataPage() {
       .sort((a, b) => {
         const dateA = parseSupabaseDate(a.task_start_date)
         const dateB = parseSupabaseDate(b.task_start_date)
-        if (!dateA) return 1
-        if (!dateB) return -1
         return dateB - dateA // Sort newest first
-      })    // Return only the items for current page
-    return filtered.slice(0, currentPageHistory * 50) // 50 items per page
-  }, [history, searchTerm, selectedMembers, startDate, endDate, currentPageHistory, userRole, userDept])
+      });
+      
+    return filtered; // Return all data so UI pagination works
+  }, [history, searchTerm, selectedMembers, startDate, endDate, userRole, userDept])
 
 
   const getTaskStatistics = () => {
@@ -980,10 +905,7 @@ const fileToBase64 = (file) => {
     resetFilters()
   }
 
-  useEffect(() => {
-    setCurrentPagePending(1);
-    setCurrentPageHistory(1);
-  }, [searchTerm, selectedMembers, startDate, endDate, showHistory]);
+
 
   const LoadingIndicator = () => (
     <div className="text-center py-4 bg-gray-50">
@@ -1154,6 +1076,16 @@ const submissionData = await Promise.all(
 
   // Convert Set to Array for display
   const selectedItemsCount = selectedItems.size
+
+  // Load all tasks on a single page
+  const currentPendingData = filteredAccountData;
+  const totalPendingPages = 1;
+
+  const currentHistoryData = filteredHistoryData;
+  const totalHistoryPages = 1;
+
+  const currentMaintData = filteredMaintenanceData;
+  const totalMaintPages = 1;
 
   return (
     <AdminLayout>
@@ -1502,8 +1434,8 @@ const submissionData = await Promise.all(
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredHistoryData.length > 0 ? (
-                          filteredHistoryData.map((history, index) => (
+                        {currentHistoryData.length > 0 ? (
+                          currentHistoryData.map((history, index) => (
                             <tr key={index} className="hover:bg-gray-50">
                               <td className="px-2 sm:px-3 py-2 sm:py-4">
                                 <div className="text-xs sm:text-sm font-medium text-gray-900 break-words">
@@ -1637,6 +1569,29 @@ const submissionData = await Promise.all(
                       </tbody>
                     </table>
 
+                    {/* Pagination Controls Array History */}
+                    {totalHistoryPages > 1 && (
+                      <div className="flex justify-between items-center py-4 px-6 border-t border-gray-200 bg-white">
+                        <button
+                          onClick={handlePrevPageHistory}
+                          disabled={currentPageHistory === 1}
+                          className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-sm text-gray-700">
+                          Page <span className="font-medium">{currentPageHistory}</span> of <span className="font-medium">{totalHistoryPages}</span>
+                        </span>
+                        <button
+                          onClick={handleNextPageHistory}
+                          disabled={currentPageHistory === totalHistoryPages}
+                          className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+
                     {isLoadingMoreHistory && (
                       <div className="sticky bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200">
                         <div className="flex justify-center items-center py-3">
@@ -1663,8 +1618,8 @@ const submissionData = await Promise.all(
             >
               {/* Mobile Card View for Maintenance */}
               <div className="sm:hidden space-y-3 p-3">
-                {filteredMaintenanceData.length > 0 ? (
-                  filteredMaintenanceData.map((item, index) => {
+                {currentMaintData.length > 0 ? (
+                  currentMaintData.map((item, index) => {
                     const isSelected = maintSelectedItems.has(item.task_id);
                     return (
                       <div key={index} className={`bg-white border rounded-lg p-3 shadow-sm border-gray-200`}>
@@ -1836,8 +1791,8 @@ const submissionData = await Promise.all(
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredMaintenanceData.length > 0 ? (
-                    filteredMaintenanceData.map((item, index) => {
+                  {currentMaintData.length > 0 ? (
+                    currentMaintData.map((item, index) => {
                       const isSelected = maintSelectedItems.has(item.task_id);
                       return (
                         <tr key={index} className={`${isSelected ? "bg-purple-50" : ""} hover:bg-gray-50`}>
@@ -1946,6 +1901,29 @@ const submissionData = await Promise.all(
                   )}
                 </tbody>
               </table>
+
+              {/* Pagination Controls Current Maintenance */}
+              {totalMaintPages > 1 && (
+                <div className="flex justify-between items-center py-4 px-6 border-t border-gray-200 bg-white">
+                  <button
+                    onClick={handlePrevPageMaint}
+                    disabled={currentPageMaint === 1}
+                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-700">
+                    Page <span className="font-medium">{currentPageMaint}</span> of <span className="font-medium">{totalMaintPages}</span>
+                  </span>
+                  <button
+                    onClick={handleNextPageMaint}
+                    disabled={currentPageMaint === totalMaintPages}
+                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
               {maintIsFetchingMore && (
                 <div className="sticky bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200">
                   <div className="flex justify-center items-center py-3">
@@ -1964,8 +1942,8 @@ const submissionData = await Promise.all(
             >
               {/* Mobile Card View */}
               <div className="sm:hidden space-y-3 p-3">
-                {filteredAccountData.length > 0 ? (
-                  filteredAccountData.map((account, index) => {
+                {currentPendingData.length > 0 ? (
+                  currentPendingData.map((account, index) => {
                     const isSelected = selectedItems.has(account.task_id);
                     const taskStatus = getTaskStatus(account.task_start_date);
                     const checkboxEnabled = isCheckboxEnabled(account.task_start_date);
@@ -2175,8 +2153,8 @@ const submissionData = await Promise.all(
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredAccountData.length > 0 ? (
-                    filteredAccountData.map((account, index) => {
+                  {currentPendingData.length > 0 ? (
+                    currentPendingData.map((account, index) => {
                       const isSelected = selectedItems.has(account.task_id);
                       const sequenceNumber = index + 1;
                       const taskStatus = getTaskStatus(account.task_start_date);
@@ -2350,18 +2328,26 @@ const submissionData = await Promise.all(
                 </tbody>
               </table>
 
-              {isFetchingMore && (
-                <div className="sticky bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200">
-                  <div className="flex justify-center items-center py-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-500 mr-2"></div>
-                    <span className="text-purple-600 text-xs sm:text-sm">Loading more tasks...</span>
-                  </div>
-                </div>
-              )}
-
-              {!hasMore && checklist.length > 0 && (
-                <div className="text-center py-4 text-gray-500 text-xs sm:text-sm">
-                  No more tasks to load
+              {/* Pagination Controls Pending Checklist */}
+              {totalPendingPages > 1 && (
+                <div className="flex justify-between items-center py-4 px-6 border-t border-gray-200 bg-white">
+                  <button
+                    onClick={handlePrevPagePending}
+                    disabled={currentPagePending === 1}
+                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-700">
+                    Page <span className="font-medium">{currentPagePending}</span> of <span className="font-medium">{totalPendingPages}</span>
+                  </span>
+                  <button
+                    onClick={handleNextPagePending}
+                    disabled={currentPagePending === totalPendingPages}
+                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
             </div>

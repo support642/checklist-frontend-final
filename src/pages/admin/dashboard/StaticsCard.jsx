@@ -134,7 +134,7 @@ export default function StatisticsCards({
 
           {/* Completed Tasks */}
           <div 
-            onClick={() => handleCardClick("completed", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/data/sales')}
+            onClick={() => handleCardClick("completed", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/history')}
             className="rounded-lg border border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 rounded-tr-lg p-3 sm:p-4">

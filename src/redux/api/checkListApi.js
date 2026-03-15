@@ -12,26 +12,43 @@ export const fetchChechListDataSortByDate = async (page = 1, search = '') => {
   const unit = localStorage.getItem("unit");
   const division = localStorage.getItem("division");
 
-  const response = await fetch(
-    `${BASE_URL}/pending?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
+  const firstRes = await fetch(
+    `${BASE_URL}/pending?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
   );
 
-  if (!response.ok) {
-    const contentType = response.headers.get("content-type");
+  if (!firstRes.ok) {
+    const contentType = firstRes.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
-      const errJson = await response.json();
-      throw new Error(errJson.error || `Server error ${response.status}`);
+      const errJson = await firstRes.json();
+      throw new Error(errJson.error || `Server error ${firstRes.status}`);
     } else {
-      throw new Error(`Server returned non-JSON response (${response.status}). This often means the API URL or Port is incorrect.`);
+      throw new Error(`Server returned non-JSON response (${firstRes.status}). This often means the API URL or Port is incorrect.`);
     }
   }
 
-  const contentType = response.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) {
-    return await response.json();
-  } else {
+  const contentType = firstRes.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
     throw new Error("Expected JSON response but received HTML/Text. Check your API configuration.");
   }
+
+  const firstJson = await firstRes.json();
+  const totalCount = firstJson.totalCount || 0;
+  let allData = firstJson.data || [];
+  const PAGE_SIZE = 50;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  if (totalPages > 1) {
+    const remaining = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, i) =>
+        fetch(`${BASE_URL}/pending?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`)
+          .then(r => r.json())
+          .then(j => j.data || [])
+      )
+    );
+    allData = [...allData, ...remaining.flat()];
+  }
+
+  return { data: allData, totalCount, page: 1 };
 };
 
 
