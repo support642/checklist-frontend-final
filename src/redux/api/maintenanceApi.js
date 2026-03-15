@@ -12,7 +12,7 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, search = '') => {
     const division = localStorage.getItem("division");
 
     const response = await fetch(
-        `${BASE_URL}/?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
+        `${BASE_URL}?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
     );
 
     if (!response.ok) {
