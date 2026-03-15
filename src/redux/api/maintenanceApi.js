@@ -16,11 +16,21 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, search = '') => {
     );
 
     if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || `Server error ${response.status}`);
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            const errJson = await response.json();
+            throw new Error(errJson.error || `Server error ${response.status}`);
+        } else {
+            throw new Error(`Server returned non-JSON response (${response.status}). This often means the API URL or Port is incorrect.`);
+        }
     }
 
-    return await response.json();
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+        return await response.json();
+    } else {
+        throw new Error("Expected JSON response but received HTML/Text. Check your API configuration.");
+    }
 };
 
 // =======================================================
