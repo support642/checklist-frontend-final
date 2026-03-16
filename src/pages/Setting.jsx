@@ -144,20 +144,32 @@ const Setting = () => {
   }));
 };
 
-const fetchDeviceLogsAndUpdateStatus = async () => {
-  return
-  try {
-    setIsRefreshing(true);
-    // const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/logs/device-sync`);
-    const data = await response.json();
-    console.log(data.message);
-    dispatch(userDetails());
-  } catch (error) {
-    console.error('Error syncing device logs:', error);
-  } finally {
-    setIsRefreshing(false);
-  }
-};
+  const fetchDeviceLogsAndUpdateStatus = async () => {
+    try {
+      setIsRefreshing(true);
+      
+      // Re-fetch data based on active tab
+      if (activeTab === 'users') {
+        await dispatch(userDetails()).unwrap();
+      } else if (activeTab === 'departments') {
+        await dispatch(departmentDetails()).unwrap();
+        await dispatch(departmentOnlyDetails()).unwrap();
+        await dispatch(givenByDetails()).unwrap();
+      } else if (activeTab === 'machines') {
+        await dispatch(machineDetails()).unwrap();
+      } else if (activeTab === 'leave' || activeTab === 'extendTask') {
+        await dispatch(userDetails()).unwrap();
+      }
+
+      // Optional: Logic for syncing device logs if needed in future
+      // const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/logs/device-sync`);
+      
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
 
 

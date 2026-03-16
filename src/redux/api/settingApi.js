@@ -215,11 +215,16 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
 // =======================================================
 export const deleteUserByIdApi = async (id) => {
   try {
-    await fetch(`${BASE_URL}/users/${id}`, {
+    const response = await fetch(`${BASE_URL}/users/${id}`, {
       method: "DELETE",
     });
+    if (!response.ok) {
+      console.error("❌ deleteUserByIdApi server error:", response.status);
+    }
+    return id;
   } catch (error) {
     console.log("Error deleting user", error);
+    return null;
   }
 };
 
