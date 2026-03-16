@@ -137,12 +137,66 @@ const Setting = () => {
   const dispatch = useDispatch();
   const canManageSettings = hasPageAccess('settings_admin');
 
+  // Fallback to localStorage login data when Redux resets after page reload
+  const loginUserData = (currentUser && !Array.isArray(currentUser) && Object.keys(currentUser).length > 0)
+    ? currentUser
+    : {
+        user_name: localStorage.getItem('user-name'),
+        role: localStorage.getItem('role'),
+        email_id: localStorage.getItem('email_id'),
+        unit: localStorage.getItem('unit'),
+        division: localStorage.getItem('division'),
+        department: localStorage.getItem('department'),
+        user_access: localStorage.getItem('user_access')
+      };
+
+  const loggedInUserId = Array.isArray(userData) ? userData.find(u => u.user_name === (loginUserData?.user_name || localStorage.getItem('user-name')))?.id : null;
+
   const togglePasswordVisibility = (userId) => {
   setShowPasswords(prev => ({
     ...prev,
     [userId]: !prev[userId]
   }));
 };
+
+
+  // Populate user form if it's a regular user
+  useEffect(() => {
+    if (currentUserRole?.toLowerCase() === 'user' && loginUserData?.user_name && !isEditing) {
+      // Find the user data in the list to get all details (including password and number)
+      const userFullData = Array.isArray(userData) ? userData.find(u => u.user_name === loginUserData.user_name) : null;
+      
+      // If userData is still loading, we might only have basic info from localStorage
+      // But we wait until userFullData is found or userData has finished loading
+      if (!userFullData && loading) return;
+
+      const dataToUse = userFullData || loginUserData;
+      
+      const deptName = (dataToUse?.user_access || dataToUse?.department)?.split(',')[0]?.trim();
+      const deptRecord = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
+
+      setUserForm({
+        username: dataToUse.user_name || '',
+        email: dataToUse.email_id || '',
+        password: dataToUse.password || '',
+        phone: dataToUse.number || '',
+        unit: dataToUse?.unit || deptRecord?.unit || '',
+        division: dataToUse?.division || deptRecord?.division || '',
+        department: dataToUse?.department || dataToUse?.user_access || '',
+        role: dataToUse.role || 'user',
+        status: dataToUse.status || 'active'
+      });
+      
+      // Preserving existing permissions
+      setSystemAccess(dataToUse.system_access || []);
+      setPageAccess(dataToUse.page_access || []);
+      
+      if (dataToUse.id) {
+        setCurrentUserId(dataToUse.id);
+        setIsEditing(true); // Treat as editing mode for the update call
+      }
+    }
+  }, [loginUserData, currentUserRole, userData, department, loading, isEditing]);
 
   const fetchDeviceLogsAndUpdateStatus = async () => {
     try {
@@ -1219,8 +1273,14 @@ const resetUserForm = () => {
           {/* Top Row: Title and Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
             <div>
-              <h1 className="text-lg font-bold text-gray-800">User Management System</h1>
-              <p className="text-xs text-gray-500">Manage users, departments, and leave</p>
+              {currentUserRole?.toLowerCase() === 'user' ? (
+                <h1 className="text-xl font-bold text-purple-700">User Details</h1>
+              ) : (
+                <>
+                  <h1 className="text-lg font-bold text-gray-800">User Management System</h1>
+                  <p className="text-xs text-gray-500">Manage users, departments, and leave</p>
+                </>
+              )}
             </div>
             
             <div className="flex flex-wrap items-center gap-2">
@@ -1233,7 +1293,7 @@ const resetUserForm = () => {
                 <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
               
-              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && canManageSettings && canModifySettings && (
+              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && canManageSettings && canModifySettings && currentUserRole?.toLowerCase() !== 'user' && (
                 <>
                   <button
                     onClick={handleAddButtonClick}
@@ -1257,77 +1317,83 @@ const resetUserForm = () => {
           </div>
           
           {/* Bottom Row: Tabs */}
-          <div className="flex border-b border-gray-200">
-            <button
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'users' 
-                  ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => {
-                handleTabChange('users');
-                dispatch(userDetails());
-              }}
-            >
-              <User size={18} />
-              Users
-            </button>
-            <button
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'departments' 
-                  ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => {
-                handleTabChange('departments');
-                dispatch(departmentOnlyDetails());
-                dispatch(givenByDetails());
-              }}
-            >
-              <Building size={18} />
-              Departments
-            </button>
-            <button
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'leave' 
-                  ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => {
-                handleTabChange('leave');
-                dispatch(userDetails());
-              }}
-            >
-              <Calendar size={18} />
-              Leave
-            </button>
-            <button
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'extendTask' 
-                  ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => {
-                handleTabChange('extendTask');
-              }}
-            >
-              <Calendar size={18} />
-              Extend Task
-            </button>
-            <button
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'machines' 
-                  ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => {
-                handleTabChange('machines');
-              }}
-            >
-              <Settings size={18} />
-              Machines
-            </button>
-          </div>
+          {currentUserRole?.toLowerCase() !== 'user' && (
+            <div className="flex border-b border-gray-200">
+              <button
+                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'users' 
+                    ? 'border-purple-600 text-purple-600 bg-purple-50' 
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => {
+                  handleTabChange('users');
+                  dispatch(userDetails());
+                }}
+              >
+                <User size={18} />
+                Users
+              </button>
+              {currentUserRole?.toLowerCase() !== 'user' && (
+                <>
+                  <button
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'departments' 
+                        ? 'border-purple-600 text-purple-600 bg-purple-50' 
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => {
+                      handleTabChange('departments');
+                      dispatch(departmentOnlyDetails());
+                      dispatch(givenByDetails());
+                    }}
+                  >
+                    <Building size={18} />
+                    Departments
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'leave' 
+                        ? 'border-purple-600 text-purple-600 bg-purple-50' 
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => {
+                      handleTabChange('leave');
+                      dispatch(userDetails());
+                    }}
+                  >
+                    <Calendar size={18} />
+                    Leave
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'extendTask' 
+                        ? 'border-purple-600 text-purple-600 bg-purple-50' 
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => {
+                      handleTabChange('extendTask');
+                    }}
+                  >
+                    <Calendar size={18} />
+                    Extend Task
+                  </button>
+                  <button
+                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'machines' 
+                        ? 'border-purple-600 text-purple-600 bg-purple-50' 
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                    onClick={() => {
+                      handleTabChange('machines');
+                    }}
+                  >
+                    <Settings size={18} />
+                    Machines
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 {/* <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
         <h3 className="text-sm font-medium text-yellow-800">Debug Info</h3>
@@ -1522,7 +1588,7 @@ const resetUserForm = () => {
         {/* Users Tab */}
 {activeTab === 'users' && (
   <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
-    <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex justify-between items-center">
+    <div className={`${currentUserRole?.toLowerCase() === 'user' ? 'hidden' : 'bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex justify-between items-center'}`}>
       <h2 className="text-lg font-medium text-purple-700">User List</h2>
 
       {/* Username Filter */}
@@ -1591,7 +1657,116 @@ const resetUserForm = () => {
     </div>
 
     <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
-      {/* Mobile Card View */}
+      {currentUserRole?.toLowerCase() === 'user' ? (
+        <div className="p-6 bg-white">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+              <div className="bg-purple-100 p-3 rounded-full text-purple-600">
+                <User size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">My Profile</h2>
+                <p className="text-sm text-gray-500">View and update your personal information</p>
+              </div>
+            </div>
+            
+            <form onSubmit={handleUpdateUser} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={userForm.username}
+                    onChange={handleUserInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={userForm.email}
+                    onChange={handleUserInputChange}
+                    placeholder={userForm.email ? "" : "Enter your email address"}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showModalPassword ? "text" : "password"}
+                      name="password"
+                      value={userForm.password}
+                      onChange={handleUserInputChange}
+                      placeholder={userForm.password ? "Leave empty to keep current password" : "Enter new password"}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowModalPassword(!showModalPassword)}
+                      className="absolute right-3 top-1/2 bottom-1/4 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showModalPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={userForm.phone}
+                    onChange={handleUserInputChange}
+                    placeholder={userForm.phone ? "" : "Enter your phone number"}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+
+                {/* Read-only fields for regular users */}
+                <div className="space-y-1 opacity-70">
+                  <label className="block text-sm font-medium text-gray-700">Unit</label>
+                  <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm">
+                    {userForm.unit || 'N/A'}
+                  </div>
+                </div>
+                <div className="space-y-1 opacity-70">
+                  <label className="block text-sm font-medium text-gray-700">Division</label>
+                  <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm">
+                    {userForm.division || 'N/A'}
+                  </div>
+                </div>
+                <div className="space-y-1 opacity-70">
+                  <label className="block text-sm font-medium text-gray-700">Department</label>
+                  <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm">
+                    {userForm.department || 'N/A'}
+                  </div>
+                </div>
+                <div className="space-y-1 opacity-70">
+                  <label className="block text-sm font-medium text-gray-700">Role</label>
+                  <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm capitalize">
+                    {userForm.role || 'user'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-6 border-t border-gray-100">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 shadow-md transition-all active:scale-95"
+                >
+                  <Save size={18} />
+                  Update Profile
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Mobile Card View */}
       <div className="sm:hidden space-y-3 p-3">
         {(() => {
           const userRole = localStorage.getItem('role')?.toLowerCase();
@@ -1626,14 +1801,16 @@ const resetUserForm = () => {
                   </span>
                 </div>
                 <div className="flex space-x-2">
-                  {canManageSettings && (
+                  {(canManageSettings || user?.id === loggedInUserId) && (
                     <>
                       <button onClick={() => handleEditUser(user?.id)} className="text-blue-600" title="Edit">
                         <Edit size={16} />
                       </button>
-                      <button onClick={() => handleDeleteUser(user?.id)} className="text-red-600" title="Delete">
-                        <Trash2 size={16} />
-                      </button>
+                      {canManageSettings && user?.id !== loggedInUserId && (
+                        <button onClick={() => handleDeleteUser(user?.id)} className="text-red-600" title="Delete">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -1803,7 +1980,7 @@ const resetUserForm = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {canManageSettings && (
+                  {(canManageSettings || user?.id === loggedInUserId) && (
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleEditUser(user?.id)}
@@ -1812,13 +1989,15 @@ const resetUserForm = () => {
                       >
                         <Edit size={18} />
                       </button>
-                      <button
-                        onClick={() => handleDeleteUser(user?.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete User"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {canManageSettings && user?.id !== loggedInUserId && (
+                        <button
+                          onClick={() => handleDeleteUser(user?.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete User"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>
@@ -1827,6 +2006,8 @@ const resetUserForm = () => {
         })()}
         </tbody>
       </table>
+      </>
+      )}
     </div>
   </div>
 )}
@@ -2587,7 +2768,9 @@ const resetUserForm = () => {
                 <div>
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      {isEditing ? 'Edit User' : 'Create New User'}
+                      {isEditing 
+                        ? (currentUserId === loggedInUserId ? 'My Profile' : 'Edit User') 
+                        : 'Create New User'}
                     </h3>
                     <button
                       onClick={() => setShowUserModal(false)}
@@ -2708,9 +2891,9 @@ const resetUserForm = () => {
                             id="role"
                             name="role"
                             value={userForm.role}
-
+                            disabled={isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin'}
                             onChange={handleUserInputChange}
-                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            className={`mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin' ? 'bg-gray-50 opacity-70' : ''}`}
                           >
                             <option value="user">User</option>
                             <option value="admin">Admin</option>
@@ -2727,9 +2910,9 @@ const resetUserForm = () => {
                           </label>
                           <select
                              value={userForm.unit}
-
+                             disabled={isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin'}
                             onChange={(e) => handleUnitChange(e.target.value)}
-                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            className={`mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin' ? 'bg-gray-50 opacity-70' : ''}`}
                           >
                             <option value="">Select Unit</option>
                             {availableUnits.map((unit, idx) => (
@@ -2744,9 +2927,9 @@ const resetUserForm = () => {
                           </label>
                           <select
                              value={userForm.division}
-
+                             disabled={isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin'}
                             onChange={(e) => handleDivisionChange(e.target.value)}
-                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            className={`mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin' ? 'bg-gray-50 opacity-70' : ''}`}
                           >
                             <option value="">Select Division</option>
                             {availableDivisions.map((div, idx) => (
@@ -2761,9 +2944,9 @@ const resetUserForm = () => {
                           </label>
                           <select
                              value={userForm.department}
-
+                             disabled={isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin'}
                             onChange={(e) => handleDepartmentChange(e.target.value)}
-                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            className={`mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin' ? 'bg-gray-50 opacity-70' : ''}`}
                           >
                             <option value="">Select Department</option>
                             {availableDepartments.map((dept, idx) => (
@@ -2780,9 +2963,9 @@ const resetUserForm = () => {
                             id="status"
                             name="status"
                              value={userForm.status}
-
+                             disabled={isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin'}
                             onChange={handleUserInputChange}
-                            className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            className={`mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${isEditing && currentUserId === loggedInUserId && currentUserRole?.toLowerCase() !== 'super_admin' ? 'bg-gray-50 opacity-70' : ''}`}
                           >
                             <option value="active">Active</option>
                             <option value="inactive">Inactive</option>

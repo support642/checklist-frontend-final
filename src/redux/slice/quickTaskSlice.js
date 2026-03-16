@@ -19,9 +19,26 @@ export const fetchUsers = createAsyncThunk(
 
 export const uniqueChecklistTaskData = createAsyncThunk(
   'fetch/checklistTask',
-  async ({ page = 0, pageSize = 50, nameFilter = '', freqFilter = '', append = false }) => {
-    const result = await fetchChecklistData(page, pageSize, nameFilter, freqFilter);
-    return { ...result, append };
+  async ({ page = 0, pageSize = 50, nameFilter = '', freqFilter = '', append = false, userRole = '', userDept = '', userDiv = '' }) => {
+    const result = await fetchChecklistData(page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv);
+    
+    // Apply role-based filtering on the frontend
+    let filteredData = result.data || [];
+    const role = userRole?.toLowerCase();
+    const dept = userDept?.toLowerCase()?.trim();
+    const div = userDiv?.toLowerCase()?.trim();
+
+    if (role === 'admin') {
+      filteredData = filteredData.filter(task => 
+        task.department?.toLowerCase()?.trim() === dept
+      );
+    } else if (role === 'div_admin') {
+      filteredData = filteredData.filter(task => 
+        task.division?.toLowerCase()?.trim() === div
+      );
+    }
+
+    return { ...result, data: filteredData, append };
   }
 );
 

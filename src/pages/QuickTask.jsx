@@ -35,7 +35,6 @@ export default function QuickTask() {
   const [editFormData, setEditFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // const { quickTask, loading, delegationTasks, users } = useSelector((state) => state.quickTask);
   const { 
     quickTask, 
     loading, 
@@ -49,13 +48,44 @@ export default function QuickTask() {
     delegationHasMore
   } = useSelector((state) => state.quickTask);
   const { uniqueMaintenanceTotal } = useSelector((state) => state.maintenance);
+  const { userData: currentUser } = useSelector((state) => state.login);
   const dispatch = useDispatch();
+
+  // Retrieve user role and department info
+  const userRole = (currentUser && !Array.isArray(currentUser))
+    ? currentUser.role
+    : localStorage.getItem('role');
+  
+  const loginUserData = (currentUser && !Array.isArray(currentUser) && Object.keys(currentUser).length > 0)
+    ? currentUser
+    : {
+        user_name: localStorage.getItem('user-name'),
+        role: localStorage.getItem('role'),
+        email_id: localStorage.getItem('email_id'),
+        unit: localStorage.getItem('unit'),
+        division: localStorage.getItem('division'),
+        department: localStorage.getItem('department'),
+        user_access: localStorage.getItem('user_access')
+      };
+
+  const userDept = loginUserData?.department || loginUserData?.user_access;
+  const userDiv = loginUserData?.division;
 
 useEffect(() => {
   dispatch(fetchUsers());
-  dispatch(resetChecklistPagination());
-  dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '', freqFilter: '' }));
-}, [dispatch]);
+  if (userRole) {
+    dispatch(resetChecklistPagination());
+    dispatch(uniqueChecklistTaskData({ 
+      page: 0, 
+      pageSize: 50, 
+      nameFilter: '', 
+      freqFilter: '',
+      userRole,
+      userDept,
+      userDiv
+    }));
+  }
+}, [dispatch, userRole, userDept, userDiv]);
 
 
 // Add this new function
@@ -144,7 +174,16 @@ useEffect(() => {
       setEditFormData({});
 
       // Refresh the data to show all updated rows
-      dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter, append: false }));
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter, 
+        freqFilter, 
+        append: false,
+        userRole,
+        userDept,
+        userDiv
+      }));
 
     } catch (error) {
       console.error("Failed to update task:", error);
@@ -241,7 +280,10 @@ const handleNameFilterSelect = (name) => {
         pageSize: 50, 
         nameFilter: name,
         freqFilter: freqFilter,
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv
       }));
     } else {
       dispatch(resetDelegationPagination());
@@ -267,7 +309,10 @@ const handleNameFilterSelect = (name) => {
         pageSize: 50, 
         nameFilter: nameFilter,
         freqFilter: freq,
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv
       }));
     } else if (activeTab === 'delegation') {
       dispatch(resetDelegationPagination());
@@ -292,7 +337,10 @@ const clearNameFilter = () => {
         pageSize: 50, 
         nameFilter: '',
         freqFilter: freqFilter,
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv
       }));
     } else {
       dispatch(resetDelegationPagination());
@@ -318,7 +366,10 @@ const clearNameFilter = () => {
         pageSize: 50, 
         nameFilter: nameFilter,
         freqFilter: '',
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv
       }));
     } else if (activeTab === 'delegation') {
       dispatch(resetDelegationPagination());
@@ -345,13 +396,51 @@ const allNames = [
 
 
 const filteredChecklistTasks = quickTask.filter(task => {
+  // Role-based filtering
+  const role = userRole?.toLowerCase();
+  const targetDept = userDept?.toLowerCase()?.trim();
+  const targetDiv = userDiv?.toLowerCase()?.trim();
+
+  let rolePass = true;
+  if (role === 'admin') {
+    rolePass = task.department?.toLowerCase()?.trim() === targetDept;
+  } else if (role === 'div_admin') {
+    rolePass = task.division?.toLowerCase()?.trim() === targetDiv;
+  }
+
   const freqFilterPass = !freqFilter || task.frequency === freqFilter;
   const searchTermPass = !searchTerm || task.task_description
     ?.toLowerCase()
     .includes(searchTerm.toLowerCase());
-  return freqFilterPass && searchTermPass;  // Only these two filters
+    
+  return rolePass && freqFilterPass && searchTermPass;
 }).sort((a, b) => {
-  if (!sortConfig.key) return 0;
+  // Automatic priority sorting based on role
+  if (!sortConfig.key) {
+    const role = userRole?.toLowerCase();
+    const targetDept = userDept?.toLowerCase()?.trim();
+    const targetDiv = userDiv?.toLowerCase()?.trim();
+
+    if (role === 'admin') {
+      const aMatch = a.department?.toLowerCase()?.trim() === targetDept;
+      const bMatch = b.department?.toLowerCase()?.trim() === targetDept;
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+    } else if (role === 'div_admin') {
+      const aDivMatch = a.division?.toLowerCase()?.trim() === targetDiv;
+      const bDivMatch = b.division?.toLowerCase()?.trim() === targetDiv;
+      if (aDivMatch && !bDivMatch) return -1;
+      if (!aDivMatch && bDivMatch) return 1;
+      
+      const aDeptMatch = a.department?.toLowerCase()?.trim() === targetDept;
+      const bDeptMatch = b.department?.toLowerCase()?.trim() === targetDept;
+      if (aDeptMatch && !bDeptMatch) return -1;
+      if (!aDeptMatch && bDeptMatch) return 1;
+    }
+    return 0;
+  }
+
+  // Manual sorting (overrides automatic)
   if (a[sortConfig.key] < b[sortConfig.key]) {
     return sortConfig.direction === 'asc' ? -1 : 1;
   }
@@ -443,7 +532,15 @@ const filteredChecklistTasks = quickTask.filter(task => {
                   onClick={() => {
                     setActiveTab('checklist');
                     dispatch(resetChecklistPagination());
-                    dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
+                    dispatch(uniqueChecklistTaskData({ 
+                      page: 0, 
+                      pageSize: 50, 
+                      nameFilter, 
+                      freqFilter,
+                      userRole,
+                      userDept,
+                      userDiv
+                    }));
                   }}
                 >
                   Checklist
@@ -636,7 +733,16 @@ const filteredChecklistTasks = quickTask.filter(task => {
           {error}{" "}
           <button
             onClick={() => {
-              dispatch(uniqueChecklistTaskData({ page: 0, pageSize: 50, nameFilter: '', freqFilter: '', append: false }))
+              dispatch(uniqueChecklistTaskData({ 
+                page: 0, 
+                pageSize: 50, 
+                nameFilter: '', 
+                freqFilter: '', 
+                append: false,
+                userRole,
+                userDept,
+                userDiv
+              }))
             }}
             className="underline ml-2 hover:text-red-600"
           >
@@ -1135,6 +1241,9 @@ const filteredChecklistTasks = quickTask.filter(task => {
               freqFilter={freqFilter}
               setNameFilter={setNameFilter}
               setFreqFilter={setFreqFilter}
+              userRole={userRole}
+              userDept={userDept}
+              userDiv={userDiv}
             />
           ) : (
             <MaintenanceQuickTaskPage
@@ -1143,6 +1252,9 @@ const filteredChecklistTasks = quickTask.filter(task => {
               freqFilter={freqFilter}
               setNameFilter={setNameFilter}
               setFreqFilter={setFreqFilter}
+              userRole={userRole}
+              userDept={userDept}
+              userDiv={userDiv}
             />
           )}
         </>

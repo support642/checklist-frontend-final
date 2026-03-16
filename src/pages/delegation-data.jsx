@@ -18,7 +18,7 @@ const CONFIG = {
 
 
 
-function DelegationPage({ searchTerm, nameFilter, freqFilter }) {
+function DelegationPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv }) {
  const [successMessage, setSuccessMessage] = useState("")
   const [error, setError] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -135,13 +135,12 @@ useEffect(()=>{
   }, [dispatch, isInitialized, nameFilter, freqFilter])
 
   const filteredTasks = useMemo(() => {
-    let filtered = delegationTasks;
+    let filtered = [...delegationTasks]; // Create a copy to sort
     
     filtered = filtered.filter(task =>
-  task.task_description?.toLowerCase().includes(searchTerm.toLowerCase())
-);
+      task.task_description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-    
     if (nameFilter) {
       filtered = filtered.filter(task => task.name === nameFilter)
     }
@@ -149,7 +148,7 @@ useEffect(()=>{
     if (freqFilter) {
       filtered = filtered.filter(task => task.frequency === freqFilter)
     }
-    
+
     return filtered
   }, [delegationTasks, searchTerm, nameFilter, freqFilter])
 

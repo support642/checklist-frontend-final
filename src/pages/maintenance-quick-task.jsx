@@ -10,10 +10,9 @@ const CONFIG = {
   },
 };
 
-function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
+function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState(null);
-  const [userRole, setUserRole] = useState("");
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -33,8 +32,6 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
   }, [dispatch, nameFilter, freqFilter]);
 
   useEffect(() => {
-    const role = localStorage.getItem("role");
-    setUserRole(role || "");
     setIsInitialized(true);
   }, []);
 
@@ -171,7 +168,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
   };
 
   const filteredTasks = useMemo(() => {
-    let filtered = uniqueMaintenanceTasks || [];
+    let filtered = [...(uniqueMaintenanceTasks || [])]; // Create a copy to sort
     
     if (searchTerm) {
         filtered = filtered.filter(task =>
@@ -188,7 +185,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter }) {
     if (freqFilter) {
       filtered = filtered.filter(task => task.frequency === freqFilter);
     }
-    
+
     return filtered;
   }, [uniqueMaintenanceTasks, searchTerm, nameFilter, freqFilter]);
 

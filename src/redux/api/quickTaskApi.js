@@ -7,11 +7,11 @@ const API_BASE = `${import.meta.env.VITE_API_BASE_URL}`;
 // =========================
 // FETCH CHECKLIST (PAGINATED)
 // =========================
-export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "") => {
+export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "", userRole = "", userDept = "", userDiv = "") => {
   const res = await fetch(`${API_BASE}/tasks/checklist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ page, pageSize, nameFilter, freqFilter }),
+    body: JSON.stringify({ page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv }),
   });
 
   return res.json();
