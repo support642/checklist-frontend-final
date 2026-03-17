@@ -150,14 +150,7 @@ export default function DashboardHeader({
             </div>
           )}
 
-          <select
-            value={dashboardType}
-            onChange={(e) => setDashboardType(e.target.value)}
-            className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
-          >
-            {canAccessModule("checklist") && <option value="checklist">Checklist</option>}
-            {canAccessModule("delegation") && <option value="delegation">Delegation</option>}
-          </select>
+          {/* Removed internal dashboardType select as it's now a top-level module tab */}
 
           {/* Unit Filter - Only show for checklist */}
           {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
@@ -299,14 +292,7 @@ export default function DashboardHeader({
             </div>
           )}
 
-          <select
-            value={dashboardType}
-            onChange={(e) => setDashboardType(e.target.value)}
-            className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-          >
-            {canAccessModule("checklist") && <option value="checklist">Checklist</option>}
-            {canAccessModule("delegation") && <option value="delegation">Delegation</option>}
-          </select>
+          {/* Removed internal dashboardType select as it's now a top-level module tab */}
 
           {/* Unit Filter - Only show for checklist */}
           {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (

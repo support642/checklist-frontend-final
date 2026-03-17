@@ -31,7 +31,11 @@ import MaintenanceView from "../../components/Maintenance/MaintenanceView.jsx"
 import { fetchDelegationDataSortByDate } from "../../redux/api/delegationApi.js"
 
 export default function AdminDashboard() {
-  const [dashboardType, setDashboardType] = useState("checklist")
+  const [dashboardType, setDashboardType] = useState(() => {
+    const saved = localStorage.getItem("admin_dashboard_active_module");
+    if (saved === "delegation") return "delegation";
+    return "checklist";
+  })
   const [taskView, setTaskView] = useState("recent")
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterStaff, setFilterStaff] = useState("all")
@@ -1183,6 +1187,7 @@ useEffect(() => {
     if (saved && canAccessModule(saved)) return saved;
     // Default fallback based on access
     if (canAccessModule("checklist")) return "checklist";
+    if (canAccessModule("delegation")) return "delegation";
     if (canAccessModule("maintenance")) return "maintenance";
     return "checklist"; // Hard fallback
   });
@@ -1190,6 +1195,13 @@ useEffect(() => {
   const handleModuleChange = (module) => {
     setActiveModule(module);
     localStorage.setItem("admin_dashboard_active_module", module);
+    
+    // Sync dashboardType with module
+    if (module === "checklist") {
+      setDashboardType("checklist");
+    } else if (module === "delegation") {
+      setDashboardType("delegation");
+    }
   };
 
   return (
@@ -1213,6 +1225,19 @@ useEffect(() => {
               >
                 <i className="fas fa-clipboard-list h-4 w-4" />
                 Checklist
+              </button>
+            )}
+            {canAccessModule("delegation") && (
+              <button
+                onClick={() => handleModuleChange("delegation")}
+                className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                  activeModule === "delegation"
+                    ? "bg-blue-600 text-white shadow-lg scale-105"
+                    : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                }`}
+              >
+                <i className="fas fa-handshake h-4 w-4" />
+                Delegation
               </button>
             )}
             {canAccessModule("maintenance") && (
@@ -1244,7 +1269,7 @@ useEffect(() => {
           </div>
         )}
 
-        {activeModule === "checklist" ? (
+        {(activeModule === "checklist" || activeModule === "delegation") ? (
           <div className="space-y-6 animate-in fade-in duration-500">
             <DashboardHeader
               dashboardType={dashboardType}
@@ -1302,7 +1327,7 @@ useEffect(() => {
               }}
             />
 
-            {activeTab === "overview" && (
+            {activeTab === "overview" && (activeModule === "checklist" || activeModule === "delegation") && (
               <div className="space-y-4">
                 <div className="rounded-lg border border-purple-200 shadow-md bg-white">
                   <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-4">

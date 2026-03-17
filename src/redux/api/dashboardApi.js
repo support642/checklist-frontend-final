@@ -208,11 +208,22 @@ export const fetchStaffTasksDataApi = async (
 ) => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
+  const role = localStorage.getItem("role");
+  const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
+
   const params = new URLSearchParams({
     dashboardType,
     staffFilter,
     page,
-    limit
+    limit,
+    role,
+    username,
+    unit,
+    division,
+    department
   });
 
   // Add monthYear if provided
@@ -235,8 +246,14 @@ export const fetchStaffTasksDataApi = async (
 export const getStaffTasksCountApi = async (dashboardType, staffFilter = "all") => {
   staffFilter = getFinalStaffFilter(staffFilter);
 
+  const role = localStorage.getItem("role");
+  const username = localStorage.getItem("user-name");
+  const unit = localStorage.getItem("unit");
+  const division = localStorage.getItem("division");
+  const department = localStorage.getItem("department");
+
   const res = await fetch(
-    `${BASE_URL1}/count?dashboardType=${dashboardType}&staffFilter=${staffFilter}`
+    `${BASE_URL1}/count?dashboardType=${dashboardType}&staffFilter=${staffFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`
   );
   return res.json();
 };

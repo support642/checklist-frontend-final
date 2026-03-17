@@ -207,9 +207,7 @@ export default function AssignTask() {
 
 
   const getCurrentTime = () => {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    return `${hours}:00`;
+    return "23:59";
   };
 
   const [date, setSelectedDate] = useState(new Date());
@@ -230,6 +228,7 @@ export default function AssignTask() {
   const frequencies = [
     { value: "one-time", label: "One Time (No Recurrence)" },
     { value: "daily", label: "Daily" },
+    { value: "tertiary", label: "Tertiary (Every 3 Days)" },
     { value: "weekly", label: "Weekly" },
     { value: "fortnightly", label: "Fortnightly" },
     { value: "monthly", label: "Monthly" },
@@ -569,6 +568,12 @@ useEffect(() => {
             currentDate = addDays(new Date(taskDate.split("/").reverse().join("-")), 1);
             break;
 
+          case "tertiary":
+            taskDate = findNextWorkingDay(currentDate);
+            if (!taskDate) break; // No more working days available
+            currentDate = addDays(new Date(taskDate.split("/").reverse().join("-")), 3);
+            break;
+
           case "weekly":
             taskDate = findNextWorkingDay(currentDate);
             if (!taskDate) break; // No more working days available
@@ -749,6 +754,11 @@ useEffect(() => {
               taskDate = findNextWorkingDay(currentDate);
               if (!taskDate) break;
               currentDate = addDays(new Date(taskDate.split("/").reverse().join("-")), 1);
+              break;
+            case "tertiary":
+              taskDate = findNextWorkingDay(currentDate);
+              if (!taskDate) break;
+              currentDate = addDays(new Date(taskDate.split("/").reverse().join("-")), 3);
               break;
             case "weekly":
               taskDate = findNextWorkingDay(currentDate);

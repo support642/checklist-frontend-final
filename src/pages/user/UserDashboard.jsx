@@ -7,7 +7,13 @@ import { LayoutDashboard, Tool, Building2 } from "lucide-react";
 const UserDashboard = () => {
   // Persistence for active module tab
   const [activeModule, setActiveModule] = useState(() => {
-    return localStorage.getItem("user_dashboard_active_module") || "checklist";
+    const saved = localStorage.getItem("user_dashboard_active_module");
+    if (saved && canAccessModule(saved)) return saved;
+    // Default fallback based on access
+    if (canAccessModule("checklist")) return "checklist";
+    if (canAccessModule("delegation")) return "delegation";
+    if (canAccessModule("maintenance")) return "maintenance";
+    return "checklist";
   });
   
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -38,7 +44,7 @@ const UserDashboard = () => {
   // Module visibility fallback logic
   useEffect(() => {
     if (!canAccessModule(activeModule)) {
-      const availableModules = ["checklist", "maintenance"].filter(canAccessModule);
+      const availableModules = ["checklist", "delegation", "maintenance"].filter(canAccessModule);
       if (availableModules.length > 0) {
         setActiveModule(availableModules[0]);
       }
@@ -68,6 +74,19 @@ const UserDashboard = () => {
             >
               <Building2 className="h-4 w-4" />
               Checklist
+            </button>
+          )}
+          {canAccessModule("delegation") && (
+            <button
+              onClick={() => handleModuleChange("delegation")}
+              className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                activeModule === "delegation"
+                  ? "bg-blue-600 text-white shadow-lg scale-105"
+                  : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+              }`}
+            >
+              <i className="fas fa-handshake h-4 w-4" />
+              Delegation
             </button>
           )}
           {canAccessModule("maintenance") && (
@@ -105,8 +124,8 @@ const UserDashboard = () => {
 
       {/* Main Module Content */}
       <div className="mt-6">
-        {activeModule === "checklist" ? (
-          <ChecklistView />
+        {activeModule === "checklist" || activeModule === "delegation" ? (
+          <ChecklistView dashboardType={activeModule} />
         ) : (
           <MaintenanceView />
         )}

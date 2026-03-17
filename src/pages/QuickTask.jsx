@@ -227,6 +227,19 @@ useEffect(() => {
       console.log("Deleting rows:", selectedTasks);
       await dispatch(deleteChecklistTask(selectedTasks)).unwrap();
       setSelectedTasks([]);
+
+      // Refresh the data to update counts and pagination
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter, 
+        freqFilter, 
+        append: false,
+        userRole,
+        userDept,
+        userDiv
+      }));
+
     } catch (error) {
       console.error("Failed to delete tasks:", error);
       setError("Failed to delete tasks");

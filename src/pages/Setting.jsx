@@ -34,6 +34,9 @@ const Setting = () => {
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [showGivenByModal, setShowGivenByModal] = useState(false);
   const [givenByInput, setGivenByInput] = useState('');
+  const [isEditingGivenBy, setIsEditingGivenBy] = useState(false);
+  const [currentGivenById, setCurrentGivenById] = useState(null);
+  const [givenByDeptData, setGivenByDeptData] = useState({});
   
   // Task Delegation Modal State
   const [showDelegationModal, setShowDelegationModal] = useState(false);
@@ -227,11 +230,7 @@ const Setting = () => {
 
 
 
-useEffect(() => {
-  const intervalId = setInterval(fetchDeviceLogsAndUpdateStatus, 10000);
 
-  return () => clearInterval(intervalId);
-}, []);
 
   // Add real-time subscription
   // useEffect(() => {
@@ -714,6 +713,7 @@ const handleConfirmDelegation = async () => {
   // Add to your handleAddButtonClick function
 
   // Handle Add Given By submission
+  // Modified handleAddGivenBy to support both Add and Update
   const handleAddGivenBy = async (e) => {
     e.preventDefault();
     if (!givenByInput.trim()) {
@@ -721,14 +721,41 @@ const handleConfirmDelegation = async () => {
       return;
     }
     try {
-      const newEntry = { givenBy: givenByInput.trim() };
-      await dispatch(createDepartment(newEntry)).unwrap();
+      if (isEditingGivenBy) {
+        // Update existing Given By
+        const updatedDept = {
+          ...givenByDeptData,
+          given_by: givenByInput.trim()
+        };
+        await dispatch(updateDepartment({ id: currentGivenById, updatedDept })).unwrap();
+      } else {
+        // Create new Given By
+        const newEntry = { givenBy: givenByInput.trim() };
+        await dispatch(createDepartment(newEntry)).unwrap();
+      }
+      
       setGivenByInput('');
+      setIsEditingGivenBy(false);
+      setCurrentGivenById(null);
       setShowGivenByModal(false);
       dispatch(departmentDetails());
-      // setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
-      console.error('Error adding given by:', error);
+      console.error('Error saving given by:', error);
+    }
+  };
+
+  const handleEditGivenBy = (deptId) => {
+    const dept = department.find(d => d.id === deptId);
+    if (dept) {
+      setGivenByInput(dept.given_by || '');
+      setGivenByDeptData({
+        department: dept.department || '',
+        unit: dept.unit || '',
+        division: dept.division || ''
+      });
+      setCurrentGivenById(deptId);
+      setIsEditingGivenBy(true);
+      setShowGivenByModal(true);
     }
   };
 
@@ -783,8 +810,10 @@ const [userForm, setUserForm] = useState({
 });
 
   const [deptForm, setDeptForm] = useState({
-    name: '',
-    givenBy: ''
+    department: '',
+    given_by: '',
+    unit: '',
+    division: ''
   });
 
   // Multi-row department form state for Create New Department
@@ -890,10 +919,10 @@ const handleUpdateUser = async (e) => {
       // Submit each row as a separate department entry
       for (const row of validRows) {
         const newDept = {
-          name: row.department,
+          department: row.department,
           unit: row.unit,
           division: row.division,
-          // givenBy: '' // Given By is commented out for now
+          given_by: '' 
         };
         await dispatch(createDepartment(newDept)).unwrap();
       }
@@ -909,12 +938,15 @@ const handleUpdateUser = async (e) => {
   const handleUpdateDepartment = async (e) => {
     e.preventDefault();
     const updatedDept = {
-      department: deptForm.name,
-      given_by: deptForm.givenBy
+      department: deptForm.department,
+      given_by: deptForm.given_by,
+      unit: deptForm.unit,
+      division: deptForm.division
     };
 
     try {
       await dispatch(updateDepartment({ id: currentDeptId, updatedDept })).unwrap();
+      dispatch(departmentDetails());
       resetDeptForm();
       setShowDeptModal(false);
       // setTimeout(() => window.location.reload(), 1000);
@@ -1054,8 +1086,8 @@ const handleEditUser = (userId) => {
   const handleEditDepartment = (deptId) => {
     const dept = department.find(d => d.id === deptId);
     setDeptForm({
-      name: dept.department,  // Match your API response field names
-      givenBy: dept.given_by,
+      department: dept.department,  // Match your API response field names
+      given_by: dept.given_by,
       unit: dept.unit || '',
       division: dept.division || ''
     });
@@ -1152,6 +1184,9 @@ const resetUserForm = () => {
     });
     setDeptRows([{ unit: '', division: '', department: '' }]);
     setCurrentDeptId(null);
+    setGivenByInput('');
+    setIsEditingGivenBy(false);
+    setCurrentGivenById(null);
   };
 
   // Machine form handlers
@@ -2138,7 +2173,7 @@ const resetUserForm = () => {
                   <div className="flex justify-between items-center">
                     <p className="text-sm font-medium text-gray-900">#{index + 1} {dept.given_by}</p>
                     {canManageSettings && (
-                      <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600" title="Edit">
+                      <button onClick={() => handleEditGivenBy(dept.id)} className="text-blue-600" title="Edit">
                         <Edit size={16} />
                       </button>
                     )}
@@ -2170,7 +2205,7 @@ const resetUserForm = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex space-x-2">
                         {canManageSettings && (
-                        <button onClick={() => handleEditDepartment(dept.id)} className="text-blue-600 hover:text-blue-900">
+                        <button onClick={() => handleEditGivenBy(dept.id)} className="text-blue-600 hover:text-blue-900">
                           <Edit size={18} />
                         </button>
                         )}
@@ -2202,7 +2237,7 @@ const resetUserForm = () => {
                 <div>
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Add Given By
+                      {isEditingGivenBy ? 'Edit Given By' : 'Add Given By'}
                     </h3>
                     <button
                       onClick={() => { setShowGivenByModal(false); setGivenByInput(''); }}
@@ -2241,7 +2276,7 @@ const resetUserForm = () => {
                           className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                           <Save size={18} className="mr-2" />
-                          Save
+                          {isEditingGivenBy ? 'Update' : 'Save'}
                         </button>
                       </div>
                     </form>
@@ -3123,9 +3158,9 @@ const resetUserForm = () => {
                             </label>
                             <input
                               type="text"
-                              name="name"
-                              id="name"
-                              value={deptForm.name}
+                              name="department"
+                              id="department"
+                              value={deptForm.department}
                               onChange={handleDeptInputChange}
                               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                             />

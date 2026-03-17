@@ -426,6 +426,8 @@ function AccountDataPage() {
       switch (frequency?.toLowerCase()) {
         case 'daily':
           return 1; // Show today + 1 day (tomorrow)
+        case 'tertiary':
+          return 3; // Show 3 days ahead for tertiary
         case 'weekly':
           return 7; // Show 7 days ahead for weekly
         case 'fortnightly':
@@ -446,6 +448,8 @@ function AccountDataPage() {
       switch (frequency?.toLowerCase()) {
         case 'daily':
           return 0; // Only today
+        case 'tertiary':
+          return 2; // 2 days previous
         case 'weekly':
           return 5; // 5 days previous
         case 'monthly':

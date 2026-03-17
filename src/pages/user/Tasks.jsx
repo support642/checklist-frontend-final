@@ -250,6 +250,7 @@ const UserTasks = () => {
                 <option value="all">All Frequencies</option>
                 <option value="one-time">One Time</option>
                 <option value="daily">Daily</option>
+                <option value="tertiary">Tertiary</option>
                 <option value="weekly">Weekly</option>
                 <option value="fortnightly">Fortnightly</option>
                 <option value="monthly">Monthly</option>

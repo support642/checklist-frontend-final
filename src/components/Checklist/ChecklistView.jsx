@@ -1,34 +1,39 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const ChecklistView = () => {
+const ChecklistView = ({ dashboardType = "checklist" }) => {
   const [taskView, setTaskView] = useState("recent");
   const [activeTab, setActiveTab] = useState("tasks");
   const navigate = useNavigate();
 
+  const isDelegation = dashboardType === "delegation";
+  const title = isDelegation ? "Delegation Dashboard" : "Dashboard";
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <h1 className="text-2xl font-bold tracking-tight text-purple-500">Dashboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-purple-500">{title}</h1>
         <Link
-          to="/user/tasks"
+          to={isDelegation ? "/user/tasks?type=delegation" : "/user/tasks"}
           className="btn btn-primary bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white shadow-md"
         >
-          View All Tasks
+          View All {isDelegation ? "Delegation " : ""}Tasks
         </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* ... existing cards ... */}
+        {/* Note: In a real app, these values would come from an API based on dashboardType */}
         <div 
           onClick={() => navigate("/dashboard/data/sales")}
           className="card border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all cursor-pointer"
         >
           <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-tr-lg p-4 border-b border-blue-200 dark:border-blue-800">
-            <h3 className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Tasks</h3>
-            <i className="fas fa-clipboard-list h-4 w-4 text-blue-500"></i>
+            <h3 className="text-sm font-medium text-blue-700 dark:text-blue-300">Total {isDelegation ? "Delegations" : "Tasks"}</h3>
+            <i className={`fas ${isDelegation ? 'fa-handshake' : 'fa-clipboard-list'} h-4 w-4 text-blue-500`}></i>
           </div>
           <div className="p-4">
-            <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">24</div>
+            <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">{isDelegation ? "8" : "24"}</div>
             <p className="text-xs text-blue-600 dark:text-blue-400">Assigned to you</p>
           </div>
         </div>
@@ -37,13 +42,13 @@ const ChecklistView = () => {
           onClick={() => navigate("/dashboard/data/sales")}
           className="card border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all cursor-pointer"
         >
-          <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-tr-lg p-4 border-b border-green-200 dark:border-green-800">
+          <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-tr-lg p-4 border-b border-green-200 dark:border-blue-800">
             <h3 className="text-sm font-medium text-green-700 dark:text-green-300">Completed</h3>
             <i className="fas fa-check-circle h-4 w-4 text-green-500"></i>
           </div>
           <div className="p-4">
-            <div className="text-3xl font-bold text-green-700 dark:text-green-300">18</div>
-            <p className="text-xs text-green-600 dark:text-green-400">75% completion rate</p>
+            <div className="text-3xl font-bold text-green-700 dark:text-green-300">{isDelegation ? "5" : "18"}</div>
+            <p className="text-xs text-green-600 dark:text-green-400">{isDelegation ? "62" : "75"}% completion rate</p>
           </div>
         </div>
 
@@ -56,8 +61,8 @@ const ChecklistView = () => {
             <i className="fas fa-clock h-4 w-4 text-amber-500"></i>
           </div>
           <div className="p-4">
-            <div className="text-3xl font-bold text-amber-700 dark:text-amber-300">5</div>
-            <p className="text-xs text-amber-600 dark:text-amber-400">Tasks to be completed</p>
+            <div className="text-3xl font-bold text-amber-700 dark:text-amber-300">{isDelegation ? "2" : "5"}</div>
+            <p className="text-xs text-amber-600 dark:text-amber-400">{isDelegation ? "Delegations" : "Tasks"} to be completed</p>
           </div>
         </div>
 
@@ -70,7 +75,7 @@ const ChecklistView = () => {
             <i className="fas fa-exclamation-triangle h-4 w-4 text-red-500"></i>
           </div>
           <div className="p-4">
-            <div className="text-3xl font-bold text-red-700 dark:text-red-300">1</div>
+            <div className="text-3xl font-bold text-red-700 dark:text-red-300">{isDelegation ? "1" : "1"}</div>
             <p className="text-xs text-red-600 dark:text-red-400">Requires immediate attention</p>
           </div>
         </div>
@@ -85,7 +90,7 @@ const ChecklistView = () => {
               }`}
             onClick={() => setTaskView("recent")}
           >
-            Recent Tasks
+            Recent {isDelegation ? "Delegations" : "Tasks"}
           </button>
           <button
             className={`py-3 text-center font-medium transition-colors ${taskView === "upcoming"
@@ -94,7 +99,7 @@ const ChecklistView = () => {
               }`}
             onClick={() => setTaskView("upcoming")}
           >
-            Upcoming Tasks
+            Upcoming {isDelegation ? "Delegations" : "Tasks"}
           </button>
           <button
             className={`py-3 text-center font-medium transition-colors ${taskView === "overdue"
@@ -103,29 +108,29 @@ const ChecklistView = () => {
               }`}
             onClick={() => setTaskView("overdue")}
           >
-            Overdue Tasks
+            Overdue {isDelegation ? "Delegations" : "Tasks"}
           </button>
         </div>
 
         <div className="p-4 bg-white dark:bg-gray-950">
           {taskView === "recent" && (
             <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
-              <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Recently Assigned Tasks</h3>
-              <TasksList filter="recent" />
+              <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Recently Assigned {isDelegation ? "Delegations" : "Tasks"}</h3>
+              <TasksList filter="recent" isDelegation={isDelegation} />
             </div>
           )}
 
           {taskView === "upcoming" && (
             <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
-              <h3 className="text-lg font-medium text-blue-700 dark:text-blue-300">Upcoming Tasks</h3>
-              <TasksList filter="upcoming" />
+              <h3 className="text-lg font-medium text-blue-700 dark:text-blue-300">Upcoming {isDelegation ? "Delegations" : "Tasks"}</h3>
+              <TasksList filter="upcoming" isDelegation={isDelegation} />
             </div>
           )}
 
           {taskView === "overdue" && (
             <div className="space-y-4 animate-in slide-in-from-left-2 duration-300">
-              <h3 className="text-lg font-medium text-red-700 dark:text-green-300">Overdue Tasks</h3>
-              <TasksList filter="overdue" />
+              <h3 className="text-lg font-medium text-red-700 dark:text-green-300">Overdue {isDelegation ? "Delegations" : "Tasks"}</h3>
+              <TasksList filter="overdue" isDelegation={isDelegation} />
             </div>
           )}
         </div>
@@ -140,7 +145,7 @@ const ChecklistView = () => {
               }`}
             onClick={() => setActiveTab("tasks")}
           >
-            My Tasks
+            My {isDelegation ? "Delegations" : "Tasks"}
           </button>
           <button
             className={`py-2 px-4 font-medium transition-all ${activeTab === "overview"
@@ -156,11 +161,11 @@ const ChecklistView = () => {
         {activeTab === "tasks" && (
           <div className="card border-green-200 dark:border-green-800 shadow-md animate-in fade-in duration-300">
             <div className="card-header bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950">
-              <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Pending Tasks</h3>
-              <p className="text-sm text-green-600 dark:text-green-400">Tasks that require your attention</p>
+              <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Pending {isDelegation ? "Delegations" : "Tasks"}</h3>
+              <p className="text-sm text-green-600 dark:text-green-400">Items that require your attention</p>
             </div>
             <div className="card-body bg-white dark:bg-gray-950">
-              <TasksList />
+              <TasksList isDelegation={isDelegation} />
             </div>
           </div>
         )}
@@ -168,12 +173,12 @@ const ChecklistView = () => {
         {activeTab === "overview" && (
           <div className="card border-green-200 dark:border-green-800 shadow-md animate-in fade-in duration-300">
             <div className="card-header bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950">
-              <h3 className="text-lg font-medium text-green-700 dark:text-green-300">Task Completion</h3>
-              <p className="text-sm text-green-600 dark:text-green-400">Your task completion over time</p>
+              <h3 className="text-lg font-medium text-green-700 dark:text-green-300">{isDelegation ? "Delegation" : "Task"} Completion</h3>
+              <p className="text-sm text-green-600 dark:text-green-400">Your performance over time</p>
             </div>
             <div className="card-body bg-white dark:bg-gray-950">
               <div className="h-[350px] w-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-md border border-dashed border-gray-300">
-                <p className="text-gray-500 dark:text-gray-400">Task completion chart would be displayed here</p>
+                <p className="text-gray-500 dark:text-gray-400">{isDelegation ? "Delegation" : "Task"} completion chart would be displayed here</p>
               </div>
             </div>
           </div>
@@ -184,8 +189,25 @@ const ChecklistView = () => {
 };
 
 // Internal TasksList component (moved from UserDashboard.jsx)
-const TasksList = ({ filter }) => {
-  const tasks = [
+const TasksList = ({ filter, isDelegation }) => {
+  const tasks = isDelegation ? [
+    {
+      id: 101,
+      title: "Review delegation A",
+      description: "Review the files for delegation A",
+      dueDate: "2023-05-16",
+      frequency: "once",
+      completed: false,
+    },
+    {
+      id: 102,
+      title: "Approve delegation B",
+      description: "Final approval for delegation B project",
+      dueDate: "2023-05-19",
+      frequency: "once",
+      completed: false,
+    }
+  ] : [
     {
       id: 1,
       title: "Complete weekly report",
@@ -194,6 +216,7 @@ const TasksList = ({ filter }) => {
       frequency: "weekly",
       completed: false,
     },
+    // ...
     {
       id: 2,
       title: "Update inventory records",
@@ -225,7 +248,7 @@ const TasksList = ({ filter }) => {
     <div className="space-y-4">
       {filteredTasks.length === 0 ? (
         <div className="text-center p-8 text-gray-500 dark:text-gray-400">
-          <p>No tasks found.</p>
+          <p>No {isDelegation ? "delegations" : "tasks"} found.</p>
         </div>
       ) : (
         filteredTasks.map((task) => (

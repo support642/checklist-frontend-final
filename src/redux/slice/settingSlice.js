@@ -247,8 +247,15 @@ const settingsSlice = createSlice({
       })
       .addCase(updateDepartment.fulfilled, (state, action) => {
         state.loading = false;
-        state.department = action.payload;
-
+        const index = state.department.findIndex(dept => dept.id === action.payload.id);
+        if (index !== -1) {
+          state.department[index] = action.payload;
+        } else {
+          // If for some reason it's not found (id mismatch), we might need to re-fetch
+          // or at least not corrupt the state. For now, let's just push or ignore.
+          // But since we are using users table as department storage, re-fetching is safest.
+          state.department.push(action.payload);
+        }
       })
       .addCase(updateDepartment.rejected, (state, action) => {
         state.loading = false;

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { Download, FileText, Search } from "lucide-react"
 import { fetchStaffTasksDataApi, getStaffTasksCountApi, getTotalUsersCountApi } from "../../../redux/api/dashboardApi"
 
 export default function StaffTasksTable({
@@ -9,16 +10,13 @@ export default function StaffTasksTable({
   departmentFilter,
   parseTaskStartDate
 }) {
-  const [currentPage, setCurrentPage] = useState(1)
   const [staffMembers, setStaffMembers] = useState([])
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [hasMoreData, setHasMoreData] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [totalStaffCount, setTotalStaffCount] = useState(0)
   const [totalUsersCount, setTotalUsersCount] = useState(0)
   const [selectedMonthYear, setSelectedMonthYear] = useState("")
   const [tillDate, setTillDate] = useState(new Date().toLocaleDateString('en-CA'))
   const [monthYearOptions, setMonthYearOptions] = useState([])
-  const itemsPerPage = 20
 
   // Generate month-year options (last 12 months + current month)
   const generateMonthYearOptions = useCallback(() => {
@@ -59,115 +57,67 @@ export default function StaffTasksTable({
     generateMonthYearOptions()
   }, [generateMonthYearOptions])
 
-  // Reset pagination when filters change
+  // Reset when filters change
   useEffect(() => {
-    setCurrentPage(1)
     setStaffMembers([])
-    setHasMoreData(true)
     setTotalStaffCount(0)
   }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate])
 
-  // Function to load staff data from server
-const loadStaffData = useCallback(async (page = 1, append = false) => {
-  if (isLoadingMore) return;
+// Function to load staff data from server
+const loadStaffData = useCallback(async () => {
+  if (isLoading) return;
 
   try {
-    setIsLoadingMore(true)
+    setIsLoading(true)
 
-    // Fetch staff data with their task summaries
+    // Fetch ALL staff data (using a high limit to get everything at once)
     const data = await fetchStaffTasksDataApi(
       dashboardType,
       dashboardStaffFilter,
-      page,
-      itemsPerPage,
+      1,
+      1000, // Very high limit to show all
       selectedMonthYear,
-      tillDate // Pass tillDate parameter
+      tillDate
     )
 
-      // Get total counts for both staff with tasks and total users
-      if (page === 1) {
-        const [staffCount, usersCount] = await Promise.all([
-          getStaffTasksCountApi(dashboardType, dashboardStaffFilter),
-          getTotalUsersCountApi()
-        ]);
-        setTotalStaffCount(staffCount)
-        setTotalUsersCount(usersCount)
-      }
+    // Get total counts
+    const [staffCount, usersCount] = await Promise.all([
+      getStaffTasksCountApi(dashboardType, dashboardStaffFilter),
+      getTotalUsersCountApi()
+    ]);
+    setTotalStaffCount(staffCount)
+    setTotalUsersCount(usersCount)
 
-      if (!data || data.length === 0) {
-        setHasMoreData(false)
-        if (!append) {
-          setStaffMembers([])
-        }
-        setIsLoadingMore(false)
-        return
-      }
-
-      // Filter data by selected month-year if specified
-      let filteredData = data
-      if (selectedMonthYear) {
-        const [year, month] = selectedMonthYear.split('-').map(Number)
-        filteredData = data.filter(staff => {
-          // This is a placeholder - you'll need actual task dates for each staff
-          // You might need to modify your API to accept month-year filter
-          return true // Filter logic will go here
-        })
-      }
-
-      if (append) {
-        setStaffMembers(prev => [...prev, ...filteredData])
-      } else {
-        setStaffMembers(filteredData)
-      }
-
-      // Check if we have more data
-      setHasMoreData(data.length === itemsPerPage)
-
-    } catch (error) {
-      console.error('Error loading staff data:', error)
-    } finally {
-      setIsLoadingMore(false)
+    if (!data || data.length === 0) {
+      setStaffMembers([])
+      return
     }
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, isLoadingMore, selectedMonthYear, tillDate])
+
+    // Filter data by selected month-year if specified
+    let filteredData = data
+    if (selectedMonthYear) {
+      const [year, month] = selectedMonthYear.split('-').map(Number)
+      filteredData = data.filter(staff => {
+        // Placeholder filter logic
+        return true 
+      })
+    }
+
+    setStaffMembers(filteredData)
+
+  } catch (error) {
+    console.error('Error loading staff data:', error)
+  } finally {
+    setIsLoading(false)
+  }
+}, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate])
 
   // Initial load when component mounts or dependencies change
   useEffect(() => {
-    loadStaffData(1, false)
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate])
+    loadStaffData()
+  }, [loadStaffData]) // Added loadStaffData to dependency array
 
-  // Function to load more data when scrolling
-  const loadMoreData = () => {
-    if (!isLoadingMore && hasMoreData) {
-      const nextPage = currentPage + 1
-      setCurrentPage(nextPage)
-      loadStaffData(nextPage, true)
-    }
-  }
 
-  // Handle scroll event for infinite loading
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!hasMoreData || isLoadingMore) return
-
-      const tableContainer = document.querySelector('.staff-table-container')
-      if (!tableContainer) return
-
-      const { scrollTop, scrollHeight, clientHeight } = tableContainer
-      const isNearBottom = scrollHeight - scrollTop <= clientHeight * 1.2
-
-      if (isNearBottom) {
-        loadMoreData()
-      }
-    }
-
-    const tableContainer = document.querySelector('.staff-table-container')
-    if (tableContainer) {
-      tableContainer.addEventListener('scroll', handleScroll)
-      return () => tableContainer.removeEventListener('scroll', handleScroll)
-    }
-  }, [hasMoreData, isLoadingMore, currentPage])
-
-  // Format on-time score with color coding
   const renderOnTimeScore = (score) => {
     let bgColor = "bg-red-100"
     let textColor = "text-red-800"
@@ -175,7 +125,7 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
     if (score >= 80) {
       bgColor = "bg-green-100"
       textColor = "text-green-800"
-    } else if (score >= 0) {
+    } else if (score >= 20) {
       bgColor = "bg-yellow-100"
       textColor = "text-yellow-800"
     }
@@ -186,6 +136,68 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
       </span>
     )
   }
+
+  // Role check for export button
+  const userRole = localStorage.getItem("role") || "";
+  const canExportReport = ["super_admin", "admin", "div_admin"].includes(userRole.toLowerCase());
+
+  const handleExportCSV = async () => {
+    try {
+      setIsLoading(true);
+      // Fetch data with a very large limit to get all filtered records for export
+      const allData = await fetchStaffTasksDataApi(
+        dashboardType,
+        dashboardStaffFilter,
+        1,
+        10000, 
+        selectedMonthYear,
+        tillDate
+      );
+
+      if (!allData || allData.length === 0) {
+        alert("No data available to export.");
+        return;
+      }
+
+      // Define CSV headers
+      const headers = ["SEQ NO.", "NAME", "TOTAL TASKS", "COMPLETED", "PENDING", "DONE ON TIME", "WORK DONE SCORE"];
+      
+      // Map data to rows
+      const rows = allData.map((staff, index) => {
+        const score = staff.completedTasks > 0 ? Math.round((staff.completedTasks / staff.totalTasks) * 100) : 0;
+        return [
+          index + 1,
+          staff.name,
+          staff.totalTasks,
+          staff.completedTasks,
+          staff.pendingTasks,
+          staff.doneOnTime || 0,
+          `${score}%`
+        ];
+      });
+
+      // Assemble CSV content
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.map(value => `"${value}"`).join(","))
+      ].join("\n");
+
+      // Create blob and download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Work_Done_Report_${dashboardType}_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      alert("Failed to export report.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -241,32 +253,45 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
           )}
         </div>
 
-        {/* Show active filters */}
-        <div className="flex flex-wrap gap-2">
-          {dashboardStaffFilter !== "all" && (
-            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
-              Staff: {dashboardStaffFilter}
-            </span>
+        <div className="flex flex-col items-end gap-3">
+          {canExportReport && (
+            <button
+              onClick={handleExportCSV}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium disabled:opacity-50"
+            >
+              <Download size={18} />
+              Work done report
+            </button>
           )}
-          {departmentFilter !== "all" && dashboardType === "checklist" && (
-            <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
-              Dept Filter: {departmentFilter}
-            </span>
-          )}
-          {selectedMonthYear && (
-            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
-              Month: {monthYearOptions.find(opt => opt.value === selectedMonthYear)?.label || selectedMonthYear}
-            </span>
-          )}
-          {tillDate && (
-            <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
-              Till: {tillDate}
-            </span>
-          )}
+
+          {/* Show active filters */}
+          <div className="flex flex-wrap gap-2 justify-end">
+            {dashboardStaffFilter !== "all" && (
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs">
+                Staff: {dashboardStaffFilter}
+              </span>
+            )}
+            {departmentFilter !== "all" && dashboardType === "checklist" && (
+              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">
+                Dept Filter: {departmentFilter}
+              </span>
+            )}
+            {selectedMonthYear && (
+              <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs">
+                Month: {monthYearOptions.find(opt => opt.value === selectedMonthYear)?.label || selectedMonthYear}
+              </span>
+            )}
+            {tillDate && (
+              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
+                Till: {tillDate}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {staffMembers.length === 0 && !isLoadingMore ? (
+      {staffMembers.length === 0 && !isLoading ? (
         <div className="text-center p-8 text-gray-500">
           <p>No staff data found for the selected filters.</p>
           {selectedMonthYear && (
@@ -387,16 +412,10 @@ const loadStaffData = useCallback(async (page = 1, append = false) => {
             ))}
           </div>
 
-          {isLoadingMore && (
+          {isLoading && (
             <div className="text-center py-4">
               <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <p className="text-sm text-gray-500 mt-2">Loading more staff...</p>
-            </div>
-          )}
-
-          {!hasMoreData && staffMembers.length > 0 && (
-            <div className="text-center py-4 text-sm text-gray-500">
-              All staff members loaded
+              <p className="text-sm text-gray-500 mt-2">Loading staff data...</p>
             </div>
           )}
         </div>

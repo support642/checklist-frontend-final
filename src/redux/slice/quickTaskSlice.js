@@ -170,8 +170,10 @@ const quickTaskSlice = createSlice({
       })
       .addCase(deleteChecklistTask.fulfilled, (state, action) => {
         state.loading = false;
+        // Since payload is an array of objects, we need to extract IDs or compare objects
+        const deletedIds = action.payload.map(t => t.task_id);
         state.quickTask = state.quickTask.filter(
-          task => !action.payload.includes(task.task_id)
+          task => !deletedIds.includes(task.task_id)
         );
       })
       .addCase(deleteChecklistTask.rejected, (state, action) => {
