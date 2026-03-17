@@ -1200,7 +1200,17 @@ const resetUserForm = () => {
   const handleAddMachine = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(createMachineThunk(machineForm)).unwrap();
+      let finalPartNames = [...machineForm.part_name];
+      if (partInput.trim() && !finalPartNames.includes(partInput.trim())) {
+        finalPartNames.push(partInput.trim());
+      }
+      
+      const submitData = {
+        ...machineForm,
+        part_name: finalPartNames
+      };
+
+      await dispatch(createMachineThunk(submitData)).unwrap();
       resetMachineForm();
       setShowMachineModal(false);
       dispatch(machineDetails());
@@ -1228,7 +1238,17 @@ const resetUserForm = () => {
   const handleUpdateMachine = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(updateMachineThunk({ id: currentMachineId, updatedMachine: machineForm })).unwrap();
+      let finalPartNames = [...machineForm.part_name];
+      if (partInput.trim() && !finalPartNames.includes(partInput.trim())) {
+        finalPartNames.push(partInput.trim());
+      }
+      
+      const submitData = {
+        ...machineForm,
+        part_name: finalPartNames
+      };
+
+      await dispatch(updateMachineThunk({ id: currentMachineId, updatedMachine: submitData })).unwrap();
       resetMachineForm();
       setShowMachineModal(false);
       dispatch(machineDetails());
@@ -1255,6 +1275,7 @@ const resetUserForm = () => {
       machine_department: '',
       machine_division: ''
     });
+    setPartInput('');
     setIsEditingMachine(false);
     setCurrentMachineId(null);
     setShowMachineModal(false);
