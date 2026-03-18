@@ -1289,6 +1289,7 @@ const handleSubmit = async () => {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Remarks</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Given by</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Unit</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Division</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
@@ -1473,7 +1474,10 @@ const handleSubmit = async () => {
                           </td>
                           <td className="px-6 py-4 text-xs text-gray-700">
                             <div>{item.name}</div>
-                            <div className="text-[10px] text-gray-400 capitalize">{item.department || item.given_by}</div>
+                            <div className="text-[10px] text-gray-400 capitalize">{item.department}</div>
+                          </td>
+                          <td className="px-6 py-4 text-xs text-gray-700 font-medium">
+                            {item.given_by || "—"}
                           </td>
                           <td className="px-6 py-4 text-xs text-gray-700">
                             {item.unit || "—"}
@@ -1549,6 +1553,7 @@ const handleSubmit = async () => {
                       <div className="text-sm font-medium mb-1">{item.task_description}</div>
                        <div className="flex justify-between text-[10px] text-gray-500 mb-1">
                          <span>ID: {item.task_id}</span>
+                         <span className="text-gray-400">Given By: {item.given_by || "—"}</span>
                          <span> {isApproval ? "ADMIN APPROVAL" : "MY TASK"}</span>
                        </div>
                        <div className="flex justify-between text-[10px] mb-1">

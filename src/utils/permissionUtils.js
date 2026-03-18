@@ -51,6 +51,10 @@ export const hasPageAccess = (page) => {
   // Specific page access
   if (pageAccess.includes(page) || pageAccess.includes(`${page}_view`) || pageAccess.includes(`${page}_modify`)) return true;
 
+  // // Development whitelist for Repair module
+  // const repairPages = ['dashboard', 'request_form', 'pending_request', 'request_approval', 'repair_setting'];
+  // if (repairPages.includes(page)) return true;
+
   // Fallback to role-based logic if page_access is empty
   if (!pageAccess || pageAccess.length === 0) {
     // STRICT FALLBACK: If no explicit permissions are granted, 

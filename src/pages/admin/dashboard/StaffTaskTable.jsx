@@ -160,7 +160,7 @@ const loadStaffData = useCallback(async () => {
       }
 
       // Define CSV headers
-      const headers = ["SEQ NO.", "NAME", "TOTAL TASKS", "COMPLETED", "PENDING", "DONE ON TIME", "WORK DONE SCORE"];
+      const headers = ["SEQ NO.", "NAME", "DIVISION", "DEPARTMENT", "TOTAL TASKS", "COMPLETED", "PENDING", "OVERDUE", "DONE ON TIME", "WORK DONE SCORE"];
       
       // Map data to rows
       const rows = allData.map((staff, index) => {
@@ -168,9 +168,12 @@ const loadStaffData = useCallback(async () => {
         return [
           index + 1,
           staff.name,
+          staff.division || "N/A",
+          staff.department || "N/A",
           staff.totalTasks,
           staff.completedTasks,
           staff.pendingTasks,
+          staff.overdueTasks || 0,
           staff.doneOnTime || 0,
           `${score}%`
         ];
@@ -316,6 +319,12 @@ const loadStaffData = useCallback(async () => {
                   Name
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Division
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Department
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Total Tasks
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -323,6 +332,9 @@ const loadStaffData = useCallback(async () => {
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Pending
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Overdue
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Done on Time
@@ -344,9 +356,12 @@ const loadStaffData = useCallback(async () => {
                       )}
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.division || "N/A"}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.department || "N/A"}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.totalTasks}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.completedTasks}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{staff.pendingTasks}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-500">{staff.overdueTasks || 0}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {staff.doneOnTime || 0}
                     {staff.completedTasks > 0 && (
@@ -376,7 +391,12 @@ const loadStaffData = useCallback(async () => {
                    </div>
                 </div>
                 
-                <div className="text-sm font-medium mb-1 text-gray-800">{staff.name}</div>
+                <div className="text-sm font-medium mb-1 text-gray-800">
+                  {staff.name} 
+                  <span className="text-[10px] text-gray-500 font-normal ml-1">
+                    ({staff.division || "N/A"} - {staff.department || "N/A"})
+                  </span>
+                </div>
                 
                 {staff.email && !staff.email.includes('example.com') && (
                   <div className="text-[10px] text-gray-500 mb-2 truncate">{staff.email}</div>
@@ -394,6 +414,10 @@ const loadStaffData = useCallback(async () => {
                    <div className="text-center">
                       <div className="font-semibold text-yellow-600">{staff.pendingTasks}</div>
                       <div>Pending</div>
+                   </div>
+                   <div className="text-center">
+                      <div className="font-semibold text-red-500">{staff.overdueTasks || 0}</div>
+                      <div>Overdue</div>
                    </div>
                 </div>
                 

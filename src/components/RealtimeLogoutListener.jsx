@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-// import supabase from "../SupabaseClient";
 
 const RealtimeLogoutListener = () => {
   const navigate = useNavigate();
@@ -12,100 +11,55 @@ const RealtimeLogoutListener = () => {
     }
   }, []);
 
-  // ✅ User auto-logout listener (for current user)
+  // ✅ User auto-logout listener using Native Server-Sent Events (SSE)
   useEffect(() => {
-    let subscription;
     const username = localStorage.getItem("user-name");
     if (!username) return;
 
-    subscription = supabase
-      .channel("user-status-watch")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "users",
-          filter: `user_name=eq.${username}`,
-        },
-        (payload) => {
-          const updatedUser = payload.new;
-          if (updatedUser.status !== "active") {
-            // Show Chrome notification to user
-            if (Notification.permission === "granted") {
-              new Notification("Account Deactivated", {
-                body: "Your account has been deactivated. You have been logged out.",
-                icon: "/logo.png",
-              });
-            }
+    const sseUrl = `${import.meta.env.VITE_API_BASE_URL}/login/stream?username=${encodeURIComponent(username)}`;
+    const eventSource = new EventSource(sseUrl);
 
-            localStorage.clear();
-            navigate("/login");
-            window.location.reload();
-          }
-        }
-      )
-      .subscribe();
+    // Listen for the 'logout' custom event from the backend
+    eventSource.addEventListener("logout", () => {
+      // Show Chrome notification to user
+      if (Notification.permission === "granted") {
+        new Notification("Session Expired", {
+          body: "Your account details or permissions have been updated. Please log in again.",
+          icon: "/Rama_TMT_logo.png",
+        });
+      }
+
+      localStorage.clear();
+      
+      // Add a slight delay before redirect to ensure notification can render
+      setTimeout(() => {
+        navigate("/login");
+        window.location.reload();
+      }, 500);
+    });
+
+    eventSource.onerror = (err) => {
+      console.error("SSE connection error", err);
+      // The browser natively reconnects automatically if the stream drops!
+    };
 
     return () => {
-      if (subscription) supabase.removeChannel(subscription);
+      eventSource.close();
     };
   }, [navigate]);
 
-  // ✅ Admin listener to see logout notifications
-useEffect(() => {
-  const role = localStorage.getItem("role");
-  if ((role !== "admin" && role !== "div_admin")) return;
-
-  const adminSubscription = supabase
-    .channel("admin-user-status-watch")
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "users",
-      },
-      (payload) => {
-        console.log("📡 Realtime event received:", payload); // 👈 Add this
-        const updatedUser = payload.new;
-        const previousUser = payload.old;
-
-        if (previousUser?.status === "active" && updatedUser?.status === "inactive") {
-          console.log("🚨 User changed from active → inactive:", updatedUser.user_name);
-          if (Notification.permission === "granted") {
-            new Notification("User Logged Out", {
-              body: `User "${updatedUser.user_name}" has been logged out.`,
-              icon: "/logo.png",
-            });
-          }
-        }
-      }
-    )
-    .subscribe((status) => console.log("✅ Subscribed to admin Realtime:", status));
-
-  return () => {
-    supabase.removeChannel(adminSubscription);
-  };
-}, []);
-
-
-  // ✅ Check user status on refresh
+  // ✅ Check user status on refresh (Sync check)
   useEffect(() => {
     const checkUserStatusOnLoad = async () => {
       const username = localStorage.getItem("user-name");
       if (!username) return;
-
-      const { data } = await supabase
-        .from("users")
-        .select("status")
-        .eq("user_name", username)
-        .single();
-
-      if (!data || data.status !== "active") {
-        localStorage.clear();
-        navigate("/login");
-        window.location.reload();
+      
+      try {
+        // Here we ideally would hit a small auth endpoint.
+        // For now, the backend will auto-stream the `logout` event if they are inactive 
+        // the next time their settings are touched, or we can leave this block for future auth checks.
+      } catch (err) {
+        console.error(err);
       }
     };
 

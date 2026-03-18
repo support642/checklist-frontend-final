@@ -7,11 +7,11 @@ const API_BASE = `${import.meta.env.VITE_API_BASE_URL}`;
 // =========================
 // FETCH CHECKLIST (PAGINATED)
 // =========================
-export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "", userRole = "", userDept = "", userDiv = "") => {
+export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "", userRole = "", userDept = "", userDiv = "", userName = "") => {
   const res = await fetch(`${API_BASE}/tasks/checklist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv }),
+    body: JSON.stringify({ page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv, userName }),
   });
 
   return res.json();
@@ -20,11 +20,11 @@ export const fetchChecklistData = async (page = 0, pageSize = 50, nameFilter = "
 // =========================
 // FETCH DELEGATION
 // =========================
-export const fetchDelegationData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "") => {
+export const fetchDelegationData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "", userRole = "", userDept = "", userDiv = "", userName = "") => {
   const res = await fetch(`${API_BASE}/tasks/delegation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ page, pageSize, nameFilter, freqFilter }),
+    body: JSON.stringify({ page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv, userName }),
   });
 
   return res.json();

@@ -287,8 +287,8 @@ export const getUniqueDepartmentsApi = async () => {
   return res.json();
 };
 
-export const getStaffNamesByDepartmentApi = async (department) => {
-  const res = await fetch(`${BASE_URL}/staff?department=${department}`);
+export const getStaffNamesByDepartmentApi = async (department, unit = "all", division = "all") => {
+  const res = await fetch(`${BASE_URL}/staff?department=${department}&unit=${unit}&division=${division}`);
   return res.json();
 };
 

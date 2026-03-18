@@ -23,6 +23,13 @@ import HolidayManagementPage from "./pages/admin/HolidayManagementPage"
 import RealtimeLogoutListener from "./components/RealtimeLogoutListener"   // ✅ Added listener
 import { hasPageAccess } from "./utils/permissionUtils"
 
+// Repair Module Imports
+// import RepairDashboard from "./pages/repair/repairDashboard"
+// import RequestForm from "./pages/repair/requestForm"
+// import PendingRequest from "./pages/repair/pendingRequest"
+// import RequestApproval from "./pages/repair/requestApproval"
+// import RepairSetting from "./pages/repair/repairSetting"
+
 // Auth wrapper component to protect routes
 const ProtectedRoute = ({ children, page }) => {
   const username = localStorage.getItem("user-name")
@@ -59,7 +66,7 @@ function App() {
   return (
     <Router>
       {/* ✅ Realtime listener inside Router so useNavigate works */}
-      {/* <RealtimeLogoutListener /> */}
+      <RealtimeLogoutListener />
 
       <Routes>
         {/* Root redirect */}
@@ -195,6 +202,48 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Repair Module Routes */}
+        {/* <Route
+          path="/repair/dashboard"
+          element={
+            <ProtectedRoute page="dashboard">
+              <RepairDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair/request-form"
+          element={
+            <ProtectedRoute page="request_form">
+              <RequestForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair/pending-request"
+          element={
+            <ProtectedRoute page="pending_request">
+              <PendingRequest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair/request-approval"
+          element={
+            <ProtectedRoute page="request_approval">
+              <RequestApproval />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair/repair-setting"
+          element={
+            <ProtectedRoute page="repair_setting">
+              <RepairSetting />
+            </ProtectedRoute>
+          }
+        /> */}
 
         {/* Backward compatibility redirects */}
         <Route path="/admin/*" element={<Navigate to="/dashboard/admin" replace />} />

@@ -618,10 +618,10 @@ useEffect(() => {
       // Extract unique staff names for the dropdown from the filtered data
       let uniqueStaff;
 
-      if (dashboardType === 'checklist' && departmentFilter !== 'all') {
+      if (dashboardType === 'checklist' && (departmentFilter !== 'all' || divisionFilter !== 'all' || unitFilter !== 'all')) {
         // For checklist with department filter, get staff from users table based on user_access
         try {
-          uniqueStaff = await getStaffNamesByDepartmentApi(departmentFilter);
+          uniqueStaff = await getStaffNamesByDepartmentApi(departmentFilter, unitFilter, divisionFilter);
         } catch (error) {
           console.error('Error fetching staff by department:', error);
           uniqueStaff = [...new Set(filteredData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
@@ -923,22 +923,24 @@ useEffect(() => {
   // Update available staff when department filter changes
   useEffect(() => {
     const updateStaffList = async () => {
-      if (dashboardType === 'checklist' && departmentFilter !== 'all') {
-        try {
-          const staffNames = await getStaffNamesByDepartmentApi(departmentFilter);
-          setAvailableStaff(staffNames || []);
-        } catch (error) {
-          console.error('Error fetching staff by department:', error);
-          setAvailableStaff([]);
+      if (dashboardType === 'checklist') {
+        if (departmentFilter !== 'all' || divisionFilter !== 'all' || unitFilter !== 'all') {
+          try {
+            const staffNames = await getStaffNamesByDepartmentApi(departmentFilter, unitFilter, divisionFilter);
+            setAvailableStaff(staffNames || []);
+          } catch (error) {
+            console.error('Error fetching staff by filters:', error);
+            setAvailableStaff([]);
+          }
+        } else {
+          // When "all" is selected, reset to empty and let fetchDepartmentData populate it
+          // Don't clear it here as it will be populated by fetchDepartmentData
         }
-      } else if (dashboardType === 'checklist' && departmentFilter === 'all') {
-        // When "all" is selected, reset to empty and let fetchDepartmentData populate it
-        // Don't clear it here as it will be populated by fetchDepartmentData
       }
     };
 
     updateStaffList();
-  }, [departmentFilter, dashboardType]);
+  }, [departmentFilter, divisionFilter, unitFilter, dashboardType]);
 
   // Add scroll event listener for infinite scroll
   useEffect(() => {

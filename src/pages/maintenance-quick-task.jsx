@@ -10,7 +10,7 @@ const CONFIG = {
   },
 };
 
-function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv }) {
+function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv, userName }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -28,8 +28,18 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
 
   useEffect(() => {
     dispatch(resetUniqueMaintenancePagination());
-    dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }));
-  }, [dispatch, nameFilter, freqFilter]);
+    dispatch(uniqueMaintenanceTaskData({ 
+      page: 0, 
+      pageSize: 50, 
+      nameFilter: nameFilter, 
+      freqFilter: freqFilter, 
+      append: false,
+      userRole,
+      userDept,
+      userDiv,
+      userName
+    }));
+  }, [dispatch, nameFilter, freqFilter, userRole, userDept, userDiv, userName]);
 
   useEffect(() => {
     setIsInitialized(true);
@@ -49,11 +59,15 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
           pageSize: 50, 
           nameFilter,
           freqFilter,
-          append: true 
+          append: true,
+          userRole,
+          userDept,
+          userDiv,
+          userName
         }));
       }
     }
-  }, [loading, uniqueMaintenanceHasMore, uniqueMaintenancePage, nameFilter, dispatch]);
+  }, [loading, uniqueMaintenanceHasMore, uniqueMaintenancePage, nameFilter, freqFilter, dispatch, userRole, userDept, userDiv, userName]);
 
   useEffect(() => {
     const container = tableContainerRef.current;
@@ -181,7 +195,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
     if (nameFilter) {
       filtered = filtered.filter(task => task.name === nameFilter);
     }
-    
+
     if (freqFilter) {
       filtered = filtered.filter(task => task.frequency === freqFilter);
     }

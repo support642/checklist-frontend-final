@@ -871,7 +871,6 @@ const handleUpdateUser = async (e) => {
     page_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? (pageAccess.length > 0 ? pageAccess : null) : null)
   };
 
-  console.log('DEBUG: handleUpdateUser payload:', { id: currentUserId, updatedUser });
 
 
 
@@ -957,6 +956,10 @@ const handleUpdateUser = async (e) => {
 
   // Modified handleDeleteUser
   const handleDeleteUser = async (userId) => {
+    if (!window.confirm("Do you want to delete this user?")) {
+      return;
+    }
+    
     try {
       await dispatch(deleteUser(userId)).unwrap();
       // setTimeout(() => window.location.reload(), 1000);
@@ -1047,7 +1050,6 @@ useEffect(() => {
   // };
 const handleEditUser = (userId) => {
   const user = userData.find(u => u.id === userId);
-  console.log('DEBUG: handleEditUser source user:', user);
   const deptName = (user?.user_access || user?.department)?.split(',')[0]?.trim();
   const deptRecord = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
   

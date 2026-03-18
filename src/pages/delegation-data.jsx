@@ -18,7 +18,7 @@ const CONFIG = {
 
 
 
-function DelegationPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv }) {
+function DelegationPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv, userName }) {
  const [successMessage, setSuccessMessage] = useState("")
   const [error, setError] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -149,8 +149,13 @@ useEffect(()=>{
       filtered = filtered.filter(task => task.frequency === freqFilter)
     }
 
+    // User role filtering - show only their own tasks
+    if (userRole?.toLowerCase() === 'user' && userName) {
+      filtered = filtered.filter(task => task.name?.toLowerCase()?.trim() === userName.toLowerCase().trim());
+    }
+
     return filtered
-  }, [delegationTasks, searchTerm, nameFilter, freqFilter])
+  }, [delegationTasks, searchTerm, nameFilter, freqFilter, userRole, userName])
 
   
 
@@ -197,7 +202,7 @@ useEffect(()=>{
             <div>
               <h2 className="text-purple-700 font-medium">Delegation Tasks</h2>
               <p className="text-purple-600 text-sm">
-                {CONFIG.PAGE_CONFIG.description} ({delegationTotal} tasks)
+                {CONFIG.PAGE_CONFIG.description} ({userRole?.toLowerCase() === 'user' ? filteredTasks.length : delegationTotal} tasks)
               </p>
             </div>
             

@@ -936,7 +936,7 @@ useEffect(() => {
             )}
             Assign New Task {taskType ? `(${taskType === 'checklist' ? 'Checklist' : taskType === 'maintenance' ? 'Maintenance' : 'Delegation'})` : ''}
           </h1>
-          <button
+{/*<button
             onClick={() => setShowImportModal(true)}
             type="button"
             style={{
@@ -964,7 +964,7 @@ useEffect(() => {
           >
             <Download className="h-4 w-4" style={{ flexShrink: 0 }} />
             Import Tasks
-          </button>
+          </button>*/}
         </div>
         {!taskType ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 py-8">
@@ -1653,14 +1653,14 @@ useEffect(() => {
       </div>
       
       {/* CSV Import Modal */}
-      <CSVImportModal
+      {/*<CSVImportModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
         onSuccess={() => {
           // Optionally refresh data or show success message
           console.log('Import successful!');
         }}
-      />
+      />*/}
     </AdminLayout>
   );
 }

@@ -467,7 +467,7 @@ export default function TaskNavigationTabs({
                              <CheckCircle2 size={16} /> Done
                            </span>
                         ) : (
-                           (userRole === 'admin' || userRole === 'super_admin') && 
+                           /*(userRole === 'admin' || userRole === 'super_admin') && 
                            task.assignedTo?.toLowerCase() === username?.toLowerCase() ? (
                              <button 
                                onClick={() => handleTaskCompletion(task)}
@@ -476,7 +476,7 @@ export default function TaskNavigationTabs({
                              >
                                <Circle size={16} /> Mark Done
                              </button>
-                           ) : (
+                           ) : */(
                              <span className="text-gray-400 text-xs">Pending</span>
                            )
                         )}
@@ -515,7 +515,7 @@ export default function TaskNavigationTabs({
                               <CheckCircle2 size={12} /> Done
                             </span>
                          ) : (
-                            (userRole === 'admin' || userRole === 'super_admin') && 
+                            /*(userRole === 'admin' || userRole === 'super_admin') && 
                             task.assignedTo?.toLowerCase() === username?.toLowerCase() ? (
                               <button 
                                 onClick={() => handleTaskCompletion(task)}
@@ -524,7 +524,7 @@ export default function TaskNavigationTabs({
                               >
                                 <Circle size={12} /> Mark Done
                               </button>
-                            ) : (
+                            ) : */(
                               <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase shadow-sm bg-yellow-100 text-yellow-700 border border-yellow-200">Pending</span>
                             )
                          )}

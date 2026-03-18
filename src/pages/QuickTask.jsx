@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { format } from 'date-fns';
 import { Search, ChevronDown, Filter, Trash2, Edit, Save, X } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
@@ -47,7 +47,7 @@ export default function QuickTask() {
     delegationPage,
     delegationHasMore
   } = useSelector((state) => state.quickTask);
-  const { uniqueMaintenanceTotal } = useSelector((state) => state.maintenance);
+  const { uniqueMaintenanceTasks, uniqueMaintenanceTotal } = useSelector((state) => state.maintenance);
   const { userData: currentUser } = useSelector((state) => state.login);
   const dispatch = useDispatch();
 
@@ -82,10 +82,11 @@ useEffect(() => {
       freqFilter: '',
       userRole,
       userDept,
-      userDiv
+      userDiv,
+      userName: loginUserData.user_name
     }));
   }
-}, [dispatch, userRole, userDept, userDiv]);
+}, [dispatch, userRole, userDept, userDiv, loginUserData.user_name]);
 
 
 // Add this new function
@@ -102,7 +103,11 @@ const handleScroll = useCallback(() => {
         pageSize: 50, 
         nameFilter,
         freqFilter,
-        append: true 
+        append: true,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
       }));
     } else if (activeTab === 'delegation' && delegationHasMore) {
       dispatch(uniqueDelegationTaskData({ 
@@ -110,11 +115,15 @@ const handleScroll = useCallback(() => {
         pageSize: 50, 
         nameFilter,
         freqFilter,
-        append: true 
+        append: true,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
       }));
     }
   }
-}, [loading, activeTab, checklistHasMore, delegationHasMore, checklistPage, delegationPage, nameFilter, dispatch]);
+}, [loading, activeTab, checklistHasMore, delegationHasMore, checklistPage, delegationPage, nameFilter, freqFilter, dispatch, userRole, userDept, userDiv, loginUserData.user_name]);
 
 // Add scroll listener
 useEffect(() => {
@@ -296,7 +305,8 @@ const handleNameFilterSelect = (name) => {
         append: false,
         userRole,
         userDept,
-        userDiv
+        userDiv,
+        userName: loginUserData.user_name
       }));
     } else {
       dispatch(resetDelegationPagination());
@@ -305,7 +315,11 @@ const handleNameFilterSelect = (name) => {
         pageSize: 50, 
         nameFilter: name,
         freqFilter: freqFilter,
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
       }));
     }
   
@@ -325,7 +339,8 @@ const handleNameFilterSelect = (name) => {
         append: false,
         userRole,
         userDept,
-        userDiv
+        userDiv,
+        userName: loginUserData.user_name
       }));
     } else if (activeTab === 'delegation') {
       dispatch(resetDelegationPagination());
@@ -334,7 +349,11 @@ const handleNameFilterSelect = (name) => {
         pageSize: 50, 
         nameFilter: nameFilter,
         freqFilter: freq,
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
       }));
     }
     
@@ -353,7 +372,8 @@ const clearNameFilter = () => {
         append: false,
         userRole,
         userDept,
-        userDiv
+        userDiv,
+        userName: loginUserData.user_name
       }));
     } else {
       dispatch(resetDelegationPagination());
@@ -362,7 +382,11 @@ const clearNameFilter = () => {
         pageSize: 50, 
         nameFilter: '',
         freqFilter: freqFilter,
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
       }));
     }
   
@@ -382,7 +406,8 @@ const clearNameFilter = () => {
         append: false,
         userRole,
         userDept,
-        userDiv
+        userDiv,
+        userName: loginUserData.user_name
       }));
     } else if (activeTab === 'delegation') {
       dispatch(resetDelegationPagination());
@@ -391,7 +416,11 @@ const clearNameFilter = () => {
         pageSize: 50, 
         nameFilter: nameFilter,
         freqFilter: '',
-        append: false 
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
       }));
     }
     
@@ -409,24 +438,12 @@ const allNames = [
 
 
 const filteredChecklistTasks = quickTask.filter(task => {
-  // Role-based filtering
-  const role = userRole?.toLowerCase();
-  const targetDept = userDept?.toLowerCase()?.trim();
-  const targetDiv = userDiv?.toLowerCase()?.trim();
-
-  let rolePass = true;
-  if (role === 'admin') {
-    rolePass = task.department?.toLowerCase()?.trim() === targetDept;
-  } else if (role === 'div_admin') {
-    rolePass = task.division?.toLowerCase()?.trim() === targetDiv;
-  }
-
   const freqFilterPass = !freqFilter || task.frequency === freqFilter;
   const searchTermPass = !searchTerm || task.task_description
     ?.toLowerCase()
     .includes(searchTerm.toLowerCase());
     
-  return rolePass && freqFilterPass && searchTermPass;
+  return freqFilterPass && searchTermPass;
 }).sort((a, b) => {
   // Automatic priority sorting based on role
   if (!sortConfig.key) {
@@ -462,6 +479,43 @@ const filteredChecklistTasks = quickTask.filter(task => {
   }
   return 0;
 });
+
+const filteredDelegationTasks = useMemo(() => {
+  let filtered = [...(delegationTasks || [])];
+  if (searchTerm) {
+    filtered = filtered.filter(task =>
+      task.task_description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }
+  if (nameFilter) {
+    filtered = filtered.filter(task => task.name === nameFilter);
+  }
+  if (freqFilter) {
+    filtered = filtered.filter(task => task.frequency === freqFilter);
+  }
+  return filtered;
+}, [delegationTasks, searchTerm, nameFilter, freqFilter]);
+
+const filteredMaintenanceTasks = useMemo(() => {
+  let filtered = [...(uniqueMaintenanceTasks || [])];
+  if (searchTerm) {
+    filtered = filtered.filter(task =>
+      task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      task.machine_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '')).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }
+  if (nameFilter) {
+    filtered = filtered.filter(task => task.name === nameFilter);
+  }
+  if (freqFilter) {
+    filtered = filtered.filter(task => task.frequency === freqFilter);
+  }
+  if (userRole?.toLowerCase() === 'user' && loginUserData?.user_name) {
+    filtered = filtered.filter(task => task.name?.toLowerCase()?.trim() === loginUserData.user_name.toLowerCase().trim());
+  }
+  return filtered;
+}, [uniqueMaintenanceTasks, searchTerm, nameFilter, freqFilter, userRole, loginUserData]);
 
   function formatTimestampToDDMMYYYY(timestamp) {
     if (!timestamp || timestamp === "" || timestamp === null) {
@@ -552,7 +606,8 @@ const filteredChecklistTasks = quickTask.filter(task => {
                       freqFilter,
                       userRole,
                       userDept,
-                      userDiv
+                      userDiv,
+                      userName: loginUserData.user_name
                     }));
                   }}
                 >
@@ -805,7 +860,8 @@ const filteredChecklistTasks = quickTask.filter(task => {
                               type="checkbox"
                               checked={selectedTasks.includes(task)}
                               onChange={() => handleCheckboxChange(task)}
-                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                              disabled={!canModifyTasks}
+                              className={`rounded border-gray-300 text-purple-600 focus:ring-purple-500 ${!canModifyTasks ? 'opacity-50 cursor-not-allowed' : ''}`}
                             />
                             <span className={`px-2 py-1 rounded-full text-xs ${
                               task.frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
@@ -997,7 +1053,8 @@ const filteredChecklistTasks = quickTask.filter(task => {
                           type="checkbox"
                           checked={selectedTasks.length === filteredChecklistTasks.length && filteredChecklistTasks.length > 0}
                           onChange={handleSelectAll}
-                          className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          disabled={!canModifyTasks}
+                          className={`rounded border-gray-300 text-purple-600 focus:ring-purple-500 ${!canModifyTasks ? 'opacity-50 cursor-not-allowed' : ''}`}
                         />
                       </th>
                       {[
@@ -1041,7 +1098,8 @@ const filteredChecklistTasks = quickTask.filter(task => {
                               type="checkbox"
                               checked={selectedTasks.includes(task)}
                               onChange={() => handleCheckboxChange(task)}
-                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                              disabled={!canModifyTasks}
+                              className={`rounded border-gray-300 text-purple-600 focus:ring-purple-500 ${!canModifyTasks ? 'opacity-50 cursor-not-allowed' : ''}`}
                             />
                           </td>
 
@@ -1257,6 +1315,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
               userRole={userRole}
               userDept={userDept}
               userDiv={userDiv}
+              userName={loginUserData?.user_name}
             />
           ) : (
             <MaintenanceQuickTaskPage
@@ -1268,6 +1327,7 @@ const filteredChecklistTasks = quickTask.filter(task => {
               userRole={userRole}
               userDept={userDept}
               userDiv={userDiv}
+              userName={loginUserData?.user_name}
             />
           )}
         </>

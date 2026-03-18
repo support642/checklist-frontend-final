@@ -94,6 +94,17 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
         //     { name: "Documentation", route: "/docs", page: "documentation", icon: ClipboardList },
         //     { name: "Subscription", route: "/subscription", page: "subscription", icon: BookmarkCheck }
         //   ]
+        // },
+        // {
+        //   title: "Repair",
+        //   key: "repair",
+        //   children: [
+        //     { name: "Dashboard", route: "/repair/dashboard", page: "dashboard", icon: Database },
+        //     { name: "Request Form", route: "/repair/request-form", page: "request_form", icon: CheckSquare },
+        //     { name: "Pending Request", route: "/repair/pending-request", page: "pending_request", icon: ClipboardList },
+        //     { name: "Request Approval", route: "/repair/request-approval", page: "request_approval", icon: History },
+        //     { name: "Settings", route: "/repair/repair-setting", page: "repair_setting", icon: Settings },
+        //   ]
         // }
       ]
     }
