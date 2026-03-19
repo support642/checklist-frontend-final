@@ -303,7 +303,7 @@ export default function DashboardHeader({
             <SearchableDropdown
               value={dashboardStaffFilter}
               onChange={(val) => setDashboardStaffFilter(val)}
-              options={(divisionFilter === "all" || departmentFilter === "all") ? [] : availableStaff}
+              options={(userRole !== "super_admin" && dashboardType !== "delegation" && (divisionFilter === "all" || departmentFilter === "all")) ? [] : availableStaff}
               placeholder="staff"
               allLabel="All Staff Members"
             />
@@ -429,7 +429,7 @@ export default function DashboardHeader({
             <SearchableDropdown
               value={dashboardStaffFilter}
               onChange={(val) => setDashboardStaffFilter(val)}
-              options={(divisionFilter === "all" || departmentFilter === "all") ? [] : availableStaff}
+              options={(userRole !== "super_admin" && dashboardType !== "delegation" && (divisionFilter === "all" || departmentFilter === "all")) ? [] : availableStaff}
               placeholder="staff"
               allLabel="All Staff Members"
             />

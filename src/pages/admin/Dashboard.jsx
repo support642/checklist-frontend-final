@@ -656,7 +656,13 @@ useEffect(() => {
               return userDepartments.includes(taskDept);
             });
           }
-          uniqueStaff = [...new Set(filteredDelegation.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+          // Only show members who have at least one pending delegation task
+          uniqueStaff = [...new Set(
+            filteredDelegation
+              .filter(task => !task.submission_date)
+              .map((task) => task.name)
+              .filter((name) => name && name.trim() !== "")
+          )];
         } catch (error) {
           console.error('Error fetching staff from delegation:', error);
           uniqueStaff = [...new Set(filteredData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
