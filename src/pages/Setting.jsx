@@ -229,10 +229,7 @@ const Setting = () => {
   };
 
 
-
-
-
-  // Add real-time subscription
+  // Add real-time subscription - DISABLED AS PER USER REQUEST (Manual Refresh only)
   // useEffect(() => {
   //   // Subscribe to users table changes
   //   const subscription = supabase
@@ -730,7 +727,7 @@ const handleConfirmDelegation = async () => {
         await dispatch(updateDepartment({ id: currentGivenById, updatedDept })).unwrap();
       } else {
         // Create new Given By
-        const newEntry = { givenBy: givenByInput.trim() };
+        const newEntry = { given_by: givenByInput.trim() };
         await dispatch(createDepartment(newEntry)).unwrap();
       }
       
@@ -1543,9 +1540,10 @@ const resetUserForm = () => {
                   dispatch(updateUser({
                     id: user.id,
                     updatedUser: { leave_date: null, leave_end_date: null, remark: null }
-                  })).then(() => {
-                    setTimeout(() => window.location.reload(), 500);
-                  });
+                  }));
+                  // .then(() => {
+                  //   setTimeout(() => window.location.reload(), 500);
+                  // });
                 }
               }}
               className="text-red-600" title="Clear Leave"
@@ -1622,7 +1620,7 @@ const resetUserForm = () => {
                         remark: null
                       }
                     })).then(() => {
-                      setTimeout(() => window.location.reload(), 500);
+                      // setTimeout(() => window.location.reload(), 500);
                     });
                   }
                 }}
