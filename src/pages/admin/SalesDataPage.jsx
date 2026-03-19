@@ -1622,6 +1622,31 @@ const submissionData = await Promise.all(
             >
               {/* Mobile Card View for Maintenance */}
               <div className="sm:hidden space-y-3 p-3">
+                {/* Mobile Select All for Maintenance */}
+                {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && currentMaintData.length > 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      checked={filteredMaintenanceData.length > 0 && filteredMaintenanceData.every(item => maintSelectedItems.has(item.task_id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setMaintSelectedItems(new Set(filteredMaintenanceData.map(item => item.task_id)));
+                          setMaintAdditionalData(prev => {
+                            const updated = { ...prev };
+                            filteredMaintenanceData.forEach(item => { updated[item.task_id] = "Yes" });
+                            return updated;
+                          });
+                        } else {
+                          setMaintSelectedItems(new Set());
+                          setMaintAdditionalData({});
+                          setMaintRemarksData({});
+                        }
+                      }}
+                    />
+                    <span className="text-xs font-medium text-purple-700">Select All ({filteredMaintenanceData.length})</span>
+                  </div>
+                )}
                 {currentMaintData.length > 0 ? (
                   currentMaintData.map((item, index) => {
                     const isSelected = maintSelectedItems.has(item.task_id);
@@ -1754,7 +1779,7 @@ const submissionData = await Promise.all(
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          checked={filteredMaintenanceData.length > 0 && maintSelectedItems.size === filteredMaintenanceData.length}
+                          checked={filteredMaintenanceData.length > 0 && filteredMaintenanceData.every(item => maintSelectedItems.has(item.task_id))}
                           onChange={(e) => {
                             if (e.target.checked) {
                               setMaintSelectedItems(new Set(filteredMaintenanceData.map(item => item.task_id)));
@@ -1946,6 +1971,32 @@ const submissionData = await Promise.all(
             >
               {/* Mobile Card View */}
               <div className="sm:hidden space-y-3 p-3">
+                {/* Mobile Select All for Checklist */}
+                {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && currentPendingData.length > 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      checked={filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).length > 0 && filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).every(item => selectedItems.has(item.task_id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const enabledItems = filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date));
+                          setSelectedItems(new Set(enabledItems.map(item => item.task_id)));
+                          setAdditionalData((prev) => {
+                            const updated = { ...prev };
+                            enabledItems.forEach((item) => { updated[item.task_id] = "Yes" });
+                            return updated;
+                          });
+                        } else {
+                          setSelectedItems(new Set());
+                          setAdditionalData({});
+                          setRemarksData({});
+                        }
+                      }}
+                    />
+                    <span className="text-xs font-medium text-purple-700">Select All ({filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).length})</span>
+                  </div>
+                )}
                 {currentPendingData.length > 0 ? (
                   currentPendingData.map((account, index) => {
                     const isSelected = selectedItems.has(account.task_id);
@@ -2091,7 +2142,7 @@ const submissionData = await Promise.all(
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          checked={filteredAccountData.length > 0 && selectedItems.size === filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).length && filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).length > 0}
+                          checked={filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).length > 0 && filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).every(item => selectedItems.has(item.task_id))}
                           onChange={(e) => {
                             if (e.target.checked) {
                               // Only select items with enabled checkboxes (today and overdue)

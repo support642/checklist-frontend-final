@@ -1532,6 +1532,23 @@ const handleSubmit = async () => {
 
               {/* Mobile Card View (Simplified) */}
               <div className="sm:hidden space-y-3 p-3">
+                {/* Mobile Select All */}
+                {unifiedData.length > 0 && (
+                  <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      onChange={(e) => handleUnifiedSelectAll(e.target.checked)}
+                      checked={
+                        unifiedData.length > 0 && 
+                        unifiedData.every(item => 
+                          (item.unifiedType === 'approval' && item.admin_done === 'Done') || isRowSelected(item)
+                        )
+                      }
+                    />
+                    <span className="text-xs font-medium text-purple-700">Select All ({unifiedData.length})</span>
+                  </div>
+                )}
                 {unifiedData.map((item, index) => {
                   const isSelected = isRowSelected(item);
                   const isApproval = item.unifiedType === 'approval';

@@ -1,9 +1,115 @@
 /* eslint-disable no-unused-vars */
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { Search, ChevronDown, X } from "lucide-react"
 import { getTotalUsersCountApi } from "../../../redux/api/dashboardApi"
 import { canAccessModule } from "../../../utils/permissionUtils"
+
+// Reusable Searchable Dropdown Component
+function SearchableDropdown({ value, onChange, options, placeholder, allLabel }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const filteredOptions = options.filter(opt =>
+    opt.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const displayValue = value === "all" ? allLabel : value;
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSelect = (val) => {
+    onChange(val);
+    setIsOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <div ref={dropdownRef} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm bg-white hover:bg-gray-50 text-left"
+      >
+        <span className={`truncate ${value === "all" ? "text-gray-500" : "text-gray-900"}`}>
+          {displayValue}
+        </span>
+        <ChevronDown size={14} className={`flex-shrink-0 ml-1 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-purple-200 rounded-md shadow-lg z-50 overflow-hidden">
+          {/* Search Input */}
+          <div className="p-2 border-b border-gray-100">
+            <div className="relative">
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={`Search ${placeholder}...`}
+                className="w-full pl-7 pr-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-48 overflow-y-auto">
+            {/* "All" option - always visible */}
+            {!search && (
+              <button
+                onClick={() => handleSelect("all")}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 ${value === "all" ? "bg-purple-100 text-purple-900 font-medium" : "text-gray-700"}`}
+              >
+                {allLabel}
+              </button>
+            )}
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => handleSelect(opt)}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 ${value === opt ? "bg-purple-100 text-purple-900 font-medium" : "text-gray-700"}`}
+                >
+                  {opt}
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-3 text-sm text-gray-400 text-center italic">No matches found</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DashboardHeader({
   dashboardType,
@@ -76,11 +182,13 @@ export default function DashboardHeader({
     return new Date().toISOString().split('T')[0]
   }
 
+  const isAdmin = userRole === "admin" || userRole === "super_admin" || userRole === "div_admin";
+
   return (
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight text-purple-500">Dashboard</h1>
-        { (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
+        { isAdmin && (
           <div className="flex items-center gap-2 ml-auto mr-5">
             <div className="text-sm text-gray-600">Total Users</div>
             <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
@@ -96,7 +204,7 @@ export default function DashboardHeader({
       <div className="md:hidden">
         <div className="grid grid-cols-2 gap-2">
           {/* Date Range Filter */}
-          {(userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
+          {isAdmin && (
             <div className="relative">
               <button
                 onClick={() => setShowDateRangePicker(!showDateRangePicker)}
@@ -150,10 +258,8 @@ export default function DashboardHeader({
             </div>
           )}
 
-          {/* Removed internal dashboardType select as it's now a top-level module tab */}
-
           {/* Unit Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
+          {dashboardType === "checklist" && isAdmin && (
             <select
               value={unitFilter}
               onChange={(e) => setUnitFilter(e.target.value)}
@@ -170,52 +276,37 @@ export default function DashboardHeader({
             </select>
           )}
 
-          {/* Division Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
-            <select
+          {/* Division Filter - Searchable */}
+          {dashboardType === "checklist" && isAdmin && (
+            <SearchableDropdown
               value={divisionFilter}
-              onChange={(e) => setDivisionFilter(e.target.value)}
-              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
-            >
-              <option value="all">All Divisions</option>
-              {availableDivisions.map((div) => (
-                <option key={div} value={div}>
-                  {div}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setDivisionFilter(val)}
+              options={availableDivisions}
+              placeholder="divisions"
+              allLabel="All Divisions"
+            />
           )}
 
-          {/* Department Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
-            <select
+          {/* Department Filter - Searchable */}
+          {dashboardType === "checklist" && isAdmin && (
+            <SearchableDropdown
               value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
-            >
-              <option value="all">All Departments</option>
-              {availableDepartments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setDepartmentFilter(val)}
+              options={availableDepartments}
+              placeholder="departments"
+              allLabel="All Departments"
+            />
           )}
 
-          {/* Dashboard Staff Filter */}
-          {(userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") ? (
-            <select
+          {/* Dashboard Staff Filter - Searchable */}
+          {isAdmin ? (
+            <SearchableDropdown
               value={dashboardStaffFilter}
-              onChange={(e) => setDashboardStaffFilter(e.target.value)}
-              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm"
-            >
-              <option value="all">All Staff Members</option>
-              {availableStaff.map((staffName) => (
-                <option key={staffName} value={staffName}>
-                  {staffName}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setDashboardStaffFilter(val)}
+              options={(divisionFilter === "all" || departmentFilter === "all") ? [] : availableStaff}
+              placeholder="staff"
+              allLabel="All Staff Members"
+            />
           ) : (
             <select
               value={username || ""}
@@ -230,10 +321,10 @@ export default function DashboardHeader({
 
       {/* Desktop View - 3-column grid for admin, single row for users */}
       <div className="hidden md:block">
-        <div className={(userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") ? "grid grid-cols-3 gap-2" : "flex items-center gap-2 justify-end"}>
+        <div className={isAdmin ? "grid grid-cols-3 gap-2" : "flex items-center gap-2 justify-end"}>
           {/* Row 1 */}
           {/* Date Range Filter */}
-          {(userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
+          {isAdmin && (
             <div className="relative">
               <button
                 onClick={() => setShowDateRangePicker(!showDateRangePicker)}
@@ -292,10 +383,8 @@ export default function DashboardHeader({
             </div>
           )}
 
-          {/* Removed internal dashboardType select as it's now a top-level module tab */}
-
           {/* Unit Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
+          {dashboardType === "checklist" && isAdmin && (
             <select
               value={unitFilter}
               onChange={(e) => setUnitFilter(e.target.value)}
@@ -313,52 +402,37 @@ export default function DashboardHeader({
           )}
 
           {/* Row 2 */}
-          {/* Division Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
-            <select
+          {/* Division Filter - Searchable */}
+          {dashboardType === "checklist" && isAdmin && (
+            <SearchableDropdown
               value={divisionFilter}
-              onChange={(e) => setDivisionFilter(e.target.value)}
-              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-            >
-              <option value="all">All Divisions</option>
-              {availableDivisions.map((div) => (
-                <option key={div} value={div}>
-                  {div}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setDivisionFilter(val)}
+              options={availableDivisions}
+              placeholder="divisions"
+              allLabel="All Divisions"
+            />
           )}
 
-          {/* Department Filter - Only show for checklist */}
-          {dashboardType === "checklist" && (userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") && (
-            <select
+          {/* Department Filter - Searchable */}
+          {dashboardType === "checklist" && isAdmin && (
+            <SearchableDropdown
               value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-            >
-              <option value="all">All Departments</option>
-              {availableDepartments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setDepartmentFilter(val)}
+              options={availableDepartments}
+              placeholder="departments"
+              allLabel="All Departments"
+            />
           )}
 
-          {/* Dashboard Staff Filter */}
-          {(userRole === "admin" || userRole === "super_admin" || userRole === "div_admin") ? (
-            <select
+          {/* Dashboard Staff Filter - Searchable */}
+          {isAdmin ? (
+            <SearchableDropdown
               value={dashboardStaffFilter}
-              onChange={(e) => setDashboardStaffFilter(e.target.value)}
-              className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-            >
-              <option value="all">All Staff Members</option>
-              {availableStaff.map((staffName) => (
-                <option key={staffName} value={staffName}>
-                  {staffName}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setDashboardStaffFilter(val)}
+              options={(divisionFilter === "all" || departmentFilter === "all") ? [] : availableStaff}
+              placeholder="staff"
+              allLabel="All Staff Members"
+            />
           ) : (
             <select
               value={username || ""}

@@ -248,37 +248,37 @@ useEffect(()=>{
                     </div>
                     
                     {/* Task Description */}
-                    <p className="text-sm font-medium text-gray-900 mb-2">{task.task_description || "—"}</p>
+                    <p className="text-sm font-medium text-gray-900 mb-2">{task.task_description || "-"}</p>
                     
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       {/* Name */}
                       <div>
                         <span className="text-gray-500">Name:</span>{' '}
-                        <span className="font-medium">{task.name || "—"}</span>
+                        <span className="font-medium">{task.name || "-"}</span>
                       </div>
                       
                       {/* Department */}
                       <div>
                         <span className="text-gray-500">Dept:</span>{' '}
-                        <span className="font-medium">{task.department || "—"}</span>
+                        <span className="font-medium">{task.department || "-"}</span>
                       </div>
 
                       {/* Unit */}
                       <div>
                         <span className="text-gray-500">Unit:</span>{' '}
-                        <span className="font-medium">{task.unit || "—"}</span>
+                        <span className="font-medium">{task.unit || "-"}</span>
                       </div>
                       
                       {/* Division */}
                       <div>
                         <span className="text-gray-500">Div:</span>{' '}
-                        <span className="font-medium">{task.division || "—"}</span>
+                        <span className="font-medium">{task.division || "-"}</span>
                       </div>
                       
                       {/* Given By */}
                       <div>
                         <span className="text-gray-500">Given By:</span>{' '}
-                        <span className="font-medium">{task.given_by || "—"}</span>
+                        <span className="font-medium">{task.given_by || "-"}</span>
                       </div>
                       
                       {/* Start Date */}
@@ -296,13 +296,13 @@ useEffect(()=>{
                       {/* Reminder */}
                       <div>
                         <span className="text-gray-500">Reminder:</span>{' '}
-                        <span className="font-medium">{task.enable_reminder || "—"}</span>
+                        <span className="font-medium">{task.enable_reminder || "-"}</span>
                       </div>
                       
                       {/* Attachment */}
                       <div>
                         <span className="text-gray-500">Attachment:</span>{' '}
-                        <span className="font-medium">{task.require_attachment || "—"}</span>
+                        <span className="font-medium">{task.require_attachment || "-"}</span>
                       </div>
                     </div>
                     
@@ -342,15 +342,6 @@ useEffect(()=>{
                     TASK ID
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    DEPARTMENT
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    UNIT
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    DIVISION
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     GIVEN BY
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -360,10 +351,19 @@ useEffect(()=>{
                     TASK DESCRIPTION
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">
-                    TASK END DATE
+                    TASK START DATE
                   </th>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">
                     TASK END DATE
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    DEPARTMENT
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    UNIT
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    DIVISION
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     FREQ
@@ -390,36 +390,36 @@ useEffect(()=>{
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {formatDateTime(task.created_at) || "—"}
+                        {formatDateTime(task.created_at)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.task_id || "—"}
+                        {task.task_id || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.department || "—"}
+                        {task.given_by || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.unit || "—"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.division || "—"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.given_by || "—"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.name || "—"}
+                        {task.name || "-"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 min-w-[300px] max-w-[400px]">
                         <div className="whitespace-normal break-words">
-                          {task.task_description || "—"}
+                          {task.task_description || "-"}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
-                        {formatDateTime(task.task_start_date) || "—"}
+                        {formatDateTime(task.task_start_date)}
                       </td>
                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
-                        {formatDateTime(task.submission_date) || "—"}
+                        {formatDateTime(task.submission_date)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.department || "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.unit || "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.division || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className={`px-2 py-1 rounded-full text-xs ${
@@ -428,14 +428,14 @@ useEffect(()=>{
                           task.frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
-                          {task.frequency || "—"}
+                          {task.frequency || "-"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.enable_reminder || "—"}
+                        {task.enable_reminder || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {task.require_attachment|| "—"}
+                        {task.require_attachment|| "-"}
                       </td>
                     </tr>
                   ))

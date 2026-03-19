@@ -851,6 +851,18 @@ const filteredMaintenanceTasks = useMemo(() => {
 >
                 {/* Mobile Card View */}
                 <div className="sm:hidden space-y-3 p-3">
+                  {/* Mobile Select All */}
+                  {canModifyTasks && filteredChecklistTasks.length > 0 && (
+                    <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+                      <input
+                        type="checkbox"
+                        checked={selectedTasks.length === filteredChecklistTasks.length && filteredChecklistTasks.length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="text-xs font-medium text-purple-700">Select All ({filteredChecklistTasks.length})</span>
+                    </div>
+                  )}
                   {filteredChecklistTasks.length > 0 ? (
                     filteredChecklistTasks.map((task, index) => (
                       <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">

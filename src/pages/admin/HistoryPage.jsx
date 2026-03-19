@@ -808,6 +808,19 @@ function HistoryPage() {
               </div>
             ) : activeTab === "maintenance" ? (
               /* Maintenance Table */
+              <>
+              {/* Mobile Select All for Maintenance */}
+              {isSuperAdmin && (
+                <div className="sm:hidden flex items-center gap-2 p-2 mx-3 mt-2 bg-purple-50 border border-purple-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    onChange={(e) => handleSelectAllMaintenance(e.target.checked)}
+                    checked={selectedMaintenanceItems.length > 0 && selectedMaintenanceItems.length === pendingMaintenanceApprovalCount}
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                  />
+                  <span className="text-xs font-medium text-purple-700">Select All ({pendingMaintenanceApprovalCount})</span>
+                </div>
+              )}
               <table className="min-w-full divide-y divide-gray-200 mobile-card-table">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
@@ -984,8 +997,22 @@ function HistoryPage() {
                   )}
                 </tbody>
               </table>
+              </>
             ) : activeTab === "checklist" ? (
               /* Checklist Table */
+              <>
+              {/* Mobile Select All for Checklist */}
+              {isSuperAdmin && (
+                <div className="sm:hidden flex items-center gap-2 p-2 mx-3 mt-2 bg-purple-50 border border-purple-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    checked={selectedHistoryItems.length > 0 && selectedHistoryItems.length === pendingApprovalCount}
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                  />
+                  <span className="text-xs font-medium text-purple-700">Select All ({pendingApprovalCount})</span>
+                </div>
+              )}
               <table className="min-w-full divide-y divide-gray-200 mobile-card-table">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
@@ -1173,6 +1200,7 @@ function HistoryPage() {
                   )}
                 </tbody>
               </table>
+              </>
             ) : (
               /* Delegation Table */
               <table className="min-w-full divide-y divide-gray-200 mobile-card-table">
