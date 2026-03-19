@@ -168,11 +168,26 @@ export const fetchMachineParts = async () => {
 // =======================================================
 // 6️⃣ Fetch Unique Maintenance Tasks (QuickTask Dashboard)
 // =======================================================
+// =======================================================
+// 6️⃣ Fetch Unique Maintenance Tasks (QuickTask Dashboard)
+// =======================================================
 export const fetchUniqueMaintenanceData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "", userRole = "", userDept = "", userDiv = "", userName = "") => {
     const res = await fetch(`${BASE_URL}/unique`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv, userName }),
+    });
+    return res.json();
+};
+
+// =======================================================
+// 6b️⃣ Fetch Unique Maintenance Task Count
+// =======================================================
+export const fetchMaintenanceUniqueCountApi = async (userRole, userDept, userDiv, userName) => {
+    const res = await fetch(`${BASE_URL}/unique-count`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userRole, userDept, userDiv, userName }),
     });
     return res.json();
 };

@@ -290,7 +290,7 @@ useEffect(()=>{
                       {/* End Date */}
                       <div>
                         <span className="text-gray-500">End:</span>{' '}
-                        <span className="font-medium">{formatDateTime(task.submission_date)}</span>
+                        <span className="font-medium">{formatDateTime(task.planned_date)}</span>
                       </div>
                       
                       {/* Reminder */}
@@ -354,7 +354,7 @@ useEffect(()=>{
                     TASK START DATE
                   </th>
                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">
-                    TASK END DATE
+                    PLANNED DATE
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     DEPARTMENT
@@ -410,7 +410,7 @@ useEffect(()=>{
                         {formatDateTime(task.task_start_date)}
                       </td>
                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-yellow-50">
-                        {formatDateTime(task.submission_date)}
+                        {formatDateTime(task.planned_date)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {task.department || "-"}

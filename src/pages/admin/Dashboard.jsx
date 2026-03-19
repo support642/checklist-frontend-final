@@ -278,7 +278,9 @@ useEffect(() => {
           return null;
         }
 
-        const taskStartDate = parseTaskStartDate(task.task_start_date);
+        // For delegation use planned_date, for checklist use task_start_date
+        const dateField = dashboardType === "delegation" ? task.planned_date : task.task_start_date;
+        const taskStartDate = parseTaskStartDate(dateField);
         const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null;
 
         let status = "pending";
@@ -399,7 +401,9 @@ useEffect(() => {
       end.setHours(23, 59, 59, 999);
 
       const filteredData = data.filter(task => {
-        const taskDate = parseTaskStartDate(task.task_start_date);
+        // For delegation use planned_date, for checklist use task_start_date
+        const dateField = dashboardType === "delegation" ? task.planned_date : task.task_start_date;
+        const taskDate = parseTaskStartDate(dateField);
         return taskDate && taskDate >= start && taskDate <= end;
       });
 
@@ -411,7 +415,9 @@ useEffect(() => {
       let notDoneTasks = 0;
 
       filteredData.forEach(task => {
-        const taskDate = parseTaskStartDate(task.task_start_date);
+        // For delegation use planned_date, for checklist use task_start_date
+        const dateField = dashboardType === "delegation" ? task.planned_date : task.task_start_date;
+        const taskDate = parseTaskStartDate(dateField);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -696,8 +702,9 @@ useEffect(() => {
             return null;
           }
 
-          // FIXED: Use correct field name from your Supabase data
-          const taskStartDate = parseTaskStartDate(task.task_start_date);
+          // For delegation use planned_date, for checklist use task_start_date
+          const dateField = dashboardType === "delegation" ? task.planned_date : task.task_start_date;
+          const taskStartDate = parseTaskStartDate(dateField);
           const completionDate = task.submission_date ? parseTaskStartDate(task.submission_date) : null;
 
           let status = "pending";

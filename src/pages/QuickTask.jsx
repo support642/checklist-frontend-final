@@ -7,7 +7,17 @@ import { hasPageAccess, canAccessModule, hasModifyAccess } from "../utils/permis
 import DelegationPage from "./delegation-data";
 import MaintenanceQuickTaskPage from "./maintenance-quick-task";
 import { useDispatch, useSelector } from "react-redux";
-import { deleteChecklistTask, uniqueChecklistTaskData, uniqueDelegationTaskData, updateChecklistTask, fetchUsers, resetChecklistPagination, resetDelegationPagination  } from "../redux/slice/quickTaskSlice";
+import { 
+  deleteChecklistTask, 
+  uniqueChecklistTaskData, 
+  uniqueDelegationTaskData, 
+  updateChecklistTask, 
+  fetchUsers, 
+  resetChecklistPagination, 
+  resetDelegationPagination,
+  fetchQuickTaskCounts
+} from "../redux/slice/quickTaskSlice";
+import { fetchMaintenanceCounts } from "../redux/slice/maintenanceSlice";
 
 
 export default function QuickTask() {
@@ -45,9 +55,11 @@ export default function QuickTask() {
     checklistTotal,
     checklistHasMore,
     delegationPage,
-    delegationHasMore
+    delegationHasMore,
+    discreteChecklistTotal,
+    discreteDelegationTotal
   } = useSelector((state) => state.quickTask);
-  const { uniqueMaintenanceTasks, uniqueMaintenanceTotal } = useSelector((state) => state.maintenance);
+  const { uniqueMaintenanceTasks, uniqueMaintenanceTotal, discreteMaintenanceTotal } = useSelector((state) => state.maintenance);
   const { userData: currentUser } = useSelector((state) => state.login);
   const dispatch = useDispatch();
 
@@ -74,17 +86,26 @@ export default function QuickTask() {
 useEffect(() => {
   dispatch(fetchUsers());
   if (userRole) {
+    const params = {
+      userRole,
+      userDept,
+      userDiv,
+      userName: loginUserData.user_name
+    };
+    
+    // Fetch initial data
     dispatch(resetChecklistPagination());
     dispatch(uniqueChecklistTaskData({ 
       page: 0, 
       pageSize: 50, 
       nameFilter: '', 
       freqFilter: '',
-      userRole,
-      userDept,
-      userDiv,
-      userName: loginUserData.user_name
+      ...params
     }));
+
+    // Fetch discrete counts for header
+    dispatch(fetchQuickTaskCounts(params));
+    dispatch(fetchMaintenanceCounts(params));
   }
 }, [dispatch, userRole, userDept, userDiv, loginUserData.user_name]);
 
@@ -133,6 +154,20 @@ useEffect(() => {
     return () => container.removeEventListener('scroll', handleScroll);
   }
 }, [handleScroll]);
+
+  // Helper to refresh discrete counts
+  const refreshCounts = useCallback(() => {
+    if (userRole) {
+      const params = {
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
+      };
+      dispatch(fetchQuickTaskCounts(params));
+      dispatch(fetchMaintenanceCounts(params));
+    }
+  }, [dispatch, userRole, userDept, userDiv, loginUserData.user_name]);
 
   // const userRole = localStorage.getItem("role");
   const canModifyTasks = hasModifyAccess("quick_task");
@@ -191,8 +226,11 @@ useEffect(() => {
         append: false,
         userRole,
         userDept,
-        userDiv
+        userDiv,
+        userName: loginUserData.user_name
       }));
+
+      refreshCounts();
 
     } catch (error) {
       console.error("Failed to update task:", error);
@@ -246,8 +284,11 @@ useEffect(() => {
         append: false,
         userRole,
         userDept,
-        userDiv
+        userDiv,
+        userName: loginUserData.user_name
       }));
+
+      refreshCounts();
 
     } catch (error) {
       console.error("Failed to delete tasks:", error);
@@ -437,51 +478,61 @@ const allNames = [
   const allFrequencies = ['daily', 'weekly', 'monthly', 'quarterly', 'half-yearly', 'yearly'];
 
 
-const filteredChecklistTasks = quickTask.filter(task => {
-  const freqFilterPass = !freqFilter || task.frequency === freqFilter;
-  const searchTermPass = !searchTerm || task.task_description
-    ?.toLowerCase()
-    .includes(searchTerm.toLowerCase());
-    
-  return freqFilterPass && searchTermPass;
-}).sort((a, b) => {
-  // Automatic priority sorting based on role
-  if (!sortConfig.key) {
-    const role = userRole?.toLowerCase();
-    const targetDept = userDept?.toLowerCase()?.trim();
-    const targetDiv = userDiv?.toLowerCase()?.trim();
+const filteredChecklistTasks = useMemo(() => {
+  const role = userRole?.toLowerCase();
+  const targetDept = loginUserData?.department?.toLowerCase()?.trim() || loginUserData?.user_access?.toLowerCase()?.trim();
+  const targetDiv = loginUserData?.division?.toLowerCase()?.trim();
+  const targetName = loginUserData?.user_name?.toLowerCase()?.trim();
 
+  let filtered = quickTask.filter(task => {
+    // 1. Role-based restrictions
     if (role === 'admin') {
-      const aMatch = a.department?.toLowerCase()?.trim() === targetDept;
-      const bMatch = b.department?.toLowerCase()?.trim() === targetDept;
-      if (aMatch && !bMatch) return -1;
-      if (!aMatch && bMatch) return 1;
+      if (task.division?.toLowerCase()?.trim() !== targetDiv || task.department?.toLowerCase()?.trim() !== targetDept) return false;
     } else if (role === 'div_admin') {
-      const aDivMatch = a.division?.toLowerCase()?.trim() === targetDiv;
-      const bDivMatch = b.division?.toLowerCase()?.trim() === targetDiv;
-      if (aDivMatch && !bDivMatch) return -1;
-      if (!aDivMatch && bDivMatch) return 1;
-      
-      const aDeptMatch = a.department?.toLowerCase()?.trim() === targetDept;
-      const bDeptMatch = b.department?.toLowerCase()?.trim() === targetDept;
-      if (aDeptMatch && !bDeptMatch) return -1;
-      if (!aDeptMatch && bDeptMatch) return 1;
+      if (task.division?.toLowerCase()?.trim() !== targetDiv) return false;
+    } else if (role === 'user') {
+      if (task.name?.toLowerCase()?.trim() !== targetName) return false;
     }
-    return 0;
-  }
 
-  // Manual sorting (overrides automatic)
-  if (a[sortConfig.key] < b[sortConfig.key]) {
-    return sortConfig.direction === 'asc' ? -1 : 1;
-  }
-  if (a[sortConfig.key] > b[sortConfig.key]) {
-    return sortConfig.direction === 'asc' ? 1 : -1;
-  }
-  return 0;
-});
+    // 2. Search and Frequency filters
+    const freqFilterPass = !freqFilter || task.frequency === freqFilter;
+    const searchTermPass = !searchTerm || task.task_description
+      ?.toLowerCase()
+      .includes(searchTerm.toLowerCase());
+      
+    return freqFilterPass && searchTermPass;
+  });
+
+  // 3. Sorting
+  return filtered.sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+}, [quickTask, userRole, loginUserData, freqFilter, searchTerm, sortConfig]);
 
 const filteredDelegationTasks = useMemo(() => {
+  const role = userRole?.toLowerCase();
+  const targetDept = loginUserData?.department?.toLowerCase()?.trim() || loginUserData?.user_access?.toLowerCase()?.trim();
+  const targetDiv = loginUserData?.division?.toLowerCase()?.trim();
+  const targetName = loginUserData?.user_name?.toLowerCase()?.trim();
+
   let filtered = [...(delegationTasks || [])];
+
+  // 1. Role-based restrictions
+  filtered = filtered.filter(task => {
+    if (role === 'admin') {
+      return task.division?.toLowerCase()?.trim() === targetDiv && task.department?.toLowerCase()?.trim() === targetDept;
+    } else if (role === 'div_admin') {
+      return task.division?.toLowerCase()?.trim() === targetDiv;
+    } else if (role === 'user') {
+      return task.name?.toLowerCase()?.trim() === targetName;
+    }
+    return true; // super_admin
+  });
+
+  // 2. Search, Name, and Frequency filters
   if (searchTerm) {
     filtered = filtered.filter(task =>
       task.task_description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -494,10 +545,29 @@ const filteredDelegationTasks = useMemo(() => {
     filtered = filtered.filter(task => task.frequency === freqFilter);
   }
   return filtered;
-}, [delegationTasks, searchTerm, nameFilter, freqFilter]);
+}, [delegationTasks, userRole, loginUserData, searchTerm, nameFilter, freqFilter]);
 
 const filteredMaintenanceTasks = useMemo(() => {
+  const role = userRole?.toLowerCase();
+  const targetDept = loginUserData?.department?.toLowerCase()?.trim() || loginUserData?.user_access?.toLowerCase()?.trim();
+  const targetDiv = loginUserData?.division?.toLowerCase()?.trim();
+  const targetName = loginUserData?.user_name?.toLowerCase()?.trim();
+
   let filtered = [...(uniqueMaintenanceTasks || [])];
+
+  // 1. Role-based restrictions
+  filtered = filtered.filter(task => {
+    if (role === 'admin') {
+      return task.division?.toLowerCase()?.trim() === targetDiv && task.department?.toLowerCase()?.trim() === targetDept;
+    } else if (role === 'div_admin') {
+      return task.division?.toLowerCase()?.trim() === targetDiv;
+    } else if (role === 'user') {
+      return task.name?.toLowerCase()?.trim() === targetName;
+    }
+    return true; // super_admin
+  });
+
+  // 2. Search, Name, and Frequency filters
   if (searchTerm) {
     filtered = filtered.filter(task =>
       task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -511,11 +581,8 @@ const filteredMaintenanceTasks = useMemo(() => {
   if (freqFilter) {
     filtered = filtered.filter(task => task.frequency === freqFilter);
   }
-  if (userRole?.toLowerCase() === 'user' && loginUserData?.user_name) {
-    filtered = filtered.filter(task => task.name?.toLowerCase()?.trim() === loginUserData.user_name.toLowerCase().trim());
-  }
   return filtered;
-}, [uniqueMaintenanceTasks, searchTerm, nameFilter, freqFilter, userRole, loginUserData]);
+}, [uniqueMaintenanceTasks, userRole, loginUserData, searchTerm, nameFilter, freqFilter]);
 
   function formatTimestampToDDMMYYYY(timestamp) {
     if (!timestamp || timestamp === "" || timestamp === null) {
@@ -562,15 +629,20 @@ const filteredMaintenanceTasks = useMemo(() => {
 
   // Calculate the last task date based on task_start_date and frequency
   function calculateLastTaskDate(task) {
-    if (!task || !task.task_start_date) return "—";
+    if (!task) return "—";
     
-    // If task has no frequency or is a one-time task, return start date
+    // Use planned_date if available
+    if (task.planned_date) {
+      return formatTimestampToDDMMYYYY(task.planned_date);
+    }
+
+    if (!task.task_start_date) return "—";
+    
+    // Fallback if no planned_date
     if (!task.frequency || task.frequency.toLowerCase() === 'once') {
       return formatTimestampToDDMMYYYY(task.task_start_date);
     }
 
-    // For now, return a dash - this would ideally query the max task_start_date
-    // from all tasks with same description, name, and department
     return "—";
   }
 
@@ -584,10 +656,13 @@ const filteredMaintenanceTasks = useMemo(() => {
             </h1>
             <p className="text-purple-600 text-sm">
               {activeTab === 'checklist'
-                ? `Showing ${checklistTotal} checklist tasks`
+                // ? `Showing ${filteredChecklistTasks.length} of ${discreteChecklistTotal} checklist tasks`
+                ? `Showing ${discreteChecklistTotal} checklist tasks`
                 : activeTab === 'delegation' 
-                  ? `Showing ${delegationTotal} delegation tasks` 
-                  : `Showing ${uniqueMaintenanceTotal} maintenance tasks`}
+                  // ? `Showing ${filteredDelegationTasks.length} of ${discreteDelegationTotal} delegation tasks` 
+                  // : `Showing ${filteredMaintenanceTasks.length} of ${discreteMaintenanceTotal} maintenance tasks`}
+                  ? `Showing ${discreteDelegationTotal} delegation tasks` 
+                  : `Showing ${discreteMaintenanceTotal} maintenance tasks`}
             </p>
           </div>
 
@@ -1008,6 +1083,12 @@ const filteredMaintenanceTasks = useMemo(() => {
                             <span className="text-gray-500">Start:</span>{' '}
                             <span className="font-medium">{formatTimestampToDDMMYYYY(task.task_start_date)}</span>
                           </div>
+
+                          {/* End Date (Planned Date) */}
+                          <div>
+                            <span className="text-gray-500">End:</span>{' '}
+                            <span className="font-medium">{formatTimestampToDDMMYYYY(task.planned_date)}</span>
+                          </div>
                           
                           {/* Reminder */}
                           <div>
@@ -1077,7 +1158,7 @@ const filteredMaintenanceTasks = useMemo(() => {
                         { key: 'name', label: 'Name' },
                         { key: 'task_description', label: 'Task Description', minWidth: 'whitespace-nowrap' },
                         { key: 'task_start_date', label: 'Start Date', bg: 'bg-yellow-50' },
-                        { key: 'submission_date', label: 'End Date', bg: 'bg-yellow-50' },
+                        { key: 'task_end_date', label: 'End Date', bg: 'bg-yellow-50' },
                         { key: 'frequency', label: 'Frequency' },
                         { key: 'enable_reminder', label: 'Reminders' },
                         { key: 'require_attachment', label: 'Attachment' },

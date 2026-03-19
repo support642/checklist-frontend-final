@@ -76,3 +76,15 @@ export const fetchUsersData = async () => {
   const res = await fetch(`${API_BASE}/tasks/users`);
   return res.json();
 };
+
+// =========================
+// FETCH UNIQUE TASK COUNTS
+// =========================
+export const fetchQuickTaskCountsApi = async (userRole, userDept, userDiv, userName) => {
+  const res = await fetch(`${API_BASE}/tasks/counts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userRole, userDept, userDiv, userName }),
+  });
+  return res.json();
+};

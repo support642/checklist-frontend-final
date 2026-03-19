@@ -385,6 +385,12 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
                         <span className="text-gray-500">Status:</span>{' '}
                         <span className="font-medium">{task.status || "—"}</span>
                       </div>
+
+                      {/* Planned Date */}
+                      <div>
+                        <span className="text-gray-500">Planned:</span>{' '}
+                        <span className="font-medium">{task.planned_date ? new Date(task.planned_date).toLocaleDateString() : '—'}</span>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -418,6 +424,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
                     { key: 'given_by', label: 'Assign From' },
                     { key: 'name', label: 'Name' },
                     { key: 'planned_date', label: 'Planned Date' },
+                    { key: 'task_start_date', label: 'Start Date' },
                     { key: 'frequency', label: 'Frequency' },
                     { key: 'duration', label: 'Duration' },
                     { key: 'status', label: 'Status' },
@@ -508,6 +515,11 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
                         {editingTaskId === task.task_id ? (
                           <input type="text" value={editFormData.name} onChange={(e) => handleInputChange('name', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
                         ) : (task.name || "—")}
+                      </td>
+
+                       {/* Planned Date */}
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                        {task.planned_date ? new Date(task.planned_date).toLocaleDateString() : '—'}
                       </td>
 
                       {/* Working Day (Task Start Date) */}

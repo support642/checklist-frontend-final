@@ -5,7 +5,8 @@ import {
   fetchChecklistData, 
   fetchDelegationData,
   fetchUsersData,
-  updateChecklistTaskApi  // ← Make sure this is imported
+  updateChecklistTaskApi,
+  fetchQuickTaskCountsApi
 } from "../api/quickTaskApi";
 
 
@@ -71,6 +72,13 @@ export const updateChecklistTask = createAsyncThunk(
   }
 );
 
+export const fetchQuickTaskCounts = createAsyncThunk(
+  'fetch/quickTaskCounts',
+  async ({ userRole, userDept, userDiv, userName }) => {
+    return await fetchQuickTaskCountsApi(userRole, userDept, userDiv, userName);
+  }
+);
+
 const quickTaskSlice = createSlice({
   name: 'quickTask',
   initialState: {
@@ -85,6 +93,9 @@ const quickTaskSlice = createSlice({
     delegationPage: 0,
     delegationTotal: 0,
     delegationHasMore: true,
+    // Discrete counts for header summary
+    discreteChecklistTotal: 0,
+    discreteDelegationTotal: 0,
   },
   reducers: {
     resetChecklistPagination: (state) => {
@@ -212,6 +223,11 @@ const quickTaskSlice = createSlice({
       .addCase(updateChecklistTask.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      // FETCH QUICKTASK COUNTS
+      .addCase(fetchQuickTaskCounts.fulfilled, (state, action) => {
+        state.discreteChecklistTotal = action.payload.checklistCount;
+        state.discreteDelegationTotal = action.payload.delegationCount;
       });
   },
 });

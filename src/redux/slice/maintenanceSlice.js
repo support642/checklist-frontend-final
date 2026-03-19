@@ -7,7 +7,8 @@ import {
     fetchUniqueMaintenanceData,
     deleteUniqueMaintenanceTasksApi,
     updateUniqueMaintenanceTaskApi,
-    fetchMachineParts
+    fetchMachineParts,
+    fetchMaintenanceUniqueCountApi
 } from "../api/maintenanceApi";
 
 // ============================================================
@@ -96,6 +97,13 @@ export const updateUniqueMaintenanceTask = createAsyncThunk(
     }
 );
 
+export const fetchMaintenanceCounts = createAsyncThunk(
+    "fetch/maintenanceCounts",
+    async ({ userRole, userDept, userDiv, userName }) => {
+        return await fetchMaintenanceUniqueCountApi(userRole, userDept, userDiv, userName);
+    }
+);
+
 // ============================================================
 // 8️⃣ FETCH MACHINE PARTS (master table)
 // ============================================================
@@ -125,6 +133,8 @@ const maintenanceSlice = createSlice({
         historyApprovedCount: 0,
         uniqueMaintenancePage: 0,
         uniqueMaintenanceTotal: 0,
+        // Discrete count for header summary
+        discreteMaintenanceTotal: 0,
         uniqueMaintenanceHasMore: true,
     },
 
@@ -291,6 +301,13 @@ const maintenanceSlice = createSlice({
             .addCase(updateUniqueMaintenanceTask.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+
+            // -----------------------------
+            // FETCH MAINTENANCE COUNTS
+            // -----------------------------
+            .addCase(fetchMaintenanceCounts.fulfilled, (state, action) => {
+                state.discreteMaintenanceTotal = action.payload.total;
             })
 
             // -----------------------------
