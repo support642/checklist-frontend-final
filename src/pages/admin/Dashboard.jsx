@@ -29,6 +29,7 @@ import {
 import { fetchDepartmentDataApi } from "../../redux/api/settingApi.js"
 import MaintenanceView from "../../components/Maintenance/MaintenanceView.jsx"
 import { fetchDelegationDataSortByDate } from "../../redux/api/delegationApi.js"
+import { fetchUserProfile } from "../../redux/slice/userProfileSlice.js"
 
 export default function AdminDashboard() {
   const [dashboardType, setDashboardType] = useState(() => {
@@ -97,29 +98,47 @@ export default function AdminDashboard() {
   })
 
   const { dashboard, totalTask, completeTask, pendingTask, overdueTask } = useSelector((state) => state.dashBoard)
+  const { profile } = useSelector((state) => state.userProfile)
   const dispatch = useDispatch()
 
-useEffect(() => {
-  const role = localStorage.getItem("role");
-  const username = localStorage.getItem("user-name");
-
-  // Check if user has admin dashboard access. If not, restrict to their own name.
-  if (!hasPageAccess("dashboard_admin")) {
-    setDashboardStaffFilter(username);
-    setFilterStaff(username);
-    setDepartmentFilter("all");        // user cannot filter department
-    setUnitFilter("all");
-    setDivisionFilter("all");
-  }
-
-  // DIV_ADMIN: Default division filter to their own division on mount
-  if (role === "div_admin") {
-    const userDivision = localStorage.getItem("division");
-    if (userDivision) {
-      setDivisionFilter(userDivision);
+  useEffect(() => {
+    if (username) {
+      dispatch(fetchUserProfile(username));
     }
-  }
-}, []);
+  }, [dispatch, username]);
+
+  useEffect(() => {
+    const role = localStorage.getItem("role");
+    const uname = localStorage.getItem("user-name");
+
+    // Check if user has admin dashboard access. If not, restrict to their own name.
+    if (!hasPageAccess("dashboard_admin")) {
+      setDashboardStaffFilter(uname);
+      setFilterStaff(uname);
+      setDepartmentFilter("all");        // user cannot filter department
+      setUnitFilter("all");
+      setDivisionFilter("all");
+    }
+  }, []);
+
+  // Role-based filter pre-filling based on user profile
+  useEffect(() => {
+    if (profile) {
+      if (userRole === "admin") {
+        if (profile.division) {
+          setDivisionFilter(profile.division);
+        }
+        // Only pre-fill department if it's a single value (not a comma-separated list)
+        if (profile.department && !profile.department.includes(",")) {
+          setDepartmentFilter(profile.department);
+        }
+      } else if (userRole === "div_admin") {
+        if (profile.division) {
+          setDivisionFilter(profile.division);
+        }
+      }
+    }
+  }, [profile, userRole]);
 
 // Tab visibility fallback logic
 useEffect(() => {
