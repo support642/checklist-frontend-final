@@ -91,11 +91,9 @@ export const getDashboardDataCount = async (dashboardType, staffFilter = "all", 
     const url = `${BASE_URL}/count?${params.toString()}`;
     const res = await fetch(url);
 
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
-
-    return await res.json();
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return typeof data === 'number' ? data : 0;
 
   } catch (err) {
     console.error("Dashboard Count Error:", err);
@@ -118,7 +116,9 @@ export const countTotalTaskApi = async (dashboardType, staffFilter = "all", depa
   const url = `${BASE_URL}/total?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`;
 
   const res = await fetch(url);
-  return res.json();
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return typeof data === 'number' ? data : 0;
 };
 
 export const countCompleteTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
@@ -133,7 +133,9 @@ export const countCompleteTaskApi = async (dashboardType, staffFilter = "all", d
   const url = `${BASE_URL}/completed?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`;
 
   const res = await fetch(url);
-  return res.json();
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return typeof data === 'number' ? data : 0;
 };
 
 export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
@@ -148,7 +150,9 @@ export const countPendingOrDelayTaskApi = async (dashboardType, staffFilter = "a
   const url = `${BASE_URL}/pending?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`;
 
   const res = await fetch(url);
-  return res.json();
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return typeof data === 'number' ? data : 0;
 };
 
 export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter = "all", departmentFilter = "all", unitFilter = "all", divisionFilter = "all") => {
@@ -165,7 +169,9 @@ export const countOverDueORExtendedTaskApi = async (dashboardType, staffFilter =
   const url = `${BASE_URL}/overdue?dashboardType=${dashboardType}&staffFilter=${staffFilter}&departmentFilter=${departmentFilter}&unitFilter=${unitFilter}&divisionFilter=${divisionFilter}${commonParams}`;
 
   const res = await fetch(url);
-  return res.json();
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return typeof data === 'number' ? data : 0;
 };
 
 // ---------------------------------------------------------------------
@@ -255,7 +261,9 @@ export const getStaffTasksCountApi = async (dashboardType, staffFilter = "all") 
   const res = await fetch(
     `${BASE_URL1}/count?dashboardType=${dashboardType}&staffFilter=${staffFilter}&role=${role}&username=${username}&unit=${unit}&division=${division}&department=${department}`
   );
-  return res.json();
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return typeof data === 'number' ? data : 0;
 };
 
 // dashboardApi.js - Add this function

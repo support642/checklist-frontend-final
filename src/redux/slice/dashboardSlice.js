@@ -5,7 +5,8 @@ import {
   countPendingOrDelayTaskApi,
   countTotalTaskApi,
   fetchDashboardDataApi,
-  countNotDoneTaskApi
+  countNotDoneTaskApi,
+  getDashboardDataCount
 } from "../api/dashboardApi";
 
 // Dashboard data thunk
@@ -113,6 +114,45 @@ export const overdueTaskInTable = createAsyncThunk(
     }
   }
 )
+
+export const pendingTodayInTable = createAsyncThunk(
+  "dashboard/pendingTodayInTable",
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+    try {
+      const response = await getDashboardDataCount(dashboardType, staffFilter, "recent", departmentFilter, unitFilter, divisionFilter)
+      return response
+    } catch (error) {
+      console.error("Error fetching pending today tasks:", error)
+      throw error
+    }
+  }
+)
+
+export const pendingUpcomingInTable = createAsyncThunk(
+  "dashboard/pendingUpcomingInTable",
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+    try {
+      const response = await getDashboardDataCount(dashboardType, staffFilter, "upcoming", departmentFilter, unitFilter, divisionFilter)
+      return response
+    } catch (error) {
+      console.error("Error fetching pending upcoming tasks:", error)
+      throw error
+    }
+  }
+)
+
+export const pendingOverdueInTable = createAsyncThunk(
+  "dashboard/pendingOverdueInTable",
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+    try {
+      const response = await getDashboardDataCount(dashboardType, staffFilter, "overdue", departmentFilter, unitFilter, divisionFilter)
+      return response
+    } catch (error) {
+      console.error("Error fetching pending overdue tasks:", error)
+      throw error
+    }
+  }
+)
 const dashboardSlice = createSlice({
   name: 'dashBoard',
   initialState: {
@@ -122,6 +162,9 @@ const dashboardSlice = createSlice({
     notDoneTask: 0,   // <-- ADD THIS
     pendingTask: 0,
     overdueTask: 0,
+    pendingToday: 0,
+    pendingUpcoming: 0,
+    pendingOverdue: 0,
     error: null,
     loading: false,
   },
@@ -133,6 +176,9 @@ const dashboardSlice = createSlice({
       state.completeTask = 0;
       state.pendingTask = 0;
       state.overdueTask = 0;
+      state.pendingToday = 0;
+      state.pendingUpcoming = 0;
+      state.pendingOverdue = 0;
       state.error = null;
       state.loading = false;
     },
@@ -225,6 +271,18 @@ const dashboardSlice = createSlice({
       .addCase(overdueTaskInTable.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error?.message || 'Failed to fetch overdue tasks';
+      })
+      // Pending Today cases
+      .addCase(pendingTodayInTable.fulfilled, (state, action) => {
+        state.pendingToday = action.payload || 0;
+      })
+      // Pending Upcoming cases
+      .addCase(pendingUpcomingInTable.fulfilled, (state, action) => {
+        state.pendingUpcoming = action.payload || 0;
+      })
+      // Pending Overdue cases
+      .addCase(pendingOverdueInTable.fulfilled, (state, action) => {
+        state.pendingOverdue = action.payload || 0;
       });
   },
 });

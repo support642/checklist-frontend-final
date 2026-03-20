@@ -13,11 +13,14 @@ import TasksOverviewChart from "./dashboard/Chart/TaskOverviewChart.jsx"
 import TasksCompletionChart from "./dashboard/Chart/TaskCompletionChart.jsx"
 import StaffTasksTable from "./dashboard/StaffTaskTable.jsx"
 import {
-  completeTaskInTable,
-  overdueTaskInTable,
-  pendingTaskInTable,
   totalTaskInTable,
-  notDoneTaskInTable
+  completeTaskInTable,
+  pendingTaskInTable,
+  overdueTaskInTable,
+  notDoneTaskInTable,
+  pendingTodayInTable,
+  pendingUpcomingInTable,
+  pendingOverdueInTable
 } from "../../redux/slice/dashboardSlice.js"
 import {
   fetchDashboardDataApi,
@@ -79,6 +82,9 @@ export default function AdminDashboard() {
     completedRatingOne: 0,
     completedRatingTwo: 0,
     completedRatingThreePlus: 0,
+    pendingToday: 0,
+    pendingUpcoming: 0,
+    pendingOverdue: 0,
   })
 
   // New state for date range filtering
@@ -95,9 +101,24 @@ export default function AdminDashboard() {
     pendingTasks: 0,
     overdueTasks: 0,
     completionRate: 0,
+    pendingToday: 0,
+    pendingUpcoming: 0,
+    pendingOverdue: 0,
+    completedRatingOne: 0,
+    completedRatingTwo: 0,
+    completedRatingThreePlus: 0,
   })
 
-  const { dashboard, totalTask, completeTask, pendingTask, overdueTask } = useSelector((state) => state.dashBoard)
+  const { 
+    dashboard, 
+    totalTask, 
+    completeTask, 
+    pendingTask, 
+    overdueTask,
+    pendingToday,
+    pendingUpcoming,
+    pendingOverdue
+  } = useSelector((state) => state.dashBoard)
   const { profile } = useSelector((state) => state.userProfile)
   const dispatch = useDispatch()
 
@@ -386,6 +407,12 @@ useEffect(() => {
       pendingTasks: finalStats.pendingTasks,
       overdueTasks: finalStats.overdueTasks,
       completionRate: finalStats.completionRate,
+      pendingToday: dashboardType === "delegation" ? (finalStats.pendingToday || 0) : 0,
+      pendingUpcoming: dashboardType === "delegation" ? (finalStats.pendingUpcoming || 0) : 0,
+      pendingOverdue: dashboardType === "delegation" ? (finalStats.pendingOverdue || 0) : 0,
+      completedRatingOne: finalStats.completedRatingOne || 0,
+      completedRatingTwo: finalStats.completedRatingTwo || 0,
+      completedRatingThreePlus: finalStats.completedRatingThreePlus || 0,
     });
   };
 
@@ -413,11 +440,18 @@ useEffect(() => {
       let pendingTasks = 0;
       let overdueTasks = 0;
       let notDoneTasks = 0;
+      let pendingToday = 0;
+      let pendingUpcoming = 0;
+      let pendingOverdue = 0;
+      let completedRatingOne = 0;
+      let completedRatingTwo = 0;
+      let completedRatingThreePlus = 0;
 
       filteredData.forEach(task => {
         // For delegation use planned_date, for checklist use task_start_date
         const dateField = dashboardType === "delegation" ? task.planned_date : task.task_start_date;
-        const taskDate = parseTaskStartDate(dateField);
+        const taskStartDate = parseTaskStartDate(dateField);
+        const taskDate = taskStartDate; // Alias for compatibility with existing code Below
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -439,16 +473,25 @@ useEffect(() => {
           }
         } else {
           // Delegation logic: if submission date exists, it's completed no matter the planned_date
-          if (task.submission_date) {
-            completedTasks++;
-            // Also ensure it is counted as a total task, since we included it
-            if (!filteredData.some(t => t.task_id === task.task_id)) totalTasks++; 
-          } else {
-            pendingTasks++;
-            if (taskDate && taskDate < today) {
-              overdueTasks++;
+            if (task.submission_date) {
+              completedTasks++;
+              // Also ensure it is counted as a total task, since we included it
+              if (!filteredData.some(t => t.task_id === task.task_id)) totalTasks++; 
+              
+              if (task.color_code_for === 1) completedRatingOne++;
+              else if (task.color_code_for === 2) completedRatingTwo++;
+              else if (task.color_code_for >= 3) completedRatingThreePlus++;
+            } else {
+              pendingTasks++;
+              if (taskDate && taskDate < today) {
+                overdueTasks++;
+                if (dashboardType === "delegation") pendingOverdue++;
+              } else if (taskDate && isDateToday(taskDate)) {
+                if (dashboardType === "delegation") pendingToday++;
+              } else if (taskDate && taskDate > today) {
+                if (dashboardType === "delegation") pendingUpcoming++;
+              }
             }
-          }
           // For delegation, not done is simply pending tasks
           notDoneTasks = pendingTasks;
         }
@@ -460,7 +503,13 @@ useEffect(() => {
         pendingTasks,
         overdueTasks,
         notDoneTasks,
-        completionRate: totalTasks > 0 ? (completedTasks / totalTasks * 100) : 0
+        completionRate: totalTasks > 0 ? (completedTasks / totalTasks * 100) : 0,
+        pendingToday,
+        pendingUpcoming,
+        pendingOverdue,
+        completedRatingOne,
+        completedRatingTwo,
+        completedRatingThreePlus,
       };
 
       processFilteredData(filteredData, stats);
@@ -614,6 +663,9 @@ useEffect(() => {
       let completedRatingOne = 0
       let completedRatingTwo = 0
       let completedRatingThreePlus = 0
+      let pendingToday = 0
+      let pendingUpcoming = 0
+      let pendingOverdue = 0
 
       const monthlyData = {
         Jan: { completed: 0, pending: 0 },
@@ -726,14 +778,21 @@ useEffect(() => {
           if (shouldCountForCards) {
             if (status === "completed") {
               completedTasks++;
-              if (dashboardType === "delegation" && task.submission_date) {
-                if (task.color_code_for === 1) completedRatingOne++;
-                else if (task.color_code_for === 2) completedRatingTwo++;
-                else if (task.color_code_for >= 3) completedRatingThreePlus++;
-              }
+              // Count ratings for all modules if they have the field
+              const rating = Number(task.color_code_for || 0);
+              if (rating === 1) completedRatingOne++;
+              else if (rating === 2) completedRatingTwo++;
+              else if (rating >= 3) completedRatingThreePlus++;
             } else {
               pendingTasks++;
-              if (status === "overdue") overdueTasks++;
+              if (status === "overdue") {
+                overdueTasks++;
+                pendingOverdue++;
+              } else if (taskStartDate && isDateToday(taskStartDate)) {
+                pendingToday++;
+              } else if (taskStartDate && taskStartDate > today) {
+                pendingUpcoming++;
+              }
             }
             totalTasks++;
           }
@@ -832,6 +891,9 @@ useEffect(() => {
           completedRatingOne: append ? prev.completedRatingOne + completedRatingOne : completedRatingOne,
           completedRatingTwo: append ? prev.completedRatingTwo + completedRatingTwo : completedRatingTwo,
           completedRatingThreePlus: append ? prev.completedRatingThreePlus + completedRatingThreePlus : completedRatingThreePlus,
+          pendingToday: append ? prev.pendingToday + pendingToday : pendingToday,
+          pendingUpcoming: append ? prev.pendingUpcoming + pendingUpcoming : pendingUpcoming,
+          pendingOverdue: append ? prev.pendingOverdue + pendingOverdue : pendingOverdue,
         }
       })
 
@@ -1008,52 +1070,25 @@ useEffect(() => {
     fetchDepartmentData(1, false)
 
     // Update Redux state counts with staff and department filters
-    dispatch(
-      totalTaskInTable({
-        dashboardType,
-        staffFilter: dashboardStaffFilter,
-        departmentFilter,
-        unitFilter,
-        divisionFilter
-      }),
-    )
-    dispatch(
-      completeTaskInTable({
-        dashboardType,
-        staffFilter: dashboardStaffFilter,
-        departmentFilter,
-        unitFilter,
-        divisionFilter
-      }),
-    )
-    dispatch(
-      pendingTaskInTable({
-        dashboardType,
-        staffFilter: dashboardStaffFilter,
-        departmentFilter,
-        unitFilter,
-        divisionFilter
-      }),
-    )
-    dispatch(
-      overdueTaskInTable({
-        dashboardType,
-        staffFilter: dashboardStaffFilter,
-        departmentFilter,
-        unitFilter,
-        divisionFilter
-      }),
-    )
-    dispatch(
-      notDoneTaskInTable({
-        dashboardType,
-        staffFilter: dashboardStaffFilter,
-        departmentFilter,
-        unitFilter,
-        divisionFilter
-      })
-    )
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, unitFilter, divisionFilter, dispatch])
+    const filterParams = {
+      dashboardType,
+      staffFilter: dashboardStaffFilter,
+      departmentFilter,
+      unitFilter,
+      divisionFilter,
+      role: userRole,
+      username
+    };
+
+    dispatch(totalTaskInTable(filterParams));
+    dispatch(completeTaskInTable(filterParams));
+    dispatch(pendingTaskInTable(filterParams));
+    dispatch(overdueTaskInTable(filterParams));
+    dispatch(notDoneTaskInTable(filterParams));
+    dispatch(pendingTodayInTable(filterParams));
+    dispatch(pendingUpcomingInTable(filterParams));
+    dispatch(pendingOverdueInTable(filterParams));
+  }, [dashboardType, dashboardStaffFilter, departmentFilter, unitFilter, divisionFilter, dispatch, userRole, username])
 
   // Filter tasks based on criteria
   const filteredTasks = departmentData.allTasks.filter((task) => {
@@ -1213,11 +1248,24 @@ useEffect(() => {
     completedTasks: filteredDateStats.completedTasks || 0,
     pendingTasks: filteredDateStats.pendingTasks || 0,
     overdueTasks: filteredDateStats.overdueTasks || 0,
+    pendingToday: filteredDateStats.pendingToday || 0,
+    pendingUpcoming: filteredDateStats.pendingUpcoming || 0,
+    pendingOverdue: filteredDateStats.pendingOverdue || 0,
+    completedRatingOne: filteredDateStats.completedRatingOne || 0,
+    completedRatingTwo: filteredDateStats.completedRatingTwo || 0,
+    completedRatingThreePlus: filteredDateStats.completedRatingThreePlus || 0,
   } : {
+    // Use Redux global counts instead of locally calculated ones
     totalTasks: totalTask || 0,
     completedTasks: completeTask || 0,
     pendingTasks: pendingTask || 0,
     overdueTasks: overdueTask || 0,
+    pendingToday: pendingToday || 0,
+    pendingUpcoming: pendingUpcoming || 0,
+    pendingOverdue: pendingOverdue || 0,
+    completedRatingOne: departmentData.completedRatingOne || 0,
+    completedRatingTwo: departmentData.completedRatingTwo || 0,
+    completedRatingThreePlus: departmentData.completedRatingThreePlus || 0,
   };
 
   // const notDoneTask = (displayStats.totalTasks || 0) - (displayStats.completedTasks || 0);
@@ -1344,6 +1392,12 @@ useEffect(() => {
               dateRange={dateRange.filtered ? dateRange : null}
               dashboardStaffFilter={dashboardStaffFilter}
               allStaffTasks={departmentData.allTasks}
+              pendingToday={displayStats.pendingToday}
+              pendingUpcoming={displayStats.pendingUpcoming}
+              pendingOverdue={displayStats.pendingOverdue}
+              completedRatingOne={displayStats.completedRatingOne}
+              completedRatingTwo={displayStats.completedRatingTwo}
+              completedRatingThreePlus={displayStats.completedRatingThreePlus}
             />
 
             <TaskNavigationTabs

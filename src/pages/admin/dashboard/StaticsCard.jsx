@@ -9,10 +9,16 @@ export default function StatisticsCards({
   completeTask,
   pendingTask,
   overdueTask,
-  notDoneTask,     // <-- take from props (REAL backend value)
+  notDoneTask,
   dateRange = null,
-  dashboardStaffFilter = "all", // New Props
-  allStaffTasks = []            // New Props
+  dashboardStaffFilter = "all",
+  allStaffTasks = [],
+  pendingToday = 0,
+  pendingUpcoming = 0,
+  pendingOverdue = 0,
+  completedRatingOne = 0,
+  completedRatingTwo = 0,
+  completedRatingThreePlus = 0,
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
@@ -29,13 +35,18 @@ export default function StatisticsCards({
   const notDoneRate = totalTask > 0 ? (notDoneTask / totalTask) * 100 : 0;
   const overdueRate = totalTask > 0 ? (overdueTask / totalTask) * 100 : 0;
 
+  // New rates for delegation segments
+  // Use ratings if available, regardless of module
+  const ratingOneRate = totalTask > 0 ? (completedRatingOne / totalTask) * 100 : completionRate;
+  const ratingTwoRate = totalTask > 0 ? (completedRatingTwo / totalTask) * 100 : notDoneRate;
+  const ratingThreePlusRate = totalTask > 0 ? (completedRatingThreePlus / totalTask) * 100 : overdueRate;
 
-  // Calculate stroke dash arrays for each segment
-  const circumference = 251.3; // 2 * π * 40
-  const completedDash = completionRate * circumference / 100;
+  // Calculate stroke dash arrays
+  const circumference = 251.3;
   const pendingDash = pendingRate * circumference / 100;
-  const notDoneDash = notDoneRate * circumference / 100;
-  const overdueDash = overdueRate * circumference / 100;
+  const notDoneDash = (completedRatingTwo > 0 ? ratingTwoRate : notDoneRate) * circumference / 100;
+  const overdueDash = (completedRatingThreePlus > 0 ? ratingThreePlusRate : overdueRate) * circumference / 100;
+  const completedDash = (completedRatingOne > 0 ? ratingOneRate : completionRate) * circumference / 100;
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -64,25 +75,28 @@ export default function StatisticsCards({
             : `Completed Tasks (Checklist) for ${dashboardStaffFilter}`;
           break;
         case "pending":
-          filtered = allStaffTasks.filter((t) => t.status === "pending" || t.status === "not_done");
+          filtered = allStaffTasks.filter((t) => t.status === "pending" || t.status === "overdue");
           title = dashboardType === "delegation"
             ? `Pending Tasks (Delegation) for ${dashboardStaffFilter}`
             : `Pending Tasks (Checklist) for ${dashboardStaffFilter}`;
           break;
         case "not_done":
-          // In delegation, not_done is typically the same as pending minus overdue, or just pending
-          filtered = allStaffTasks.filter(
-            (t) => t.status !== "completed" && t.status !== "overdue"
-          );
-          title = dashboardType === "delegation"
-            ? `Not Done (Delegation) for ${dashboardStaffFilter}`
-            : `Not Done (Checklist) for ${dashboardStaffFilter}`;
+          if (dashboardType === "delegation") {
+            filtered = allStaffTasks.filter((t) => t.status === "completed" && t.rating === 2);
+            title = `Completed Twice (Rating 2) for ${dashboardStaffFilter}`;
+          } else {
+            filtered = allStaffTasks.filter((t) => t.status !== "completed" && t.status !== "overdue");
+            title = `Not Done (Checklist) for ${dashboardStaffFilter}`;
+          }
           break;
         case "overdue":
-          filtered = allStaffTasks.filter((t) => t.status === "overdue");
-          title = dashboardType === "delegation"
-            ? `Overdue Tasks (Delegation) for ${dashboardStaffFilter}`
-            : `Overdue Tasks (Checklist) for ${dashboardStaffFilter}`;
+          if (dashboardType === "delegation") {
+            filtered = allStaffTasks.filter((t) => t.status === "completed" && t.rating >= 3);
+            title = `Completed Thrice 3+ (Rating 3+) for ${dashboardStaffFilter}`;
+          } else {
+            filtered = allStaffTasks.filter((t) => t.status === "overdue");
+            title = `Overdue Tasks (Checklist) for ${dashboardStaffFilter}`;
+          }
           break;
         default:
           break;
@@ -139,7 +153,7 @@ export default function StatisticsCards({
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 rounded-tr-lg p-3 sm:p-4">
               <h3 className="text-xs sm:text-sm font-medium text-green-700">
-                {dashboardType === "delegation" ? "Completed Tasks" : "Completed Tasks"}
+                {dashboardType === "delegation" ? "Completed Once" : "Completed Tasks"}
               </h3>
               <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
             </div>
@@ -173,16 +187,29 @@ export default function StatisticsCards({
               )}
             </div>
             <div className="p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-amber-700">{pendingTask}</div>
-              <p className="text-xs text-amber-600">
-                {dateRange ? (
-                  <>Pending in period</>
-                ) : dashboardType === "delegation" ? (
-                  "Pending tasks"
-                ) : (
-                  "Including today"
-                )}
-              </p>
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-amber-700">
+                {dashboardType === "checklist" ? pendingToday : pendingTask}
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <p className="text-xs text-amber-600">
+                  {dateRange ? (
+                    <>Pending in period</>
+                  ) : dashboardType === "delegation" ? (
+                    "Total Pending"
+                  ) : (
+                    "Today's Pending"
+                  )}
+                </p>
+                <div className="flex gap-2 text-[10px] sm:text-xs">
+                  <span className="text-amber-700 bg-amber-100 px-1 rounded">T:{pendingToday}</span>
+                  {dashboardType !== "checklist" && (
+                    <>
+                      <span className="text-amber-700 bg-amber-100 px-1 rounded">U:{pendingUpcoming}</span>
+                      <span className="text-amber-700 bg-amber-100 px-1 rounded">O:{pendingOverdue}</span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -192,16 +219,20 @@ export default function StatisticsCards({
             className="rounded-lg border border-l-4 border-l-gray-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-tr-lg p-3 sm:p-4">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-700">Not Done</h3>
-              <XCircle className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
+              <h3 className="text-xs sm:text-sm font-medium text-gray-700">
+                {dashboardType === "delegation" ? "Completed Twice" : "Not Done"}
+              </h3>
+              <CheckCircle2 className={`h-3 w-3 sm:h-4 sm:w-4 ${dashboardType === "delegation" ? "text-gray-500" : "text-gray-500"}`} />
             </div>
             <div className="p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-700">{notDoneTask}</div>
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-700">
+                {dashboardType === "delegation" ? completedRatingTwo : notDoneTask}
+              </div>
               <p className="text-xs text-gray-600">
                 {dateRange ? (
-                  <>Not done in period</>
+                  dashboardType === "delegation" ? "Completed twice in period" : "Not done in period"
                 ) : dashboardType === "delegation" ? (
-                  "Tasks not completed"
+                  "Rating 2 tasks"
                 ) : (
                   "Absent Day's tasks"
                 )}
@@ -216,7 +247,7 @@ export default function StatisticsCards({
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-red-100 rounded-tr-lg p-3 sm:p-4">
               <h3 className="text-xs sm:text-sm font-medium text-red-700">
-                {dashboardType === "delegation" ? "Overdue Tasks" : "Overdue Tasks"}
+                {dashboardType === "delegation" ? "Completed Thrice 3+" : "Overdue Tasks"}
               </h3>
               {dashboardType === "delegation" ? (
                 <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
@@ -225,12 +256,14 @@ export default function StatisticsCards({
               )}
             </div>
             <div className="p-3 sm:p-4">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-700">{overdueTask}</div>
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-700">
+                {dashboardType === "delegation" ? completedRatingThreePlus : overdueTask}
+              </div>
               <p className="text-xs text-red-600">
                 {dateRange ? (
-                  <>Overdue in period</>
+                  dashboardType === "delegation" ? "Completed thrice in period" : "Overdue in period"
                 ) : dashboardType === "delegation" ? (
-                  "Overdue tasks"
+                  "Rating 3+ tasks"
                 ) : (
                   "Past due"
                 )}
@@ -330,23 +363,40 @@ export default function StatisticsCards({
               <div className="grid grid-cols-1 gap-1 xs:gap-2 sm:gap-3 text-xs xs:text-sm sm:text-base md:text-lg flex-1 max-w-[200px]">
                 <div className="flex items-center space-x-1 xs:space-x-2">
                   <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-green-500 flex-shrink-0"></div>
-                  <span className="font-medium">Completed:</span>
-                  <span className="text-gray-700">{completionRate.toFixed(1)}%</span>
+                  <span className="font-medium">{dashboardType === "delegation" ? "Once:" : "Completed:"}</span>
+                  <span className="text-gray-700">{(dashboardType === "delegation" ? ratingOneRate : completionRate).toFixed(1)}%</span>
                 </div>
+                {dashboardType === "delegation" ? (
+                  <>
+                    <div className="flex items-center space-x-1 xs:space-x-2">
+                      <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-gray-500 flex-shrink-0"></div>
+                      <span className="font-medium">Twice:</span>
+                      <span className="text-gray-700">{ratingTwoRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex items-center space-x-1 xs:space-x-2">
+                      <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-red-500 flex-shrink-0"></div>
+                      <span className="font-medium">Thrice:</span>
+                      <span className="text-gray-700">{ratingThreePlusRate.toFixed(1)}%</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center space-x-1 xs:space-x-2">
+                      <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-gray-500 flex-shrink-0"></div>
+                      <span className="font-medium">Not Done:</span>
+                      <span className="text-gray-700">{notDoneRate.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex items-center space-x-1 xs:space-x-2">
+                      <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-red-500 flex-shrink-0"></div>
+                      <span className="font-medium">Overdue:</span>
+                      <span className="text-gray-700">{overdueRate.toFixed(1)}%</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center space-x-1 xs:space-x-2">
                   <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-amber-500 flex-shrink-0"></div>
                   <span className="font-medium">Pending:</span>
                   <span className="text-gray-700">{pendingRate.toFixed(1)}%</span>
-                </div>
-                <div className="flex items-center space-x-1 xs:space-x-2">
-                  <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-gray-500 flex-shrink-0"></div>
-                  <span className="font-medium">Not Done:</span>
-                  <span className="text-gray-700">{notDoneRate.toFixed(1)}%</span>
-                </div>
-                <div className="flex items-center space-x-1 xs:space-x-2">
-                  <div className="w-2 h-2 xs:w-3 xs:h-3 sm:w-4 sm:h-4 rounded-full bg-red-500 flex-shrink-0"></div>
-                  <span className="font-medium">Overdue:</span>
-                  <span className="text-gray-700">{overdueRate.toFixed(1)}%</span>
                 </div>
               </div>
             </div>
