@@ -438,9 +438,11 @@ useEffect(() => {
             overdueTasks++;
           }
         } else {
-          // Delegation logic
+          // Delegation logic: if submission date exists, it's completed no matter the planned_date
           if (task.submission_date) {
             completedTasks++;
+            // Also ensure it is counted as a total task, since we included it
+            if (!filteredData.some(t => t.task_id === task.task_id)) totalTasks++; 
           } else {
             pendingTasks++;
             if (taskDate && taskDate < today) {
@@ -714,8 +716,14 @@ useEffect(() => {
             status = "overdue";
           }
 
-          // Only count tasks up to today for cards (but keep all tasks for table display)
-          if (taskStartDate && taskStartDate <= today) {
+          // Logic: For checklist, count up to today. For delegation, if completed, ALWAYS count. If pending, count up to today.
+          const shouldCountForCards = 
+            (taskStartDate && taskStartDate <= today) || 
+            (dashboardType === "delegation" && status === "completed") ||
+            (status === "completed");
+
+          // Only count tasks for cards based on the condition above
+          if (shouldCountForCards) {
             if (status === "completed") {
               completedTasks++;
               if (dashboardType === "delegation" && task.submission_date) {
