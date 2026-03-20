@@ -34,6 +34,7 @@ function HistoryPage() {
   const [markingAsDone, setMarkingAsDone] = useState(false)
   const [maintAdminRemarks, setMaintAdminRemarks] = useState({})
   const [maintCurrentPage, setMaintCurrentPage] = useState(1)
+  const [delegationCurrentPage, setDelegationCurrentPage] = useState(1)
   const [successMessage, setSuccessMessage] = useState("")
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
@@ -43,7 +44,7 @@ function HistoryPage() {
   const [adminRemarks, setAdminRemarks] = useState({}) // New state for admin remarks
 
   const { history, historyTotalCount, historyApprovedCount, loading } = useSelector((state) => state.checkList)
-  const { delegation_done } = useSelector((state) => state.delegation)
+  const { delegation_done, delegationTotalCount, delegationApprovedCount } = useSelector((state) => state.delegation)
   const { doerName } = useSelector((state) => state.assignTask)
   const { history: maintHistory, historyTotalCount: maintTotalCount, historyApprovedCount: maintApprovedCount, loading: maintLoading } = useSelector((state) => state.maintenance)
   const dispatch = useDispatch()
@@ -105,6 +106,7 @@ function HistoryPage() {
     setApprovalStatusFilter("pending") // Reset to pending
     setCurrentPage(1)
     setMaintCurrentPage(1)
+    setDelegationCurrentPage(1)
   }
 
   // Handle checkbox selection for checklist admin approval
@@ -387,6 +389,7 @@ function HistoryPage() {
   useEffect(() => {
     setCurrentPage(1)
     setMaintCurrentPage(1)
+    setDelegationCurrentPage(1)
   }, [searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
 
   // Pagination helpers (based on filtered data, not raw DB total)
@@ -457,6 +460,15 @@ function HistoryPage() {
         return dateB.getTime() - dateA.getTime()
       })
   }, [delegation_done, searchTerm, startDate, endDate, userRole, username, approvalStatusFilter])
+
+  // Delegation pagination
+  const delegationTotalPages = Math.ceil(filteredDelegationData.length / ITEMS_PER_PAGE) || 1
+  const delegationStartRecord = filteredDelegationData.length > 0 ? (delegationCurrentPage - 1) * ITEMS_PER_PAGE + 1 : 0
+  const delegationEndRecord = Math.min(delegationCurrentPage * ITEMS_PER_PAGE, filteredDelegationData.length)
+  const paginatedDelegationData = useMemo(() => {
+    const start = (delegationCurrentPage - 1) * ITEMS_PER_PAGE
+    return filteredDelegationData.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredDelegationData, delegationCurrentPage])
 
   const handleMemberSelection = (member) => {
     setSelectedMembers((prev) => {
@@ -590,7 +602,7 @@ function HistoryPage() {
                 Maintenance
               </button>
             )}
-            {canAccessModule("delegation") && false && ( // Delegation tab still explicitly hidden per original code
+            {canAccessModule("delegation") && (
               <button
                 onClick={() => {
                   setActiveTab("delegation")
@@ -697,6 +709,12 @@ function HistoryPage() {
                   <span className="text-orange-600 font-medium">{maintTotalCount - maintApprovedCount} Pending</span>
                   <span className="text-green-600 font-medium">{maintApprovedCount} Approved</span>
                 </>
+              ) : activeTab === "delegation" ? (
+                <>
+                  <span className="text-purple-600 font-medium">{delegationTotalCount} Total</span>
+                  <span className="text-orange-600 font-medium">{delegationTotalCount - delegationApprovedCount} Pending</span>
+                  <span className="text-green-600 font-medium">{delegationApprovedCount} Approved</span>
+                </>
               ) : (
                 <>
                   <span className="text-purple-600 font-medium">{historyTotalCount} Total</span>
@@ -730,8 +748,7 @@ function HistoryPage() {
               </button>
             )}
 
-            {/* Delegation Approval Button - Hidden for now */}
-            {/* {isSuperAdmin && activeTab === "delegation" && selectedDelegationItems.length > 0 && (
+            {isSuperAdmin && activeTab === "delegation" && selectedDelegationItems.length > 0 && (
               <button
                 onClick={() => handleMarkDone("delegation")}
                 disabled={markingAsDone}
@@ -740,7 +757,7 @@ function HistoryPage() {
                 <CheckCircle2 className="h-3 w-3" />
                 {markingAsDone ? "..." : `Approve (${selectedDelegationItems.length})`}
               </button>
-            )} */}
+            )}
           </div>
         </div>
 
@@ -1236,8 +1253,8 @@ function HistoryPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredDelegationData.length > 0 ? (
-                    filteredDelegationData.map((item, index) => (
+                  {paginatedDelegationData.length > 0 ? (
+                    paginatedDelegationData.map((item, index) => (
                       <tr key={index} className="hover:bg-gray-50">
                         {isSuperAdmin && (
                           <td className="px-2 sm:px-3 py-2 sm:py-4 mobile-checkbox-cell" data-label="Select">
@@ -1394,6 +1411,33 @@ function HistoryPage() {
                   <button
                     onClick={() => setMaintCurrentPage(prev => Math.min(prev + 1, maintTotalPages))}
                     disabled={maintCurrentPage >= maintTotalPages || maintLoading}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </>
+            ) : activeTab === "delegation" ? (
+              <>
+                <span className="text-xs text-gray-600">
+                  {filteredDelegationData.length > 0
+                    ? `Showing ${delegationStartRecord}–${delegationEndRecord} of ${filteredDelegationData.length} records`
+                    : "No records"}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setDelegationCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={delegationCurrentPage === 1 || loading}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> Previous
+                  </button>
+                  <span className="text-xs font-medium text-gray-700">
+                    Page {delegationCurrentPage} of {delegationTotalPages}
+                  </span>
+                  <button
+                    onClick={() => setDelegationCurrentPage(prev => Math.min(prev + 1, delegationTotalPages))}
+                    disabled={delegationCurrentPage >= delegationTotalPages || loading}
                     className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     Next <ChevronRight className="h-3 w-3" />

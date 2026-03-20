@@ -31,6 +31,8 @@ const delegationSlice = createSlice({
   initialState: {
     delegation: [],
     delegation_done: [],
+    delegationTotalCount: 0,
+    delegationApprovedCount: 0,
     loading: false,
     error: null,
   },
@@ -56,7 +58,9 @@ const delegationSlice = createSlice({
       })
       .addCase(delegationDoneData.fulfilled, (state, action) => {
         state.loading = false;
-        state.delegation_done = action.payload;
+        state.delegation_done = action.payload.data;
+        state.delegationTotalCount = parseInt(action.payload.totalCount) || 0;
+        state.delegationApprovedCount = parseInt(action.payload.approvedCount) || 0;
       })
       .addCase(delegationDoneData.rejected, (state) => {
         state.loading = false;

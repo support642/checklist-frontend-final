@@ -771,7 +771,7 @@ useEffect(() => {
           // Logic: For checklist, count up to today. For delegation, if completed, ALWAYS count. If pending, count up to today.
           const shouldCountForCards = 
             (taskStartDate && taskStartDate <= today) || 
-            (dashboardType === "delegation" && status === "completed") ||
+            (dashboardType === "delegation") ||
             (status === "completed");
 
           // Only count tasks for cards based on the condition above
@@ -1149,16 +1149,8 @@ useEffect(() => {
           return isDateToday(taskDate) && task.status !== "completed";
 
         case "upcoming":
-          // For delegation, show tomorrow's tasks regardless of completion status
-          if (dashboardType === "delegation") {
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            return taskDateOnly.getTime() === tomorrow.getTime();
-          }
-          // For checklist, show only tomorrow's tasks
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          return taskDateOnly.getTime() === tomorrow.getTime();
+          // Show all future tasks
+          return taskDateOnly > today;
 
         case "overdue":
           // For delegation, show tasks that are past due and have null submission_date
