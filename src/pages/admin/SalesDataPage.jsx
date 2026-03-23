@@ -37,6 +37,7 @@ function AccountDataPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all") // Filter for Today/Overdue/Upcoming
   const [frequencyFilter, setFrequencyFilter] = useState("all") // Filter for Frequency
+  const [nameFilter, setNameFilter] = useState("all") // Filter for Name
   const [error, setError] = useState(null)
   const [remarksData, setRemarksData] = useState({})
   const [historyData, setHistoryData] = useState([])
@@ -264,6 +265,7 @@ function AccountDataPage() {
     setSelectedMembers([])
     setStartDate("")
     setEndDate("")
+    setNameFilter("all")
   }
 
   // NEW: Admin functions for history management
@@ -520,13 +522,20 @@ function AccountDataPage() {
       });
     }
 
+    // Apply name filter
+    if (nameFilter !== 'all') {
+      filtered = filtered.filter((account) => {
+        return account.name === nameFilter;
+      });
+    }
+
     return [...filtered].sort((a, b) => {
       const dateA = new Date(a.task_start_date || "");
       const dateB = new Date(b.task_start_date || "");
 
       return dateA.getTime() - dateB.getTime();
     });
-  }, [checklist, searchTerm, statusFilter, frequencyFilter, userRole, userDept]);
+  }, [checklist, searchTerm, statusFilter, frequencyFilter, nameFilter, userRole, userDept]);
 
   const filteredMaintenanceData = useMemo(() => {
     if (!Array.isArray(maintenance)) return [];
@@ -564,6 +573,13 @@ function AccountDataPage() {
       });
     }
 
+    // Apply name filter for Maintenance
+    if (nameFilter !== 'all') {
+      filtered = filtered.filter((item) => {
+        return item.name === nameFilter;
+      });
+    }
+
     // Member filter
     if (selectedMembers.length > 0) {
       filtered = filtered.filter((item) => {
@@ -576,7 +592,7 @@ function AccountDataPage() {
       const dateB = new Date(b.task_start_date || "");
       return dateA.getTime() - dateB.getTime();
     });
-  }, [maintenance, searchTerm, statusFilter, frequencyFilter, selectedMembers, userRole, userDept]);
+  }, [maintenance, searchTerm, statusFilter, frequencyFilter, nameFilter, selectedMembers, userRole, userDept]);
 
   // Helper function to determine task status (Today, Upcoming, Overdue)
   const getTaskStatus = (taskStartDate) => {
@@ -1127,8 +1143,8 @@ const submissionData = await Promise.all(
               )}
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-            <div className="relative flex-1">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
@@ -1140,6 +1156,16 @@ const submissionData = await Promise.all(
             </div>
             {!showHistory && (
               <>
+                <select
+                  value={nameFilter}
+                  onChange={(e) => setNameFilter(e.target.value)}
+                  className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base bg-white"
+                >
+                  <option value="all">All Names</option>
+                  {doerName && doerName.map((name, index) => (
+                    <option key={index} value={name}>{name}</option>
+                  ))}
+                </select>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
@@ -1621,7 +1647,7 @@ const submissionData = await Promise.all(
               style={{ maxHeight: 'calc(100vh - 280px)' }}
             >
               {/* Mobile Card View for Maintenance */}
-              <div className="sm:hidden space-y-3 p-3">
+              <div className="lg:hidden space-y-3 p-3">
                 {/* Mobile Select All for Maintenance */}
                 {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && currentMaintData.length > 0 && (
                   <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
@@ -1650,8 +1676,9 @@ const submissionData = await Promise.all(
                 {currentMaintData.length > 0 ? (
                   currentMaintData.map((item, index) => {
                     const isSelected = maintSelectedItems.has(item.task_id);
+                    const taskStatus = getTaskStatus(item.task_start_date || item.planned_date);
                     return (
-                      <div key={index} className={`bg-white border rounded-lg p-3 shadow-sm border-gray-200`}>
+                      <div key={index} className={`bg-white border rounded-lg p-3 shadow-sm ${taskStatus === 'upcoming' ? "border-blue-300 bg-blue-50" : taskStatus === 'overdue' ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
                             {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
@@ -1662,6 +1689,14 @@ const submissionData = await Promise.all(
                                 onChange={(e) => handleMaintCheckboxClick(e, item.task_id)}
                               />
                             )}
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              taskStatus === 'today' ? "bg-green-100 text-green-800" 
+                              : taskStatus === 'upcoming' ? "bg-blue-100 text-blue-800" 
+                              : taskStatus === 'overdue' ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                            }`}>
+                              {taskStatus === 'today' ? 'Today' : taskStatus === 'upcoming' ? 'Upcoming' : 'Overdue'}
+                            </span>
                           </div>
                           <span className="text-xs text-gray-500">#{item.task_id}</span>
                         </div>
@@ -1771,7 +1806,7 @@ const submissionData = await Promise.all(
               </div>
 
               {/* Desktop view for Maintenance */}
-              <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
+              <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
@@ -1797,9 +1832,12 @@ const submissionData = await Promise.all(
                         />
                       </th>
                     )}
-                    {/* <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Time</th> */}
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">ID</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] border-b">Description</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b text-purple-600">Task Status</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b bg-yellow-50">Status</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] border-b">Task Description</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] border-b bg-orange-50">Remark</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b bg-green-50">Image</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Unit</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Division</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Dept</th>
@@ -1814,17 +1852,15 @@ const submissionData = await Promise.all(
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Freq</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Remind</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Attach</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Status</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-b">Remarks</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Image</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {currentMaintData.length > 0 ? (
                     currentMaintData.map((item, index) => {
                       const isSelected = maintSelectedItems.has(item.task_id);
+                      const taskStatus = getTaskStatus(item.task_start_date || item.planned_date);
                       return (
-                        <tr key={index} className={`${isSelected ? "bg-purple-50" : ""} hover:bg-gray-50`}>
+                        <tr key={index} className={`${isSelected ? "bg-purple-50" : taskStatus === 'upcoming' ? "bg-blue-50" : taskStatus === 'overdue' ? "bg-red-50" : ""} hover:bg-gray-50`}>
                           {(userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && (
                             <td className="px-2 sm:px-3 py-2 sm:py-4 w-12 border-b">
                               <input
@@ -1837,21 +1873,19 @@ const submissionData = await Promise.all(
                           )}
                           {/* <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.time || "—"}</div></td> */}
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.task_id || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[150px] border-b"><div className="text-xs sm:text-sm text-gray-900" title={item.task_description}>{item.task_description || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.unit || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.department || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_department || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_division || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_name || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{Array.isArray(item.part_name) ? item.part_name.join(', ') : (item.part_name || "—")}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.part_area || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.planned_date || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.frequency || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.enable_reminders || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.require_attachment || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              taskStatus === 'today' 
+                                ? "bg-green-100 text-green-800" 
+                                : taskStatus === 'upcoming' 
+                                  ? "bg-blue-100 text-blue-800" 
+                                  : taskStatus === 'overdue'
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-800"
+                            }`}>
+                              {taskStatus === 'today' ? 'Today' : taskStatus === 'upcoming' ? 'Upcoming' : taskStatus === 'overdue' ? 'Overdue' : '—'}
+                            </span>
+                          </td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50 border-b">
                             <select
                               disabled={!isSelected}
@@ -1869,7 +1903,8 @@ const submissionData = await Promise.all(
                               <option value="No">No</option>
                             </select>
                           </td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 bg-orange-50 min-w-[120px] border-b">
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[200px] border-b"><div className="text-xs sm:text-sm text-gray-900" title={item.task_description}>{item.task_description || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 bg-orange-50 min-w-[150px] border-b">
                             <input
                               type="text"
                               placeholder="Enter remarks"
@@ -1918,6 +1953,20 @@ const submissionData = await Promise.all(
                               </label>
                             )}
                           </td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.unit || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.department || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_department || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_division || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_name || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{Array.isArray(item.part_name) ? item.part_name.join(', ') : (item.part_name || "—")}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.part_area || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.planned_date || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.frequency || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.enable_reminders || "—"}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.require_attachment || "—"}</div></td>
                         </tr>
                       );
                     })
@@ -1970,7 +2019,7 @@ const submissionData = await Promise.all(
               style={{ maxHeight: 'calc(100vh - 280px)' }}
             >
               {/* Mobile Card View */}
-              <div className="sm:hidden space-y-3 p-3">
+              <div className="lg:hidden space-y-3 p-3">
                 {/* Mobile Select All for Checklist */}
                 {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && currentPendingData.length > 0 && (
                   <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
@@ -2128,7 +2177,7 @@ const submissionData = await Promise.all(
               </div>
 
               {/* Desktop Table View */}
-              <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
+              <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap w-16">

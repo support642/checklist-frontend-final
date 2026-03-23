@@ -8,6 +8,7 @@ import { uniqueDoerNameData, uniqueGivenByData } from "../../redux/slice/assignT
 import { fetchUserProfile } from "../../redux/slice/userProfileSlice";
 import { fetchMachinePartsData } from "../../redux/slice/maintenanceSlice";
 import CSVImportModal from "../../components/CSVImportModal";
+import Toast from "../../components/Toast";
 
 // Calendar Component (defined outside)
 const CalendarComponent = ({ date, onChange, onClose }) => {
@@ -249,6 +250,7 @@ export default function AssignTaskUser() {
   const [workingDays, setWorkingDays] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
   const [taskType, setTaskType] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
   // ── Form state ──
   const [formData, setFormData] = useState({
@@ -488,12 +490,20 @@ useEffect(() => {
       !formData.description ||
       !formData.frequency
     ) {
-      alert("Please fill in all required fields including date and time.");
+      setToast({ 
+        show: true, 
+        message: "Please fill in all required fields including date and time.", 
+        type: "warning" 
+      });
       return;
     }
 
     if (workingDays.length === 0) {
-      alert("Working days data not loaded yet. Please try again.");
+      setToast({ 
+        show: true, 
+        message: "Working days data not loaded yet. Please try again.", 
+        type: "info" 
+      });
       return;
     }
 
@@ -672,13 +682,21 @@ useEffect(() => {
         !formData.description ||
         !formData.frequency
       ) {
-        alert("Please fill in all required fields including date and time.");
+        setToast({ 
+          show: true, 
+          message: "Please fill in all required fields including date and time.", 
+          type: "warning" 
+        });
         setIsSubmitting(false);
         return;
       }
 
       if (workingDays.length === 0) {
-        alert("Working days data not loaded yet. Please try again.");
+        setToast({ 
+          show: true, 
+          message: "Working days data not loaded yet. Please try again.", 
+          type: "info" 
+        });
         setIsSubmitting(false);
         return;
       }
@@ -846,41 +864,58 @@ useEffect(() => {
       const tasksToSubmit = tasks;
 
       if (tasksToSubmit.length === 0) {
-        alert("No tasks could be generated. Please check your inputs.");
+        setToast({ 
+          show: true, 
+          message: "No tasks could be generated. Please check your inputs.", 
+          type: "warning" 
+        });
         setIsSubmitting(false);
         return;
       }
 
       await pushAssignTaskApi(tasksToSubmit);
-      alert(`Successfully submitted ${tasksToSubmit.length} tasks!`);
-
-      // Reset form
-      setFormData({
-        unit: formData.unit,
-        division: formData.division,
-        department: formData.department,
-        givenBy: "Admin",
-        doer: username || "",
-        description: "",
-        frequency: taskType === 'delegation' ? 'one-time' : 'daily',
-        enableReminders: true,
-        requireAttachment: false,
-        machineName: "",
-        partName: [],
-        partArea: "",
-        machinePartId: null,
-        machineDepartment: "",
-        machineDivision: "",
-        duration: "",
+      setToast({ 
+        show: true, 
+        message: `Successfully submitted ${tasksToSubmit.length} tasks!`, 
+        type: "success" 
       });
-      setSelectedDate(new Date()); // Reset to today's date instead of null
-      setStartDate(new Date());
-      setTime(getCurrentTime());
+
+      const isAdminRole = userRole === 'super_admin' || userRole === 'admin' || userRole === 'div_admin';
+      
+      if (!isAdminRole) {
+        // Reset form for non-admin users
+        setFormData({
+          unit: formData.unit,
+          division: formData.division,
+          department: formData.department,
+          givenBy: "Admin",
+          doer: username || "",
+          description: "",
+          frequency: taskType === 'delegation' ? 'one-time' : 'daily',
+          enableReminders: true,
+          requireAttachment: false,
+          machineName: "",
+          partName: [],
+          partArea: "",
+          machinePartId: null,
+          machineDepartment: "",
+          machineDivision: "",
+          duration: "",
+        });
+        setSelectedDate(new Date()); 
+        setStartDate(new Date());
+        setTime(getCurrentTime());
+      }
+      
       setGeneratedTasks([]);
       setAccordionOpen(false);
     } catch (error) {
       console.error("Submission error:", error);
-      alert("Failed to assign tasks. Please try again.");
+      setToast({ 
+        show: true, 
+        message: "Failed to assign tasks. Please try again.", 
+        type: "error" 
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -1522,7 +1557,7 @@ useEffect(() => {
                 </div>
 
                 {/* Preview and Submit Buttons */}
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <button
                     type="button"
                     onClick={generateTasks}
@@ -1603,7 +1638,7 @@ useEffect(() => {
                       </div>
                     </div>
                   )}
-                </div>
+                </div> */}
               </div>
 
               <div className="flex justify-between bg-gradient-to-r from-purple-50 to-pink-50 p-3 border-t border-purple-100">
@@ -1661,6 +1696,12 @@ useEffect(() => {
           console.log('Import successful!');
         }}
       />*/}
+        <Toast 
+          isVisible={toast.show} 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
     </AdminLayout>
   );
 }

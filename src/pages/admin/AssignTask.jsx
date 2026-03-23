@@ -8,6 +8,7 @@ import { assignTaskInTable, uniqueDepartmentData, uniqueDoerNameData, uniqueGive
 import { departmentDetails } from "../../redux/slice/settingSlice";
 import { fetchMachinePartsData } from "../../redux/slice/maintenanceSlice";
 import CSVImportModal from "../../components/CSVImportModal";
+import Toast from "../../components/Toast";
 // import supabase from "../../SupabaseClient";
 
 // Calendar Component (defined outside)
@@ -221,6 +222,7 @@ export default function AssignTask() {
   const [workingDays, setWorkingDays] = useState([]);
   const [showImportModal, setShowImportModal] = useState(false);
   const [taskType, setTaskType] = useState(null); // 'checklist', 'delegation', or 'maintenance'
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
   // Machine parts from Redux
   const machineParts = useSelector((state) => state.maintenance?.machineParts) || [];
@@ -353,13 +355,19 @@ export default function AssignTask() {
         mp.machine_name === formData.machineName &&
         mp.machine_area === formData.partArea
       );
-    // Flatten part_name arrays into individual selectable options
+    // Flatten part_name and part_images arrays into individual selectable options
     const parts = [];
     filtered.forEach(mp => {
       const names = Array.isArray(mp.part_name) ? mp.part_name : (mp.part_name ? [mp.part_name] : []);
-      names.forEach(name => {
+      const images = Array.isArray(mp.part_images) ? mp.part_images : (mp.part_images ? [mp.part_images] : []);
+      
+      names.forEach((name, idx) => {
         if (name && !parts.find(p => p.name === name)) {
-          parts.push({ id: mp.id, name });
+          parts.push({ 
+            id: mp.id, 
+            name, 
+            image: images[idx] || null 
+          });
         }
       });
     });
@@ -503,12 +511,20 @@ useEffect(() => {
       !formData.description ||
       !formData.frequency
     ) {
-      alert("Please fill in all required fields including date and time.");
+      setToast({ 
+        show: true, 
+        message: "Please fill in all required fields including date and time.", 
+        type: "warning" 
+      });
       return;
     }
 
     if (workingDays.length === 0) {
-      alert("Working days data not loaded yet. Please try again.");
+      setToast({ 
+        show: true, 
+        message: "Working days data not loaded yet. Please try again.", 
+        type: "info" 
+      });
       return;
     }
 
@@ -686,13 +702,21 @@ useEffect(() => {
         !formData.description ||
         !formData.frequency
       ) {
-        alert("Please fill in all required fields including date and time.");
+        setToast({ 
+          show: true, 
+          message: "Please fill in all required fields including date and time.", 
+          type: "warning" 
+        });
         setIsSubmitting(false);
         return;
       }
 
       if (workingDays.length === 0) {
-        alert("Working days data not loaded yet. Please try again.");
+        setToast({ 
+          show: true, 
+          message: "Working days data not loaded yet. Please try again.", 
+          type: "info" 
+        });
         setIsSubmitting(false);
         return;
       }
@@ -851,41 +875,58 @@ useEffect(() => {
       const tasksToSubmit = tasks;
 
       if (tasksToSubmit.length === 0) {
-        alert("No tasks could be generated. Please check your inputs.");
+        setToast({ 
+          show: true, 
+          message: "No tasks could be generated. Please check your inputs.", 
+          type: "warning" 
+        });
         setIsSubmitting(false);
         return;
       }
 
       await pushAssignTaskApi(tasksToSubmit);
-      alert(`Successfully submitted ${tasksToSubmit.length} tasks!`);
-
-      // Reset form
-      setFormData({
-        unit: "",
-        division: "",
-        department: "",
-        givenBy: "Admin",
-        doer: "",
-        description: "",
-        frequency: taskType === 'delegation' ? 'one-time' : 'daily',
-        enableReminders: true,
-        requireAttachment: false,
-        machineName: "",
-        partName: [],
-        partArea: "",
-        duration: "",
-        machinePartId: null,
-        machineDepartment: "",
-        machineDivision: "",
+      setToast({ 
+        show: true, 
+        message: `Successfully submitted ${tasksToSubmit.length} tasks!`, 
+        type: "success" 
       });
-      setSelectedDate(new Date()); // Reset to today's date instead of null
-      setStartDate(new Date());
-      setTime(getCurrentTime());
+
+      const isAdminRole = userRole === 'super_admin' || userRole === 'admin' || userRole === 'div_admin';
+      
+      if (!isAdminRole) {
+        // Reset form for non-admin users
+        setFormData({
+          unit: "",
+          division: "",
+          department: "",
+          givenBy: "Admin",
+          doer: "",
+          description: "",
+          frequency: taskType === 'delegation' ? 'one-time' : 'daily',
+          enableReminders: true,
+          requireAttachment: false,
+          machineName: "",
+          partName: [],
+          partArea: "",
+          duration: "",
+          machinePartId: null,
+          machineDepartment: "",
+          machineDivision: "",
+        });
+        setSelectedDate(new Date()); 
+        setStartDate(new Date());
+        setTime(getCurrentTime());
+      }
+      
       setGeneratedTasks([]);
       setAccordionOpen(false);
     } catch (error) {
       console.error("Submission error:", error);
-      alert("Failed to assign tasks. Please try again.");
+      setToast({ 
+        show: true, 
+        message: "Failed to assign tasks. Please try again.", 
+        type: "error" 
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -1329,6 +1370,11 @@ useEffect(() => {
                                         });
                                       }}
                                     />
+                                    {p.image && (
+                                      <div className="h-8 w-8 flex-shrink-0 border border-purple-100 rounded overflow-hidden bg-gray-50">
+                                        <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                                      </div>
+                                    )}
                                     <span className="text-xs font-medium truncate" title={p.name}>
                                       {p.name}
                                     </span>
@@ -1544,7 +1590,7 @@ useEffect(() => {
                 </div>
 
                 {/* Preview and Submit Buttons */}
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <button
                     type="button"
                     onClick={generateTasks}
@@ -1625,7 +1671,7 @@ useEffect(() => {
                       </div>
                     </div>
                   )}
-                </div>
+                </div> */}
               </div>
 
               <div className="flex justify-between bg-gradient-to-r from-purple-50 to-pink-50 p-3 border-t border-purple-100">
@@ -1684,6 +1730,12 @@ useEffect(() => {
           console.log('Import successful!');
         }}
       />*/}
+        <Toast 
+          isVisible={toast.show} 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast({ ...toast, show: false })} 
+        />
     </AdminLayout>
   );
 }

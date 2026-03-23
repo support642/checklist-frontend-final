@@ -51,6 +51,17 @@ export default function CalendarPage() {
   // Format date to string for comparison
   const formatDateKey = (date) => {
     if (!date) return null;
+    
+    // If it's a string from the backend (ISO 8601 or similar),
+    // extract the date part directly to avoid timezone-related shifts
+    if (typeof date === "string") {
+      const datePart = date.split('T')[0].split(' ')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+        return datePart;
+      }
+    }
+    
+    // Fallback for Date objects or other formats
     const d = new Date(date);
     if (isNaN(d.getTime())) return null;
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

@@ -20,9 +20,9 @@ export const dashboardData = createAsyncThunk(
 
 export const totalTaskInTable = createAsyncThunk(
   "dashboard/totalTaskInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
-      const response = await countTotalTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter)
+      const response = await countTotalTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate)
       return response
     } catch (error) {
       console.error("Error fetching total tasks:", error)
@@ -33,14 +33,16 @@ export const totalTaskInTable = createAsyncThunk(
 
 export const notDoneTaskInTable = createAsyncThunk(
   "dashboard/notDoneTaskInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
       const response = await countNotDoneTaskApi(
         dashboardType,
         staffFilter,
         departmentFilter,
         unitFilter,
-        divisionFilter
+        divisionFilter,
+        startDate,
+        endDate
       );
       return response;
     } catch (error) {
@@ -54,9 +56,9 @@ export const notDoneTaskInTable = createAsyncThunk(
 // Update completeTaskInTable
 export const completeTaskInTable = createAsyncThunk(
   "dashboard/completeTaskInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
-      const response = await countCompleteTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter)
+      const response = await countCompleteTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate)
       return response
     } catch (error) {
       console.error("Error fetching complete tasks:", error)
@@ -90,9 +92,9 @@ export const uniqueGivenByData = createAsyncThunk(
 // Update pendingTaskInTable
 export const pendingTaskInTable = createAsyncThunk(
   "dashboard/pendingTaskInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
-      const response = await countPendingOrDelayTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter)
+      const response = await countPendingOrDelayTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate)
       return response
     } catch (error) {
       console.error("Error fetching pending tasks:", error)
@@ -104,9 +106,9 @@ export const pendingTaskInTable = createAsyncThunk(
 // Update overdueTaskInTable
 export const overdueTaskInTable = createAsyncThunk(
   "dashboard/overdueTaskInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
-      const response = await countOverDueORExtendedTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter)
+      const response = await countOverDueORExtendedTaskApi(dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate)
       return response
     } catch (error) {
       console.error("Error fetching overdue tasks:", error)
@@ -117,9 +119,9 @@ export const overdueTaskInTable = createAsyncThunk(
 
 export const pendingTodayInTable = createAsyncThunk(
   "dashboard/pendingTodayInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
-      const response = await getDashboardDataCount(dashboardType, staffFilter, "recent", departmentFilter, unitFilter, divisionFilter)
+      const response = await getDashboardDataCount(dashboardType, staffFilter, "recent", departmentFilter, unitFilter, divisionFilter, startDate, endDate)
       return response
     } catch (error) {
       console.error("Error fetching pending today tasks:", error)
@@ -130,9 +132,9 @@ export const pendingTodayInTable = createAsyncThunk(
 
 export const pendingUpcomingInTable = createAsyncThunk(
   "dashboard/pendingUpcomingInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
-      const response = await getDashboardDataCount(dashboardType, staffFilter, "upcoming", departmentFilter, unitFilter, divisionFilter)
+      const response = await getDashboardDataCount(dashboardType, staffFilter, "upcoming", departmentFilter, unitFilter, divisionFilter, startDate, endDate)
       return response
     } catch (error) {
       console.error("Error fetching pending upcoming tasks:", error)
@@ -143,9 +145,9 @@ export const pendingUpcomingInTable = createAsyncThunk(
 
 export const pendingOverdueInTable = createAsyncThunk(
   "dashboard/pendingOverdueInTable",
-  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter }) => {
+  async ({ dashboardType, staffFilter, departmentFilter, unitFilter, divisionFilter, startDate, endDate }) => {
     try {
-      const response = await getDashboardDataCount(dashboardType, staffFilter, "overdue", departmentFilter, unitFilter, divisionFilter)
+      const response = await getDashboardDataCount(dashboardType, staffFilter, "overdue", departmentFilter, unitFilter, divisionFilter, startDate, endDate)
       return response
     } catch (error) {
       console.error("Error fetching pending overdue tasks:", error)

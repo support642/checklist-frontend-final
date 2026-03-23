@@ -32,6 +32,7 @@ import {
 import { fetchDepartmentDataApi } from "../../redux/api/settingApi.js"
 import MaintenanceView from "../../components/Maintenance/MaintenanceView.jsx"
 import { fetchDelegationDataSortByDate } from "../../redux/api/delegationApi.js"
+import { delegationData, delegationDoneData } from "../../redux/slice/delegationSlice.js"
 import { fetchUserProfile } from "../../redux/slice/userProfileSlice.js"
 
 export default function AdminDashboard() {
@@ -94,21 +95,6 @@ export default function AdminDashboard() {
     filtered: false,
   })
 
-  // State to store filtered statistics
-  const [filteredDateStats, setFilteredDateStats] = useState({
-    totalTasks: 0,
-    completedTasks: 0,
-    pendingTasks: 0,
-    overdueTasks: 0,
-    completionRate: 0,
-    pendingToday: 0,
-    pendingUpcoming: 0,
-    pendingOverdue: 0,
-    completedRatingOne: 0,
-    completedRatingTwo: 0,
-    completedRatingThreePlus: 0,
-  })
-
   const { 
     dashboard, 
     totalTask, 
@@ -117,7 +103,8 @@ export default function AdminDashboard() {
     overdueTask,
     pendingToday,
     pendingUpcoming,
-    pendingOverdue
+    pendingOverdue,
+    notDoneTask
   } = useSelector((state) => state.dashBoard)
   const { profile } = useSelector((state) => state.userProfile)
   const dispatch = useDispatch()
@@ -174,81 +161,19 @@ useEffect(() => {
 
 
   // Handle date range change from DashboardHeader
-  const handleDateRangeChange = async (startDate, endDate) => {
+  const handleDateRangeChange = (startDate, endDate) => {
     if (startDate && endDate) {
-      // Set date range state
       setDateRange({
         startDate,
         endDate,
         filtered: true
       });
-
-      // Fetch data with date range filter
-      try {
-        setIsLoadingMore(true);
-
-        if (dashboardType === "checklist") {
-          const userAccess = localStorage.getItem("user_access") || "";
-          
-          // Use the new date range API for checklist
-          let filteredData = await fetchChecklistDataByDateRangeApi(
-            startDate,
-            endDate,
-            dashboardStaffFilter,
-            departmentFilter,
-            unitFilter,
-            divisionFilter
-          );
-
-          // Also get statistics for the date range
-          let stats = await getChecklistDateRangeStatsApi(
-            startDate,
-            endDate,
-            dashboardStaffFilter,
-            departmentFilter,
-            unitFilter,
-            divisionFilter
-          );
-
-          // Admin-level restrictions if filter is "all"
-          const userRole = localStorage.getItem("role");
-          const userDepartments = userAccess ? userAccess.split(',').map(dept => dept.trim().toLowerCase()) : [];
-          
-          if (userRole === "admin" && userDepartments.length > 0) {
-              filteredData = filteredData.filter(task => {
-                  const taskDept = (task.department || "").toLowerCase().trim();
-                  return userDepartments.includes(taskDept);
-              });
-          }
-
-          // Process the filtered data
-          processFilteredData(filteredData, stats);
-        } else {
-          // For delegation, use the existing logic with date filtering
-          await fetchDepartmentDataWithDateRange(startDate, endDate);
-        }
-      } catch (error) {
-        console.error("Error fetching date range data:", error);
-      } finally {
-        setIsLoadingMore(false);
-      }
     } else {
-      // Clear date range filter
       setDateRange({
         startDate: "",
         endDate: "",
         filtered: false
       });
-      setFilteredDateStats({
-        totalTasks: 0,
-        completedTasks: 0,
-        pendingTasks: 0,
-        overdueTasks: 0,
-        completionRate: 0,
-      });
-
-      // Reload original data without date filter
-      fetchDepartmentData(1, false);
     }
   };
 
@@ -629,8 +554,19 @@ useEffect(() => {
         setIsLoadingMore(true)
       }
 
-      // Use the updated API function with department filter
-      const data = await fetchDashboardDataApi(dashboardType, dashboardStaffFilter, page, batchSize, 'all', departmentFilter, unitFilter, divisionFilter)
+      // Use the updated API function with department filter and date range
+      const data = await fetchDashboardDataApi(
+        dashboardType,
+        dashboardStaffFilter,
+        page,
+        batchSize,
+        'all',
+        departmentFilter,
+        unitFilter,
+        divisionFilter,
+        dateRange.startDate,
+        dateRange.endDate
+      )
 
       if (!data || data.length === 0) {
         if (page === 1) {
@@ -708,24 +644,24 @@ useEffect(() => {
       } else if (dashboardType === 'delegation') {
         // For delegation, fetch all delegation tasks from existing API and extract staff names
         try {
-          const delegationData = await fetchDelegationDataSortByDate();
-          let filteredDelegation = delegationData;
+          const delegationDataList = await fetchDelegationDataSortByDate(dateRange.startDate, dateRange.endDate);
+          let filteredDelegationList = delegationDataList;
           if (userRole === "admin" && userDepartments.length > 0) {
-            filteredDelegation = delegationData.filter(task => {
+            filteredDelegationList = delegationDataList.filter(task => {
               const taskDept = (task.department || "").toLowerCase().trim();
               return userDepartments.includes(taskDept);
             });
           }
           // Only show members who have at least one pending delegation task
           uniqueStaff = [...new Set(
-            filteredDelegation
+            filteredDelegationList
               .filter(task => !task.submission_date)
               .map((task) => task.name)
               .filter((name) => name && name.trim() !== "")
           )];
         } catch (error) {
-          console.error('Error fetching staff from delegation:', error);
-          uniqueStaff = [...new Set(filteredData.map((task) => task.name).filter((name) => name && name.trim() !== ""))];
+          console.error('Error fetching delegation staff:', error);
+          uniqueStaff = [];
         }
       } else {
         // Default behavior - extract from task data
@@ -1069,7 +1005,7 @@ useEffect(() => {
     // Fetch detailed data for charts and tables
     fetchDepartmentData(1, false)
 
-    // Update Redux state counts with staff and department filters
+    // Update Redux state counts with staff, department filters and date range
     const filterParams = {
       dashboardType,
       staffFilter: dashboardStaffFilter,
@@ -1077,7 +1013,9 @@ useEffect(() => {
       unitFilter,
       divisionFilter,
       role: userRole,
-      username
+      username,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate
     };
 
     dispatch(totalTaskInTable(filterParams));
@@ -1088,7 +1026,12 @@ useEffect(() => {
     dispatch(pendingTodayInTable(filterParams));
     dispatch(pendingUpcomingInTable(filterParams));
     dispatch(pendingOverdueInTable(filterParams));
-  }, [dashboardType, dashboardStaffFilter, departmentFilter, unitFilter, divisionFilter, dispatch, userRole, username])
+
+    if (dashboardType === "delegation") {
+      dispatch(delegationData({ startDate: dateRange.startDate, endDate: dateRange.endDate }));
+      dispatch(delegationDoneData({ startDate: dateRange.startDate, endDate: dateRange.endDate }));
+    }
+  }, [dashboardType, dashboardStaffFilter, departmentFilter, unitFilter, divisionFilter, dateRange.startDate, dateRange.endDate, dispatch, userRole, username])
 
   // Filter tasks based on criteria
   const filteredTasks = departmentData.allTasks.filter((task) => {
@@ -1234,20 +1177,8 @@ useEffect(() => {
     }
   }
 
-  // Determine which statistics to show based on date range filter
-  const displayStats = dateRange.filtered ? {
-    totalTasks: filteredDateStats.totalTasks || 0,
-    completedTasks: filteredDateStats.completedTasks || 0,
-    pendingTasks: filteredDateStats.pendingTasks || 0,
-    overdueTasks: filteredDateStats.overdueTasks || 0,
-    pendingToday: filteredDateStats.pendingToday || 0,
-    pendingUpcoming: filteredDateStats.pendingUpcoming || 0,
-    pendingOverdue: filteredDateStats.pendingOverdue || 0,
-    completedRatingOne: filteredDateStats.completedRatingOne || 0,
-    completedRatingTwo: filteredDateStats.completedRatingTwo || 0,
-    completedRatingThreePlus: filteredDateStats.completedRatingThreePlus || 0,
-  } : {
-    // Use Redux global counts instead of locally calculated ones
+  // Use displayStats consistently
+  const displayStats = {
     totalTasks: totalTask || 0,
     completedTasks: completeTask || 0,
     pendingTasks: pendingTask || 0,
@@ -1258,10 +1189,10 @@ useEffect(() => {
     completedRatingOne: departmentData.completedRatingOne || 0,
     completedRatingTwo: departmentData.completedRatingTwo || 0,
     completedRatingThreePlus: departmentData.completedRatingThreePlus || 0,
+    notDoneTasks: notDoneTask || 0,
   };
 
-  // const notDoneTask = (displayStats.totalTasks || 0) - (displayStats.completedTasks || 0);
-  const notDoneTask = useSelector((state) => state.dashBoard.notDoneTask);
+  const finalNotDoneTask = displayStats.notDoneTasks;
 
   // Persistence for active module tab
   const [activeModule, setActiveModule] = useState(() => {
@@ -1295,44 +1226,44 @@ useEffect(() => {
              {/* Left side empty or logo space */}
           </div>
 
-          <div className="flex p-1 bg-white rounded-2xl border border-white-100 dark:border-white-800 shadow-sm">
+          <div className="flex w-full p-1 bg-white rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
             {canAccessModule("checklist") && (
               <button
                 onClick={() => handleModuleChange("checklist")}
-                className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
                   activeModule === "checklist"
-                    ? "bg-blue-600 text-white shadow-lg scale-105"
+                    ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
                     : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
                 }`}
               >
-                <i className="fas fa-clipboard-list h-4 w-4" />
-                Checklist
+                <i className="fas fa-clipboard-list h-4 w-4 shrink-0" />
+                <span className="hidden min-[480px]:inline truncate">Checklist</span>
               </button>
             )}
             {canAccessModule("delegation") && (
               <button
                 onClick={() => handleModuleChange("delegation")}
-                className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
                   activeModule === "delegation"
-                    ? "bg-blue-600 text-white shadow-lg scale-105"
+                    ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
                     : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
                 }`}
               >
-                <i className="fas fa-handshake h-4 w-4" />
-                Delegation
+                <i className="fas fa-handshake h-4 w-4 shrink-0" />
+                <span className="hidden min-[480px]:inline truncate">Delegation</span>
               </button>
             )}
             {canAccessModule("maintenance") && (
               <button
                 onClick={() => handleModuleChange("maintenance")}
-                className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
+                className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
                   activeModule === "maintenance"
-                    ? "bg-blue-600 text-white shadow-lg scale-105"
+                    ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
                     : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
                 }`}
               >
-                <i className="fas fa-tools h-4 w-4" />
-                Maintenance
+                <i className="fas fa-tools h-4 w-4 shrink-0" />
+                <span className="hidden min-[480px]:inline truncate">Maintenance</span>
               </button>
             )}
           </div>
@@ -1428,6 +1359,8 @@ useEffect(() => {
                       dashboardStaffFilter={dashboardStaffFilter}
                       departmentFilter={departmentFilter}
                       parseTaskStartDate={parseTaskStartDate}
+                      startDate={dateRange.startDate}
+                      endDate={dateRange.endDate}
                     />
                   </div>
                 </div>
@@ -1436,7 +1369,10 @@ useEffect(() => {
           </div>
         ) : (
           <div className="animate-in fade-in duration-500">
-            <MaintenanceView />
+            <MaintenanceView 
+              startDate={dateRange.startDate} 
+              endDate={dateRange.endDate} 
+            />
           </div>
         )}
       </div>

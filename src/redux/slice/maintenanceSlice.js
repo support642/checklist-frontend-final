@@ -16,8 +16,8 @@ import {
 // ============================================================
 export const maintenanceData = createAsyncThunk(
     "fetch/maintenance",
-    async ({ page = 1, search = '' } = {}) => {
-        const { data, totalCount } = await fetchMaintenanceDataSortByDate(page, search);
+    async ({ page = 1, search = '', startDate = "", endDate = "" } = {}) => {
+        const { data, totalCount } = await fetchMaintenanceDataSortByDate(page, search, startDate, endDate);
         return { data, totalCount, page, search };
     }
 );
@@ -27,8 +27,8 @@ export const maintenanceData = createAsyncThunk(
 // ============================================================
 export const maintenanceHistoryData = createAsyncThunk(
     "fetch/maintenanceHistory",
-    async (search = "") => {
-        const { data, totalCount, approvedCount } = await fetchMaintenanceDataForHistory(search);
+    async ({ search = "", startDate = "", endDate = "" } = {}) => {
+        const { data, totalCount, approvedCount } = await fetchMaintenanceDataForHistory(search, startDate, endDate);
         return { data, totalCount, approvedCount };
     }
 );

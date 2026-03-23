@@ -69,18 +69,20 @@ function HistoryPage() {
     const user = localStorage.getItem("user-name")
     setUserRole(role || "")
     setUsername(user || "")
+    const tab = searchParams.get('tab')
     setIsSuperAdmin(role === "super_admin" || role === "admin" || role === "div_admin")
 
-    const tab = searchParams.get('tab')
     if (tab === 'maintenance') {
       setActiveTab('maintenance')
+    } else if (tab === 'delegation') {
+      setActiveTab('delegation')
     }
   }, [searchParams])
 
   // Tab visibility fallback logic
   useEffect(() => {
     if (!canAccessModule(activeTab)) {
-      const availableTabs = ["checklist", "maintenance"].filter(canAccessModule);
+      const availableTabs = ["checklist", "delegation", "maintenance"].filter(canAccessModule);
       if (availableTabs.length > 0) {
         setActiveTab(availableTabs[0]);
       }
@@ -574,13 +576,30 @@ function HistoryPage() {
                   setSelectedMaintenanceItems([])
                   setCurrentPage(1)
                 }}
-                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-l-md transition-colors ${
                   activeTab === "checklist"
                     ? "bg-purple-600 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
                 Checklist
+              </button>
+            )}
+            {canAccessModule("delegation") && (
+              <button
+                onClick={() => {
+                  setActiveTab("delegation")
+                  setSearchTerm("")
+                  setSelectedHistoryItems([])
+                  setSelectedDelegationItems([])
+                }}
+                className={`flex-1 py-2 px-3 text-sm font-medium transition-colors ${
+                  activeTab === "delegation"
+                    ? "bg-purple-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                Delegation
               </button>
             )}
             {canAccessModule("maintenance") && (
@@ -593,30 +612,13 @@ function HistoryPage() {
                   setSelectedMaintenanceItems([])
                   setMaintCurrentPage(1)
                 }}
-                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-r-md transition-colors ${
                   activeTab === "maintenance"
                     ? "bg-purple-600 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
                 Maintenance
-              </button>
-            )}
-            {canAccessModule("delegation") && (
-              <button
-                onClick={() => {
-                  setActiveTab("delegation")
-                  setSearchTerm("")
-                  setSelectedHistoryItems([])
-                  setSelectedDelegationItems([])
-                }}
-                className={`flex-1 py-2 px-3 text-sm font-medium rounded-r-md transition-colors ${
-                  activeTab === "delegation"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Delegation
               </button>
             )}
           </div>
@@ -631,9 +633,9 @@ function HistoryPage() {
 
         {/* Filters + Stats - Combined Compact */}
         <div className="bg-white rounded-md shadow-sm p-2">
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2 items-start sm:items-center">
             {/* Search */}
-            <div className="relative flex-1 min-w-[120px] max-w-[200px]">
+            <div className="relative w-full sm:flex-1 sm:min-w-[120px] sm:max-w-[200px]">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3" />
               <input
                 type="text"
@@ -645,21 +647,25 @@ function HistoryPage() {
             </div>
 
             {/* Date Range */}
-            <div className="flex gap-1 items-center">
-              <span className="text-xs text-gray-500">From</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-1.5 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-purple-500"
-              />
-              <span className="text-xs text-gray-500">To</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-1.5 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-purple-500"
-              />
+            <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-1 items-end sm:items-center w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                <span className="text-[10px] sm:text-xs text-gray-500 font-medium">From</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] sm:text-xs focus:ring-1 focus:ring-purple-500 bg-white"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                <span className="text-[10px] sm:text-xs text-gray-500 font-medium">To</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-1.5 py-1 border border-gray-300 rounded text-[11px] sm:text-xs focus:ring-1 focus:ring-purple-500 bg-white"
+                />
+              </div>
             </div>
 
             {/* Member Filter Dropdown - Only for Checklist */}

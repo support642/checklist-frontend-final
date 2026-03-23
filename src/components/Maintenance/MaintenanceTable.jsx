@@ -19,6 +19,49 @@ const MaintenanceTable = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // --- Helpers ---
+  const parseDate = (dateStr) => {
+    if (!dateStr || typeof dateStr !== "string") return new Date(NaN);
+    
+    // 1. ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+    if (dateStr.includes("-") && dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+      // Split by ' ' or 'T' to get date and time parts
+      const parts = dateStr.split(/[ T]/);
+      const datePart = parts[0];
+      const timePart = parts[1] ? parts[1].split(/[+-Z]/)[0] : "00:00:00";
+      
+      const [y, m, d] = datePart.split("-").map(Number);
+      const tUnits = timePart.split(":").map(Number);
+      
+      // Create a local date object using individual components
+      // This ignores the UTC offset if any and treats it as local time
+      return new Date(y, m - 1, d, tUnits[0] || 0, tUnits[1] || 0, tUnits[2] || 0);
+    }
+    
+    // 2. Regional format (DD/MM/YYYY or DD/MM/YYYY HH:mm:ss)
+    if (dateStr.includes("/")) {
+      const parts = dateStr.split(" ");
+      const datePart = parts[0];
+      const dateComponents = datePart.split("/");
+      if (dateComponents.length !== 3) return new Date(NaN);
+      
+      const [day, month, year] = dateComponents.map(Number);
+      const date = new Date(year, month - 1, day);
+      
+      if (parts.length > 1) {
+        const timeParts = parts[1].split(":");
+        if (timeParts.length >= 2) {
+          date.setHours(Number(timeParts[0]) || 0, Number(timeParts[1]) || 0, Number(timeParts[2]) || 0);
+        }
+      } else {
+        date.setHours(0, 0, 0, 0);
+      }
+      return date;
+    }
+    
+    return new Date(dateStr);
+  };
+
   // --- Filtering Logic ---
   const filteredTasks = useMemo(() => {
     let result = [...tasks];
@@ -26,23 +69,39 @@ const MaintenanceTable = ({
     // Time filter
     if (timeFilter !== 'all') {
       const now = new Date();
-      const todayStart = new Date(now.setHours(0, 0, 0, 0));
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       
       result = result.filter(task => {
-        const taskDate = new Date(task.planned_date || task.dueDate);
+        const dStr = task.planned_date || task.dueDate || task.task_start_date;
+        const taskDate = parseDate(dStr);
+        
+        if (isNaN(taskDate.getTime())) return false;
+
         if (timeFilter === 'today') {
-          return taskDate.toDateString() === todayStart.toDateString();
+          return taskDate.getFullYear() === now.getFullYear() &&
+                 taskDate.getMonth() === now.getMonth() &&
+                 taskDate.getDate() === now.getDate();
         }
+        
         if (timeFilter === 'week') {
-          const weekAgo = new Date(todayStart);
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          return taskDate >= weekAgo;
+          // Current Week: Monday to Sunday
+          const monday = new Date(todayStart);
+          const day = monday.getDay();
+          const diff = (day === 0 ? -6 : 1 - day);
+          monday.setDate(monday.getDate() + diff);
+          
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+          
+          return taskDate >= monday && taskDate <= sunday;
         }
+
         if (timeFilter === 'month') {
-          const monthAgo = new Date(todayStart);
-          monthAgo.setMonth(monthAgo.getMonth() - 1);
-          return taskDate >= monthAgo;
+          // Current Calendar Month
+          return taskDate.getMonth() === now.getMonth() && taskDate.getFullYear() === now.getFullYear();
         }
+        
         return true;
       });
     }
@@ -58,8 +117,26 @@ const MaintenanceTable = ({
       );
     }
 
-    // Status filter - only show pending
-    result = result.filter(task => (task.status || '').toLowerCase() === 'pending');
+    // Status filter removed to allow both pending and history tasks to show up
+    // result = result.filter(task => (task.status || '').toLowerCase() === 'pending');
+
+    // Sort: Earliest first (Ascending) - Current date followed by future tasks
+    result.sort((a, b) => {
+      const dStrA = a.planned_date || a.dueDate || a.submission_date || a.task_start_date;
+      const dStrB = b.planned_date || b.dueDate || b.submission_date || b.task_start_date;
+      const dateA = parseDate(dStrA);
+      const dateB = parseDate(dStrB);
+      
+      const timeA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
+      const timeB = isNaN(dateB.getTime()) ? 0 : dateB.getTime();
+      
+      if (timeA !== timeB) return timeA - timeB;
+      
+      // Fallback to task_id ascending
+      const idA = Number(a.task_id || a.id) || 0;
+      const idB = Number(b.task_id || b.id) || 0;
+      return idA - idB;
+    });
 
     return result;
   }, [tasks, timeFilter, searchQuery]);
@@ -173,9 +250,9 @@ const MaintenanceTable = ({
         </div>
       </div>
 
-      {/* Table Container - Matching staff-table-container */}
+      {/* Desktop Table View */}
       <div 
-        className="rounded-md border border-gray-200 overflow-auto"
+        className="hidden md:block rounded-md border border-gray-200 overflow-auto"
         style={{ maxHeight: "500px" }}
       >
         <table className="min-w-full divide-y divide-gray-200">
@@ -266,7 +343,7 @@ const MaintenanceTable = ({
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                       {task.givenBy || task.given_by || 'Admin'}
+                       {task.givenBy || task.given_by || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                        <div className="text-sm font-medium text-gray-900">{task.name || '-'}</div>
@@ -328,41 +405,205 @@ const MaintenanceTable = ({
         </table>
       </div>
 
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 animate-pulse space-y-3">
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              <div className="h-3 bg-gray-100 rounded w-3/4"></div>
+              <div className="h-8 bg-gray-50 rounded w-full"></div>
+            </div>
+          ))
+        ) : paginatedTasks.length === 0 ? (
+          <div className="py-12 bg-gray-50 rounded-xl text-center text-gray-500 border border-dashed border-gray-200">
+            No maintenance records found.
+          </div>
+        ) : (
+          paginatedTasks.map((task, index) => {
+            const isEditing = editingRowId === (task.task_id || task.id);
+            return (
+              <div 
+                key={task.task_id || task.id} 
+                className={`bg-white p-4 rounded-xl border transition-all duration-200 shadow-sm hover:shadow-md ${
+                  isEditing ? 'border-purple-300 ring-1 ring-purple-100' : 'border-gray-100'
+                }`}
+              >
+                {/* Card Header: Seq & Machine */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">#{ (currentPage - 1) * itemsPerPage + index + 1 }</span>
+                    {isEditing ? (
+                      <input
+                        name="machine_name"
+                        value={editFormData.machine_name || ''}
+                        onChange={handleEditChange}
+                        className="mt-1 px-2 py-1 text-sm font-bold border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                      />
+                    ) : (
+                      <h4 className="font-bold text-gray-900">
+                        {task.machine_name || 'Unnamed Machine'}
+                      </h4>
+                    )}
+                  </div>
+                  {getStatusBadge(task.status)}
+                </div>
+
+                {/* Card Details Grid */}
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 mb-4">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] uppercase text-gray-400 font-bold">Part & Area</p>
+                    <p className="text-xs font-medium text-gray-700 truncate">
+                      {Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '-')} 
+                      <span className="text-gray-400 mx-1">|</span> {task.part_area || '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] uppercase text-gray-400 font-bold">Dept / Div</p>
+                    <p className="text-xs font-medium text-gray-700 truncate">
+                      {task.machine_department || '-'} / {task.machine_division || '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-0.5 col-span-2">
+                    <p className="text-[10px] uppercase text-gray-400 font-bold">Assigned To (From: {task.givenBy || task.given_by || '—'})</p>
+                    <p className="text-xs font-semibold text-purple-700">{task.name || '-'}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] uppercase text-gray-400 font-bold">Planned Date</p>
+                    <p className="text-xs font-medium text-gray-600 flex items-center gap-1 text-[10px]">
+                      <Clock className="h-3 w-3" /> {task.planned_date || task.dueDate || '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] uppercase text-gray-400 font-bold">Frequency</p>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider">
+                      {task.frequency || '-'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Task Description */}
+                <div className="mb-4 p-2.5 bg-gray-50 rounded-lg border border-gray-100">
+                  <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Task Description</p>
+                  {isEditing ? (
+                    <textarea
+                      name="task_description"
+                      value={editFormData.task_description || ''}
+                      onChange={handleEditChange}
+                      rows={2}
+                      className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none bg-white"
+                    />
+                  ) : (
+                    <p className="text-xs text-gray-600 italic line-clamp-2 leading-relaxed">
+                      {task.task_description || 'No description provided'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Card Actions */}
+                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    {isEditing ? (
+                      <>
+                        <button onClick={handleSaveEdit} className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg shadow-sm font-bold text-xs active:scale-95 transition-all">
+                          <Save className="h-3.5 w-3.5" /> Save
+                        </button>
+                        <button onClick={handleCancelEdit} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-bold text-xs active:scale-95 transition-all">
+                          <X className="h-3.5 w-3.5" /> Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => handleEditClick(task)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-bold text-xs hover:bg-blue-100 active:scale-95 transition-all">
+                        <Edit2 className="h-3.5 w-3.5" /> Quick Edit
+                      </button>
+                    )}
+                  </div>
+                  {task.image_url && (
+                    <button 
+                      onClick={() => setSelectedImage(task.image_url)} 
+                      className="flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg font-bold text-xs hover:bg-purple-100 active:scale-95 transition-all"
+                    >
+                      <ImageIcon className="h-3.5 w-3.5" /> Evidence
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
       {/* Pagination Container - Matching Staff style */}
       {!isLoading && totalPages > 1 && (
-        <div className="flex items-center justify-between py-2 px-1">
-          <p className="text-xs text-gray-500">
+        <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 py-4 px-2 border-t border-gray-100 mt-2">
+          <p className="text-xs text-gray-500 order-2 sm:order-1">
             Showing <span className="font-medium text-purple-600">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium text-purple-600">{Math.min(currentPage * itemsPerPage, filteredTasks.length)}</span> of <span className="font-medium text-purple-600">{filteredTasks.length}</span> results
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 order-1 sm:order-2">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1 rounded border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+              className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50 bg-white shadow-sm transition-all active:scale-95"
             >
-              <ChevronLeft className="h-5 w-5 text-gray-500" />
+              <ChevronLeft className="h-4 w-4 text-gray-500" />
             </button>
             <div className="flex items-center gap-1">
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`w-7 h-7 rounded text-xs font-bold transition-all ${
-                    currentPage === i + 1 
-                    ? 'bg-purple-600 text-white shadow-sm' 
-                    : 'text-gray-500 hover:bg-gray-100'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
+              {/* Mobile View with 3 pages max */}
+              <div className="flex sm:hidden items-center gap-1">
+               {(() => {
+                  const max = 3;
+                  let start = Math.max(1, currentPage - Math.floor(max / 2));
+                  let end = Math.min(totalPages, start + max - 1);
+                  if (end - start < max - 1) start = Math.max(1, end - max + 1);
+                  const pages = [];
+                  for (let i = start; i <= end; i++) pages.push(i);
+                  return pages.map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-8 h-8 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
+                        currentPage === page 
+                        ? 'bg-purple-600 text-white shadow-md' 
+                        : 'text-gray-500 hover:bg-gray-100 border border-transparent'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ));
+                })()}
+              </div>
+
+              {/* Desktop View with 5 pages max */}
+              <div className="hidden sm:flex items-center gap-1">
+                {(() => {
+                  const max = 5;
+                  let start = Math.max(1, currentPage - Math.floor(max / 2));
+                  let end = Math.min(totalPages, start + max - 1);
+                  if (end - start < max - 1) start = Math.max(1, end - max + 1);
+                  const pages = [];
+                  for (let i = start; i <= end; i++) pages.push(i);
+                  return pages.map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-8 h-8 rounded-lg text-xs font-bold transition-all flex items-center justify-center ${
+                        currentPage === page 
+                        ? 'bg-purple-600 text-white shadow-md' 
+                        : 'text-gray-500 hover:bg-gray-100 border border-transparent'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ));
+                })()}
+              </div>
             </div>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1 rounded border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+              className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50 bg-white shadow-sm transition-all active:scale-95"
             >
-              <ChevronRight className="h-5 w-5 text-gray-500" />
+              <ChevronRight className="h-4 w-4 text-gray-500" />
             </button>
           </div>
         </div>

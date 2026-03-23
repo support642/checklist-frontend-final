@@ -109,7 +109,7 @@ const MachineModal = ({ isOpen, onClose, machines }) => {
   );
 };
 
-const MaintenanceView = () => {
+const MaintenanceView = ({ startDate = "", endDate = "" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const userRole = localStorage.getItem("role");
@@ -126,33 +126,155 @@ const MaintenanceView = () => {
   } = useSelector((state) => state.maintenance);
 
   useEffect(() => {
-    dispatch(maintenanceData({ page: 1 }));
-    dispatch(maintenanceHistoryData());
+    dispatch(maintenanceData({ page: 1, startDate, endDate }));
+    dispatch(maintenanceHistoryData({ startDate, endDate }));
     dispatch(fetchMachinePartsData());
-  }, [dispatch]);
+  }, [dispatch, startDate, endDate]);
+
+  // --- Helpers ---
+  const parseDate = (dateStr) => {
+    if (!dateStr || typeof dateStr !== "string") return new Date(NaN);
+    
+    // 1. ISO format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss)
+    if (dateStr.includes("-") && dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+      const parts = dateStr.split(/[ T]/);
+      const datePart = parts[0];
+      const timePart = parts[1] ? parts[1].split(/[+-Z]/)[0] : "00:00:00";
+      const [y, m, d] = datePart.split("-").map(Number);
+      const tUnits = timePart.split(":").map(Number);
+      return new Date(y, m - 1, d, tUnits[0] || 0, tUnits[1] || 0, tUnits[2] || 0);
+    }
+
+    // 2. Regional format (DD/MM/YYYY)
+    if (dateStr.includes("/")) {
+      const parts = dateStr.split(" ");
+      const dateComponents = parts[0].split("/");
+      if (dateComponents.length !== 3) return new Date(NaN);
+      const [d, m, y] = dateComponents.map(Number);
+      const date = new Date(y, m - 1, d);
+      if (parts.length > 1) {
+        const tParts = parts[1].split(":");
+        if (tParts.length >= 2) date.setHours(Number(tParts[0]) || 0, Number(tParts[1]) || 0, Number(tParts[2]) || 0);
+      } else date.setHours(0, 0, 0, 0);
+      return date;
+    }
+    return new Date(dateStr);
+  };
+
+  // --- Memoized Data ---
+  const allMaintenanceTasks = useMemo(() => {
+    const uniqueMap = new Map();
+    [...maintenance, ...history].forEach(task => {
+      const id = task.task_id || task.id;
+      if (id) uniqueMap.set(id, task);
+    });
+    return Array.from(uniqueMap.values());
+  }, [maintenance, history]);
 
   // --- Aggregate Stats ---
   const stats = useMemo(() => {
-    const totalPending = maintenance.length;
-    const totalCompleted = historyApprovedCount || 0;
-    const totalHistory = historyTotalCount || 0;
-    
-    // Simple heuristic for overdue: if status is 'overdue' in pending
-    const overdueCount = maintenance.filter(t => (t.status || '').toLowerCase() === 'overdue').length;
+    // 1. Total Unique Tasks
+    const totalTasks = allMaintenanceTasks.length;
+
+    // 2. Identify Pending (Unique)
+    const pendingTasksList = allMaintenanceTasks.filter(task => 
+      (task.status || "").toLowerCase() === "pending"
+    );
+
+    // 3. Count Overdue (Subset of Pending, due before today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const overdueCount = pendingTasksList.filter(task => {
+      const dStr = (task.task_start_date || task.planned_date || task.dueDate || "").toString().trim();
+      if (!dStr) return false;
+      const d = parseDate(dStr);
+      d.setHours(0, 0, 0, 0);
+      return !isNaN(d.getTime()) && d.getTime() < today.getTime();
+    }).length;
+
+    // 3b. Count Pending (Subset of Pending, due exactly today)
+    const pendingTodayCount = pendingTasksList.filter(task => {
+      const dStr = (task.task_start_date || task.planned_date || task.dueDate || "").toString().trim();
+      if (!dStr) return false;
+      const d = parseDate(dStr);
+      d.setHours(0, 0, 0, 0);
+      return !isNaN(d.getTime()) && d.getTime() === today.getTime();
+    }).length;
+
+    // 4. Count Completed/History (Unique)
+    const completedCount = allMaintenanceTasks.filter(task => 
+      ['approved', 'completed'].includes((task.status || "").toLowerCase())
+    ).length;
 
     return {
       totalMachines: machineParts.length || 0,
-      totalTasks: totalPending + totalHistory,
-      completedTasks: totalCompleted,
-      pendingTasks: totalPending - overdueCount,
-      overdueTasks: overdueCount,
-      totalCost: '15,000' // Dummy for now
+      totalTasks: totalTasks,
+      completedTasks: completedCount,
+      pendingTasks: pendingTodayCount, // Only today's tasks
+      overdueTasks: overdueCount    // Only tasks before today
     };
-  }, [maintenance, historyTotalCount, historyApprovedCount, machineParts]);
+  }, [allMaintenanceTasks, machineParts]);
+
+  // --- Derive Department Data ---
+  const deptData = useMemo(() => {
+    const deptCounts = {};
+    
+    allMaintenanceTasks.forEach(task => {
+      const dept = task.machine_department || 'Other';
+      deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+    });
+
+    // Return top 5 or sorted departments
+    return Object.keys(deptCounts)
+      .map(dept => ({ name: dept, value: deptCounts[dept] }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [allMaintenanceTasks]);
+
+  // --- Derive Monthly Data ---
+  const monthlyData = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Window: Current Month + Next 5 Months
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    
+    const window = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(currentYear, currentMonth + i, 1);
+      window.push({ 
+        month: monthNames[d.getMonth()], 
+        year: d.getFullYear(), 
+        tasks: 0 
+      });
+    }
+
+    allMaintenanceTasks.forEach(task => {
+      const dateStr = task.planned_date || task.dueDate || task.submission_date || task.task_start_date;
+      if (dateStr) {
+        const date = parseDate(dateStr);
+        if (!isNaN(date.getTime())) {
+          const m = date.getMonth();
+          const y = date.getFullYear();
+          // Find if this date falls into our 6-month window (Checking both Month AND Year)
+          const target = window.find(w => w.month === monthNames[m] && w.year === y);
+          if (target) {
+            target.tasks++;
+          }
+        }
+      }
+    });
+
+    return window.map(w => ({
+      month: w.month,
+      tasks: w.tasks
+    }));
+  }, [allMaintenanceTasks]);
 
   // --- Derive Frequency Data ---
   const frequencyData = useMemo(() => {
-    const allTasks = [...maintenance, ...history];
     const freqMap = {
       'one-time': 0,
       'daily': 0,
@@ -163,7 +285,7 @@ const MaintenanceView = () => {
       'yearly': 0
     };
 
-    allTasks.forEach(task => {
+    allMaintenanceTasks.forEach(task => {
       const f = (task.frequency || '').toLowerCase();
       if (freqMap.hasOwnProperty(f)) {
         freqMap[f]++;
@@ -178,7 +300,7 @@ const MaintenanceView = () => {
       name: key.charAt(0).toUpperCase() + key.slice(1),
       count: freqMap[key]
     }));
-  }, [maintenance, history]);
+  }, [allMaintenanceTasks]);
 
   // --- Handlers ---
   const handleCardClick = (type) => {
@@ -206,7 +328,7 @@ const MaintenanceView = () => {
   const handleUpdateTask = async (updatedTask) => {
     // We use updateUniqueMaintenanceTask thunk which expects { updatedTask, originalTask }
     // For simplicity here, we'll try to match the API expectation
-    const originalTask = [...maintenance, ...history].find(t => (t.task_id || t.id) === (updatedTask.task_id || updatedTask.id));
+    const originalTask = allMaintenanceTasks.find(t => (t.task_id || t.id) === (updatedTask.task_id || updatedTask.id));
     
     if (originalTask) {
       return dispatch(updateUniqueMaintenanceTask({ updatedTask, originalTask })).unwrap();
@@ -246,7 +368,11 @@ const MaintenanceView = () => {
       <StatsCards stats={stats} onCardClick={handleCardClick} />
 
       {/* Charts Section */}
-      <MaintenanceCharts frequencyData={frequencyData} />
+      <MaintenanceCharts 
+        frequencyData={frequencyData} 
+        deptData={deptData}
+        monthlyData={monthlyData}
+      />
 
       {/* Main Table Section */}
       <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
@@ -263,7 +389,7 @@ const MaintenanceView = () => {
         </div>
         <div className="p-4">
           <MaintenanceTable 
-            tasks={[...maintenance, ...history]} 
+            tasks={allMaintenanceTasks} 
             onUpdateTask={handleUpdateTask}
             isLoading={loading}
             onRefresh={handleRefresh}

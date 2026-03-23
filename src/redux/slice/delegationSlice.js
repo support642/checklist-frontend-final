@@ -7,15 +7,15 @@ import {
 
 export const delegationData = createAsyncThunk(
   "delegation/fetchPending",
-  async () => {
-    return await fetchDelegationDataSortByDate();
+  async ({ startDate = "", endDate = "" } = {}) => {
+    return await fetchDelegationDataSortByDate(startDate, endDate);
   }
 );
 
 export const delegationDoneData = createAsyncThunk(
   "delegation/fetchDone",
-  async (search = "") => {
-    return await fetchDelegation_DoneDataSortByDate(search);
+  async ({ search = "", startDate = "", endDate = "" } = {}) => {
+    return await fetchDelegation_DoneDataSortByDate(search, startDate, endDate);
   }
 );
 

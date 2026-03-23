@@ -78,7 +78,7 @@ export const insertDelegationDoneAndUpdate = createAsyncThunk(
 );
 
 // FETCH PENDING
-export const fetchDelegationDataSortByDate = async () => {
+export const fetchDelegationDataSortByDate = async (startDate = "", endDate = "") => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access");
@@ -87,14 +87,14 @@ export const fetchDelegationDataSortByDate = async () => {
   const department = localStorage.getItem("department");
 
   const { data } = await axios.get(`${API}/delegation`, {
-    params: { role, username, user_access: userAccess, unit, division, department },
+    params: { role, username, user_access: userAccess, unit, division, department, startDate, endDate },
   });
 
   return data;
 };
 
 // FETCH DONE
-export const fetchDelegation_DoneDataSortByDate = async (search = "") => {
+export const fetchDelegation_DoneDataSortByDate = async (search = "", startDate = "", endDate = "") => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access");
@@ -103,7 +103,7 @@ export const fetchDelegation_DoneDataSortByDate = async (search = "") => {
   const department = localStorage.getItem("department");
 
   const { data } = await axios.get(`${API}/delegation-done`, {
-    params: { role, username, user_access: userAccess, search, unit, division, department },
+    params: { role, username, user_access: userAccess, search, unit, division, department, startDate, endDate },
   });
 
   return data;

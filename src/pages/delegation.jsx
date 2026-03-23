@@ -13,6 +13,7 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   delegationData,
 } from "../redux/slice/delegationSlice";
+import Toast from "../components/Toast";
 
 import { insertDelegationDoneAndUpdate } from "../redux/api/delegationApi";
 
@@ -45,9 +46,9 @@ function DelegationDataPage() {
   const [uploadedImages, setUploadedImages] = useState({});
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
   const [remarksData, setRemarksData] = useState({});
   const [statusData, setStatusData] = useState({});
   const [nextTargetDate, setNextTargetDate] = useState({});
@@ -273,17 +274,17 @@ function DelegationDataPage() {
   const handleSubmit = async () => {
     const selectedItemsArray = Array.from(selectedItems);
     if (selectedItemsArray.length === 0) {
-      alert("Please select at least one task");
+      setToast({ show: true, message: "Please select at least one task", type: "warning" });
       return;
     }
 
     if (selectedItemsArray.some(id => !statusData[id])) {
-      alert("Please select status for all selected items.");
+      setToast({ show: true, message: "Please select status for all selected items.", type: "warning" });
       return;
     }
 
     if (selectedItemsArray.some(id => statusData[id] === "Extend date" && !nextTargetDate[id])) {
-      alert("Please select next target date for extended tasks.");
+      setToast({ show: true, message: "Please select next target date for extended tasks.", type: "warning" });
       return;
     }
 
@@ -293,7 +294,7 @@ function DelegationDataPage() {
     });
 
     if (missingRequiredImages.length > 0) {
-      alert("Please upload images for required attachments.");
+      setToast({ show: true, message: "Please upload images for required attachments.", type: "warning" });
       return;
     }
 
@@ -327,7 +328,11 @@ function DelegationDataPage() {
 
       const result = await dispatch(insertDelegationDoneAndUpdate({ selectedDataArray: selectedData }));
       if (result.meta.requestStatus === "fulfilled") {
-        setSuccessMessage(`✅ Successfully submitted ${selectedItemsArray.length} tasks!`);
+        setToast({ 
+          show: true, 
+          message: `Successfully submitted ${selectedItemsArray.length} tasks!`, 
+          type: "success" 
+        });
         setSelectedItems(new Set());
         setRemarksData({});
         setNextTargetDate({});
@@ -341,7 +346,11 @@ function DelegationDataPage() {
       }
     } catch (error) {
       console.error('Submission error:', error);
-      setSuccessMessage(`❌ Error: ${error.message}`);
+      setToast({ 
+        show: true, 
+        message: `Error: ${error.message}`, 
+        type: "error" 
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -360,6 +369,7 @@ function DelegationDataPage() {
   const toggleRowSelection = useCallback((item, isChecked) => handleSelectItem(item.task_id, isChecked), [handleSelectItem]);
 
   return (
+    <>
     <AdminLayout>
       <div className="space-y-6 p-2 sm:p-4 pb-20">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -404,17 +414,6 @@ function DelegationDataPage() {
           </div>
         </div>
 
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-3 sm:px-4 py-3 rounded-md flex items-center justify-between text-sm sm:text-base">
-            <div className="flex items-center">
-              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-green-500 flex-shrink-0" />
-              <span className="break-words">{successMessage}</span>
-            </div>
-            <button onClick={() => setSuccessMessage("")} className="text-green-500 hover:text-green-700 ml-2 flex-shrink-0">
-              <X className="h-4 w-4 sm:h-5 sm:w-5" />
-            </button>
-          </div>
-        )}
 
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
           <div className="bg-linear-to-r from-purple-50 to-pink-50 border-b border-purple-100 p-3 sm:p-4 flex justify-between items-center">
@@ -432,32 +431,29 @@ function DelegationDataPage() {
           ) : (
             <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
               {/* Desktop Table */}
-              <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
-                <thead className="bg-gray-50 sticky top-0 z-10">
+              <table className="min-w-full divide-y divide-gray-200 hidden sm:table table-fixed">
+                <thead className="bg-gray-50 sticky top-0 z-20 shadow-sm">
                   <tr>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Seq No.</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Admin Remarks</th>
-                    <th className="px-3 py-3 text-left">
-                       <div className="flex flex-col gap-1 items-start">
-                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</span>
-                         <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          onChange={(e) => handleSelectAll(e.target.checked)}
-                          checked={unifiedData.length > 0 && unifiedData.every(item => isRowSelected(item))}
-                        />
-                       </div>
+                    <th className="w-12 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Seq</th>
+                    <th className="w-16 px-3 py-4 text-left">
+                       <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        checked={unifiedData.length > 0 && unifiedData.every(item => isRowSelected(item))}
+                      />
                     </th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Remarks</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Given by</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Unit</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Division</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Description</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Target Date</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Submit Date</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Task ID</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold text-gray-500 uppercase tracking-wider">Proof</th>
+                    <th className="w-32 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="w-64 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Remark/Action</th>
+                    <th className="w-80 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+                    <th className="w-40 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="w-32 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Given</th>
+                    <th className="w-32 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Unit</th>
+                    <th className="w-32 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Division</th>
+                    <th className="w-44 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Target Date</th>
+                    <th className="w-44 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Submit Date</th>
+                    <th className="w-24 px-3 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Task ID</th>
+                    <th className="w-20 px-3 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Proof</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -465,27 +461,26 @@ function DelegationDataPage() {
                     unifiedData.map((item, index) => {
                       const isSelected = isRowSelected(item);
                       return (
-                        <tr key={item.unifiedId} className={`${isSelected ? "bg-purple-50" : "hover:bg-gray-50"} ${getRowColor(item.color_code_for)} transition-colors border-b`}>
-                          <td className="px-3 py-4 text-xs text-gray-500">{index + 1}</td>
-                          <td className="px-3 py-4 text-xs text-gray-600 max-w-[150px] truncate" title={item.adminremarks}>{item.adminremarks || "—"}</td>
+                        <tr key={item.unifiedId} className={`${isSelected ? "bg-purple-50" : "hover:bg-gray-50"} ${getRowColor(item.color_code_for)} transition-colors`}>
+                          <td className="px-3 py-4 text-xs text-gray-500 font-medium">{index + 1}</td>
                           <td className="px-3 py-4">
-                            <div className="flex flex-col gap-1 items-start">
-                              <StatusBadge status="pending" />
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                                checked={isSelected}
-                                onChange={(e) => toggleRowSelection(item, e.target.checked)}
-                              />
-                            </div>
+                            <input
+                              type="checkbox"
+                              className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer shadow-sm"
+                              checked={isSelected}
+                              onChange={(e) => toggleRowSelection(item, e.target.checked)}
+                            />
                           </td>
-                          <td className="px-3 py-4 min-w-[180px]">
+                          <td className="px-3 py-4">
+                            <StatusBadge status="pending" />
+                          </td>
+                          <td className="px-3 py-4">
                             {isSelected ? (
-                              <div className="space-y-1">
+                              <div className="space-y-2 max-w-[220px]">
                                 <select
                                   value={statusData[item.task_id] || "Done"}
                                   onChange={(e) => handleStatusChange(item.task_id, e.target.value)}
-                                  className="border border-gray-300 rounded px-1 py-0.5 w-full text-[10px]"
+                                  className="border border-purple-200 rounded px-2 py-1.5 w-full text-xs focus:ring-2 focus:ring-purple-500 outline-none"
                                 >
                                   <option value="Done">Done</option>
                                   <option value="Extend date">Extend</option>
@@ -495,38 +490,46 @@ function DelegationDataPage() {
                                     type="datetime-local"
                                     value={nextTargetDate[item.task_id] || ""}
                                     onChange={(e) => handleNextTargetDateChange(item.task_id, e.target.value)}
-                                    className="border border-gray-300 rounded px-1 py-0.5 w-full text-[10px]"
+                                    className="border border-purple-200 rounded px-2 py-1.5 w-full text-xs focus:ring-2 focus:ring-purple-500 outline-none"
                                   />
                                 )}
                                 <textarea
-                                  placeholder="Remarks"
+                                  placeholder="Type remarks here..."
                                   value={remarksData[item.task_id] || ""}
                                   onChange={(e) => setRemarksData(prev => ({ ...prev, [item.task_id]: e.target.value }))}
-                                  className="w-full border rounded p-1 text-[10px] h-12 focus:ring-1 focus:ring-purple-500 outline-none"
+                                  className="w-full border border-purple-200 rounded p-2 text-xs h-20 focus:ring-2 focus:ring-purple-500 outline-none resize-none"
                                 />
                               </div>
                             ) : (
-                              <div className="text-[10px] text-gray-500 italic truncate max-w-[150px]">{item.remarks || "—"}</div>
+                              <div className="text-xs text-gray-500 italic break-words line-clamp-3" title={item.remarks}>
+                                {item.remarks || "—"}
+                              </div>
                             )}
                           </td>
-                          <td className="px-3 py-4 text-xs text-gray-700">{item.name}</td>
-                          <td className="px-3 py-4 text-xs text-gray-700">{item.given_by || "—"}</td>
-                          <td className="px-3 py-4 text-[10px] text-gray-600">{item.unit || "—"}</td>
-                          <td className="px-3 py-4 text-[10px] text-gray-600">{item.division || "—"}</td>
-                          <td className="px-3 py-4 text-[10px] text-gray-700 max-w-[200px] truncate" title={item.task_description}>{item.task_description}</td>
-                          <td className="px-3 py-4 text-[10px] text-gray-600 whitespace-nowrap">{formatDateTimeForDisplay(item.planned_date)}</td>
-                          <td className="px-3 py-4 text-[10px] text-gray-600 whitespace-nowrap">{formatDateTimeForDisplay(item.submission_date)}</td>
-                          <td className="px-3 py-4 text-[10px] font-medium text-gray-700">{item.task_id}</td>
+                          <td className="px-3 py-4 text-xs text-gray-700">
+                             <div className="break-words line-clamp-4 font-medium" title={item.task_description}>
+                               {item.task_description}
+                             </div>
+                          </td>
+                          <td className="px-3 py-4 text-xs text-gray-700 font-medium">{item.name}</td>
+                          <td className="px-3 py-4 text-xs text-gray-600">{item.given_by || "—"}</td>
+                          <td className="px-3 py-4 text-xs text-gray-600">{item.unit || "—"}</td>
+                          <td className="px-3 py-4 text-xs text-gray-600">{item.division || "—"}</td>
+                          <td className="px-3 py-4 text-xs text-gray-600 whitespace-nowrap bg-purple-50/30">{formatDateTimeForDisplay(item.planned_date)}</td>
+                          <td className="px-3 py-4 text-xs text-gray-600 whitespace-nowrap">{formatDateTimeForDisplay(item.submission_date)}</td>
+                          <td className="px-3 py-4 text-xs font-bold text-purple-700">{item.task_id}</td>
                           <td className="px-3 py-4 text-center">
                             {isSelected ? (
-                              <label className="cursor-pointer text-purple-600 hover:text-purple-800 flex items-center justify-center gap-1">
-                                <Upload size={14} />
-                                <span className="text-[10px] font-bold uppercase">{uploadedImages[item.task_id] ? "Done" : "Upload"}</span>
+                              <label className="cursor-pointer bg-purple-100 text-purple-700 hover:bg-purple-200 p-2 rounded-full transition-colors inline-flex items-center justify-center" title={uploadedImages[item.task_id] ? "Image Uploaded" : "Upload Proof"}>
+                                <Upload size={18} />
+                                {uploadedImages[item.task_id] && <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>}
                                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(item.task_id, e)} />
                               </label>
                             ) : (
                               item.image && (
-                                <button onClick={() => window.open(item.image, "_blank")} className="text-purple-500 hover:text-purple-700"><Upload size={16} /></button>
+                                <button onClick={() => window.open(item.image, "_blank")} className="p-2 text-purple-600 hover:bg-purple-50 rounded-full transition-colors" title="View Proof">
+                                  <Upload size={18} />
+                                </button>
                               )
                             )}
                           </td>
@@ -605,6 +608,13 @@ function DelegationDataPage() {
         </div>
       </div>
     </AdminLayout>
+    <Toast 
+      isVisible={toast.show} 
+      message={toast.message} 
+      type={toast.type} 
+      onClose={() => setToast({ ...toast, show: false })} 
+    />
+    </>
   );
 }
 

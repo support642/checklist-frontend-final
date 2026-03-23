@@ -2,6 +2,7 @@ import { ListTodo, CheckCircle2, Clock, AlertTriangle, BarChart3, XCircle, Calen
 import { useNavigate } from "react-router-dom"
 import { useState } from "react"
 import { createPortal } from "react-dom"
+import { hasPageAccess } from "../../../utils/permissionUtils"
 
 export default function StatisticsCards({
   dashboardType,
@@ -146,9 +147,12 @@ export default function StatisticsCards({
             </div>
           </div>
 
-          {/* Completed Tasks */}
           <div 
-            onClick={() => handleCardClick("completed", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/history')}
+            onClick={() => handleCardClick("completed", 
+              dashboardType === 'delegation' 
+                ? (hasPageAccess('admin_approval') ? '/dashboard/history?tab=delegation' : '/dashboard/delegation')
+                : '/dashboard/history'
+            )}
             className="rounded-lg border border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-green-50 to-green-100 rounded-tr-lg p-3 sm:p-4">
@@ -190,7 +194,7 @@ export default function StatisticsCards({
               <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-amber-700">
                 {dashboardType === "checklist" ? pendingToday : pendingTask}
               </div>
-              <div className="flex justify-between items-center mt-1">
+              <div className="flex flex-wrap justify-between items-center mt-1 gap-y-2 gap-x-2">
                 <p className="text-xs text-amber-600">
                   {dateRange ? (
                     <>Pending in period</>
@@ -200,12 +204,12 @@ export default function StatisticsCards({
                     "Today's Pending"
                   )}
                 </p>
-                <div className="flex gap-2 text-[10px] sm:text-xs">
-                  <span className="text-amber-700 bg-amber-100 px-1 rounded">T:{pendingToday}</span>
+                <div className="flex flex-wrap gap-1 md:gap-1.5 text-[10px] sm:text-xs">
+                  <span className="text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded whitespace-nowrap">T:{pendingToday}</span>
                   {dashboardType !== "checklist" && (
                     <>
-                      <span className="text-amber-700 bg-amber-100 px-1 rounded">U:{pendingUpcoming}</span>
-                      <span className="text-amber-700 bg-amber-100 px-1 rounded">O:{pendingOverdue}</span>
+                      <span className="text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded whitespace-nowrap">U:{pendingUpcoming}</span>
+                      <span className="text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded whitespace-nowrap">O:{pendingOverdue}</span>
                     </>
                   )}
                 </div>
@@ -213,9 +217,13 @@ export default function StatisticsCards({
             </div>
           </div>
 
-          {/* Not Done Tasks */}
+          {/* Not Done Tasks / Completed Twice */}
           <div
-            onClick={() => handleCardClick("not_done", "/dashboard/data/sales")}
+            onClick={() => handleCardClick("not_done", 
+              dashboardType === 'delegation'
+                ? (hasPageAccess('admin_approval') ? '/dashboard/history?tab=delegation' : '/dashboard/delegation')
+                : "/dashboard/data/sales"
+            )}
             className="rounded-lg border border-l-4 border-l-gray-500 shadow-md hover:shadow-lg transition-all bg-white cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-tr-lg p-3 sm:p-4">
@@ -242,7 +250,11 @@ export default function StatisticsCards({
 
           {/* Overdue Tasks / Completed 3+ Times */}
           <div 
-            onClick={() => handleCardClick("overdue", dashboardType === 'delegation' ? '/dashboard/delegation' : '/dashboard/data/sales')}
+            onClick={() => handleCardClick("overdue", 
+              dashboardType === 'delegation' 
+                ? (hasPageAccess('admin_approval') ? '/dashboard/history?tab=delegation' : '/dashboard/delegation')
+                : '/dashboard/data/sales'
+            )}
             className="rounded-lg border border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all bg-white sm:col-span-2 lg:col-span-1 col-span-2 cursor-pointer"
           >
             <div className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gradient-to-r from-red-50 to-red-100 rounded-tr-lg p-3 sm:p-4">

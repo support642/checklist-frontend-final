@@ -4,16 +4,18 @@ const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/maintenance`;
 // =======================================================
 // 1️⃣ Fetch Pending Maintenance Tasks
 // =======================================================
-export const fetchMaintenanceDataSortByDate = async (page = 1, search = '') => {
+export const fetchMaintenanceDataSortByDate = async (page = 1, search = '', startDate = "", endDate = "") => {
     const username = localStorage.getItem("user-name");
     const role = localStorage.getItem("role");
     const department = localStorage.getItem("department");
     const unit = localStorage.getItem("unit");
     const division = localStorage.getItem("division");
 
-    const firstRes = await fetch(
-        `${BASE_URL}?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
-    );
+    let url = `${BASE_URL}?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+
+    const firstRes = await fetch(url);
 
     if (!firstRes.ok) {
         const contentType = firstRes.headers.get("content-type");
@@ -38,11 +40,14 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, search = '') => {
 
     if (totalPages > 1) {
         const remaining = await Promise.all(
-            Array.from({ length: totalPages - 1 }, (_, i) =>
-                fetch(`${BASE_URL}?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`)
+            Array.from({ length: totalPages - 1 }, (_, i) => {
+                let pUrl = `${BASE_URL}?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`;
+                if (startDate) pUrl += `&startDate=${startDate}`;
+                if (endDate) pUrl += `&endDate=${endDate}`;
+                return fetch(pUrl)
                     .then(r => r.json())
-                    .then(j => j.data || [])
-            )
+                    .then(j => j.data || []);
+            })
         );
         allData = [...allData, ...remaining.flat()];
     }
@@ -53,7 +58,7 @@ export const fetchMaintenanceDataSortByDate = async (page = 1, search = '') => {
 // =======================================================
 // 2️⃣ Fetch Maintenance History
 // =======================================================
-export const fetchMaintenanceDataForHistory = async (search = "") => {
+export const fetchMaintenanceDataForHistory = async (search = "", startDate = "", endDate = "") => {
     const username = localStorage.getItem("user-name");
     const role = localStorage.getItem("role");
     const department = localStorage.getItem("department");
@@ -64,9 +69,11 @@ export const fetchMaintenanceDataForHistory = async (search = "") => {
     const encodedSearch = encodeURIComponent(search);
 
     // Fetch page 1 to get totalCount
-    const firstRes = await fetch(
-        `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`
-    );
+    let url = `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`;
+    if (startDate) url += `&startDate=${startDate}`;
+    if (endDate) url += `&endDate=${endDate}`;
+
+    const firstRes = await fetch(url);
     const firstJson = await firstRes.json();
     const totalCount = firstJson.totalCount || 0;
     const approvedCount = firstJson.approvedCount || 0;
@@ -76,11 +83,14 @@ export const fetchMaintenanceDataForHistory = async (search = "") => {
     const totalPages = Math.ceil(totalCount / PAGE_SIZE);
     if (totalPages > 1) {
         const remaining = await Promise.all(
-            Array.from({ length: totalPages - 1 }, (_, i) =>
-                fetch(`${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`)
+            Array.from({ length: totalPages - 1 }, (_, i) => {
+                let pUrl = `${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`;
+                if (startDate) pUrl += `&startDate=${startDate}`;
+                if (endDate) pUrl += `&endDate=${endDate}`;
+                return fetch(pUrl)
                     .then(r => r.json())
-                    .then(j => j.data || [])
-            )
+                    .then(j => j.data || []);
+            })
         );
         allData = [...allData, ...remaining.flat()];
     }

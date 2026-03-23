@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 // import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw } from 'lucide-react';
-import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw, Eye, EyeOff, Upload, Image as ImageIcon } from 'lucide-react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { useDispatch, useSelector } from 'react-redux';
 import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, machineDetails, createMachineThunk, updateMachineThunk, deleteMachineThunk } from '../redux/slice/settingSlice';
@@ -59,17 +59,26 @@ const Setting = () => {
   const [extendLoading, setExtendLoading] = useState(false);
   const [newStartDates, setNewStartDates] = useState({});
   
+  // Category selection for Leave Transfer
+  const [popupLeaveCategory, setPopupLeaveCategory] = useState('Checklist');
+  const [bulkLeaveCategory, setBulkLeaveCategory] = useState('Checklist');
+  
   // Individual Task Assignment State
   const [userTasks, setUserTasks] = useState([]);
   const [taskAssignments, setTaskAssignments] = useState({});
   const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [fetchError, setFetchError] = useState('');
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [tasksToBulkDelete, setTasksToBulkDelete] = useState([]); // For bulk deletion modal
+  const [selectedTasksToDelete, setSelectedTasksToDelete] = useState([]); // Checked tasks
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
 
   // Machine Management State
   const [showMachineModal, setShowMachineModal] = useState(false);
   const [machineForm, setMachineForm] = useState({
     machine_name: '',
     part_name: [],
+    part_images: [], // Added for part images
     machine_area: '',
     machine_department: '',
     machine_division: ''
@@ -371,8 +380,20 @@ const debugUserStatus = async () => {
   };
 
 const handleSubmitLeave = async () => {
-  if (selectedUsers.length === 0 || !leaveStartDate || !leaveEndDate) {
-    alert('Please select at least one user and provide both start and end dates');
+  if (selectedUsers.length === 0) {
+    alert('Please select at least one user');
+    return;
+  }
+
+
+  // Show delegation modal instead of directly submitting
+  setShowDelegationModal(true);
+};
+
+// New function to handle actual delegation after doer selection
+const handleConfirmDelegation = async () => {
+  if (!selectedDoer || !leaveStartDate || !leaveEndDate) {
+    alert('Please select a doer and provide both start and end dates');
     return;
   }
 
@@ -382,17 +403,6 @@ const handleSubmitLeave = async () => {
   
   if (startDate > endDate) {
     alert('End date cannot be before start date');
-    return;
-  }
-
-  // Show delegation modal instead of directly submitting
-  setShowDelegationModal(true);
-};
-
-// New function to handle actual delegation after doer selection
-const handleConfirmDelegation = async () => {
-  if (!selectedDoer) {
-    alert('Please select a doer to delegate tasks to');
     return;
   }
 
@@ -409,7 +419,8 @@ const handleConfirmDelegation = async () => {
               username: user.user_name,
               delegateTo: selectedDoer,
               startDate: leaveStartDate,
-              endDate: leaveEndDate
+              endDate: leaveEndDate,
+              category: bulkLeaveCategory
             })
           });
 
@@ -435,6 +446,7 @@ const handleConfirmDelegation = async () => {
     setLeaveStartDate('');
     setLeaveEndDate('');
     setRemark('');
+    setBulkLeaveCategory('Checklist');
 
     // Refresh data
     // setTimeout(() => window.location.reload(), 1000);
@@ -469,7 +481,7 @@ const handleConfirmDelegation = async () => {
 
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/leave/user-tasks?username=${encodeURIComponent(currentLeaveUser.user_name)}&startDate=${popupLeaveStartDate}&endDate=${popupLeaveEndDate}`
+          `${import.meta.env.VITE_API_BASE_URL}/leave/user-tasks?username=${encodeURIComponent(currentLeaveUser.user_name)}&startDate=${popupLeaveStartDate}&endDate=${popupLeaveEndDate}&category=${popupLeaveCategory}`
         );
 
         const result = await response.json();
@@ -495,7 +507,7 @@ const handleConfirmDelegation = async () => {
     };
 
     fetchUserTasks();
-  }, [currentLeaveUser, popupLeaveStartDate, popupLeaveEndDate]);
+  }, [currentLeaveUser, popupLeaveStartDate, popupLeaveEndDate, popupLeaveCategory]);
 
   // Handler for individual task assignment
   const handleTaskAssignment = (taskId, assignedUser) => {
@@ -551,7 +563,7 @@ const handleConfirmDelegation = async () => {
         const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/leave/assign-individual-tasks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assignments })
+          body: JSON.stringify({ assignments, category: popupLeaveCategory })
         });
 
         const result = await response.json();
@@ -567,6 +579,7 @@ const handleConfirmDelegation = async () => {
         setPopupLeaveEndDate('');
         setPopupDoer('');
         setPopupRemarks('');
+        setPopupLeaveCategory('Checklist');
         setUserTasks([]);
         setTaskAssignments({});
         setSelectedUsers([]);
@@ -1200,13 +1213,17 @@ const resetUserForm = () => {
     e.preventDefault();
     try {
       let finalPartNames = [...machineForm.part_name];
+      let finalPartImages = [...(machineForm.part_images || [])];
+      
       if (partInput.trim() && !finalPartNames.includes(partInput.trim())) {
         finalPartNames.push(partInput.trim());
+        finalPartImages.push(null); // Ensure arrays stay in sync
       }
       
       const submitData = {
         ...machineForm,
-        part_name: finalPartNames
+        part_name: finalPartNames,
+        part_images: finalPartImages
       };
 
       await dispatch(createMachineThunk(submitData)).unwrap();
@@ -1221,13 +1238,26 @@ const resetUserForm = () => {
   const handleEditMachine = (machineId) => {
     const machine = machines.find(m => m.id === machineId);
     if (machine) {
+      const partNames = Array.isArray(machine.part_name) ? machine.part_name : (machine.part_name ? [machine.part_name] : []);
+      const partImages = Array.isArray(machine.part_images) ? machine.part_images : (machine.part_images ? [machine.part_images] : []);
+      
+      // Synchronize arrays if they are different lengths
+      const maxLen = Math.max(partNames.length, partImages.length);
+      const synchronizedNames = [...partNames];
+      const synchronizedImages = [...partImages];
+      
+      while (synchronizedNames.length < maxLen) synchronizedNames.push('');
+      while (synchronizedImages.length < maxLen) synchronizedImages.push(null);
+
       setMachineForm({
         machine_name: machine.machine_name || '',
-        part_name: Array.isArray(machine.part_name) ? machine.part_name : (machine.part_name ? [machine.part_name] : []),
+        part_name: synchronizedNames,
+        part_images: synchronizedImages,
         machine_area: machine.machine_area || '',
         machine_department: machine.machine_department || '',
         machine_division: machine.machine_division || ''
       });
+
       setCurrentMachineId(machineId);
       setIsEditingMachine(true);
       setShowMachineModal(true);
@@ -1238,13 +1268,17 @@ const resetUserForm = () => {
     e.preventDefault();
     try {
       let finalPartNames = [...machineForm.part_name];
+      let finalPartImages = [...(machineForm.part_images || [])];
+
       if (partInput.trim() && !finalPartNames.includes(partInput.trim())) {
         finalPartNames.push(partInput.trim());
+        finalPartImages.push(null);
       }
       
       const submitData = {
         ...machineForm,
-        part_name: finalPartNames
+        part_name: finalPartNames,
+        part_images: finalPartImages
       };
 
       await dispatch(updateMachineThunk({ id: currentMachineId, updatedMachine: submitData })).unwrap();
@@ -1253,6 +1287,71 @@ const resetUserForm = () => {
       dispatch(machineDetails());
     } catch (error) {
       console.error('Error updating machine:', error);
+    }
+  };
+
+  const handlePartImageUpload = async (index, file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/upload-part-image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      const imageUrl = data.imageUrl;
+
+      setMachineForm(prev => {
+        const newImages = [...prev.part_images];
+        // Ensure array is large enough
+        while (newImages.length <= index) newImages.push(null);
+        newImages[index] = imageUrl;
+        return { ...prev, part_images: newImages };
+      });
+    } catch (error) {
+      console.error('Error uploading part image:', error);
+      alert('Failed to upload image. Please try again.');
+    }
+  };
+
+  const handleDirectPartImageUpload = async (file) => {
+    if (!file) return;
+
+    // Use filename as part name (strip extension)
+    const partName = file.name.replace(/\.[^/.]+$/, "");
+    
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/upload-part-image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      const imageUrl = data.imageUrl;
+
+      setMachineForm(prev => ({
+        ...prev,
+        part_name: [...prev.part_name, partName],
+        part_images: [...(prev.part_images || []), imageUrl]
+      }));
+    } catch (error) {
+      console.error('Error in direct part image upload:', error);
+      alert('Failed to upload image. Please try again.');
     }
   };
 
@@ -1270,6 +1369,7 @@ const resetUserForm = () => {
     setMachineForm({
       machine_name: '',
       part_name: [],
+      part_images: [],
       machine_area: '',
       machine_department: '',
       machine_division: ''
@@ -1501,6 +1601,7 @@ const resetUserForm = () => {
                     </div>
                   </div>
                 </div>
+
 
                 {/* Submit Button */}
                 {/* Submit Button */}
@@ -2561,33 +2662,101 @@ const resetUserForm = () => {
                             />
                           </div>
                           <div>
-                            <label htmlFor="part_name_edit" className="block text-sm font-medium text-gray-700">Part Names</label>
-                            <div className="mt-1 flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
-                              {machineForm.part_name.map((part, idx) => (
-                                <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                                  {part}
-                                  <button type="button" onClick={() => setMachineForm(prev => ({ ...prev, part_name: prev.part_name.filter((_, i) => i !== idx) }))} className="text-purple-600 hover:text-purple-900">&times;</button>
-                                </span>
-                              ))}
-                              <input
-                                type="text"
-                                id="part_name_edit"
-                                value={partInput}
-                                onChange={(e) => setPartInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
-                                    e.preventDefault();
-                                    if (!machineForm.part_name.includes(partInput.trim())) {
-                                      setMachineForm(prev => ({ ...prev, part_name: [...prev.part_name, partInput.trim()] }));
+                            <label htmlFor="part_name_edit" className="block text-sm font-medium text-gray-700">Part Names & Images</label>
+                            <div className="mt-1 space-y-2">
+                              <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
+                                {machineForm.part_name.map((part, idx) => (
+                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                                    {part}
+                                    <button type="button" onClick={() => {
+                                      const newNames = machineForm.part_name.filter((_, i) => i !== idx);
+                                      const newImages = machineForm.part_images.filter((_, i) => i !== idx);
+                                      setMachineForm(prev => ({ ...prev, part_name: newNames, part_images: newImages }));
+                                    }} className="text-purple-600 hover:text-purple-900">&times;</button>
+                                  </span>
+                                ))}
+                                <input
+                                  type="text"
+                                  id="part_name_edit"
+                                  value={partInput}
+                                  onChange={(e) => setPartInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
+                                      e.preventDefault();
+                                      if (!machineForm.part_name.includes(partInput.trim())) {
+                                        setMachineForm(prev => ({ 
+                                          ...prev, 
+                                          part_name: [...prev.part_name, partInput.trim()],
+                                          part_images: [...(prev.part_images || []), null]
+                                        }));
+                                      }
+                                      setPartInput('');
                                     }
-                                    setPartInput('');
-                                  }
-                                }}
-                                placeholder={machineForm.part_name.length === 0 ? "Type part name, press Enter" : "Add more..."}
-                                className="flex-1 min-w-[120px] outline-none text-sm py-1"
-                              />
+                                  }}
+                                  placeholder={machineForm.part_name.length === 0 ? "Type part name, press Enter" : "Add more..."}
+                                  className="flex-1 min-w-[120px] outline-none text-sm py-1"
+                                />
+                                <div className="flex items-center gap-1 border-l border-gray-200 pl-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (partInput.trim() && !machineForm.part_name.includes(partInput.trim())) {
+                                        setMachineForm(prev => ({ 
+                                          ...prev, 
+                                          part_name: [...prev.part_name, partInput.trim()],
+                                          part_images: [...(prev.part_images || []), null]
+                                        }));
+                                        setPartInput('');
+                                      }
+                                    }}
+                                    className="p-1 hover:bg-purple-100 text-purple-600 rounded transition-colors"
+                                    title="Add Part"
+                                  >
+                                    <Plus size={16} />
+                                  </button>
+                                  <label className="cursor-pointer p-1 hover:bg-purple-100 text-purple-600 rounded transition-colors" title="Direct Upload (New Part)">
+                                    <ImageIcon size={16} />
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*"
+                                      onChange={(e) => handleDirectPartImageUpload(e.target.files[0])}
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                              
+                              {/* Part Images List */}
+                              {machineForm.part_name.length > 0 && (
+                                <div className="border border-gray-200 rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+                                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Upload Part Images (Optional)</p>
+                                  <div className="space-y-2">
+                                    {machineForm.part_name.map((part, idx) => (
+                                      <div key={idx} className="flex items-center justify-between gap-2 p-1.5 bg-white border border-gray-100 rounded shadow-sm">
+                                        <span className="text-xs font-medium text-gray-700 truncate max-w-[150px]">{part}</span>
+                                        <div className="flex items-center gap-2">
+                                          {machineForm.part_images?.[idx] && (
+                                            <div className="relative h-8 w-8 hover:h-20 hover:w-20 hover:z-10 transition-all border border-gray-200 rounded overflow-hidden shadow-sm">
+                                              <img src={machineForm.part_images[idx]} alt={part} className="h-full w-full object-cover" />
+                                            </div>
+                                          )}
+                                          <label className="cursor-pointer p-1.5 hover:bg-purple-100 text-purple-600 rounded-full transition-colors" title="Upload Image">
+                                            <Upload size={14} />
+                                            <input 
+                                              type="file" 
+                                              className="hidden" 
+                                              accept="image/*"
+                                              onChange={(e) => handlePartImageUpload(idx, e.target.files[0])}
+                                            />
+                                          </label>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <p className="mt-1 text-xs text-gray-500">Press Enter or comma to add each part</p>
+                            <p className="mt-1 text-xs text-gray-500">Press Enter/comma to add part name, then click upload icon</p>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -2639,33 +2808,101 @@ const resetUserForm = () => {
                             />
                           </div>
                           <div>
-                            <label htmlFor="part_name_add" className="block text-sm font-medium text-gray-700">Part Names</label>
-                            <div className="mt-1 flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
-                              {machineForm.part_name.map((part, idx) => (
-                                <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                                  {part}
-                                  <button type="button" onClick={() => setMachineForm(prev => ({ ...prev, part_name: prev.part_name.filter((_, i) => i !== idx) }))} className="text-purple-600 hover:text-purple-900">&times;</button>
-                                </span>
-                              ))}
-                              <input
-                                type="text"
-                                id="part_name_add"
-                                value={partInput}
-                                onChange={(e) => setPartInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
-                                    e.preventDefault();
-                                    if (!machineForm.part_name.includes(partInput.trim())) {
-                                      setMachineForm(prev => ({ ...prev, part_name: [...prev.part_name, partInput.trim()] }));
+                            <label htmlFor="part_name_add" className="block text-sm font-medium text-gray-700">Part Names & Images</label>
+                            <div className="mt-1 space-y-2">
+                              <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
+                                {machineForm.part_name.map((part, idx) => (
+                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                                    {part}
+                                    <button type="button" onClick={() => {
+                                      const newNames = machineForm.part_name.filter((_, i) => i !== idx);
+                                      const newImages = machineForm.part_images.filter((_, i) => i !== idx);
+                                      setMachineForm(prev => ({ ...prev, part_name: newNames, part_images: newImages }));
+                                    }} className="text-purple-600 hover:text-purple-900">&times;</button>
+                                  </span>
+                                ))}
+                                <input
+                                  type="text"
+                                  id="part_name_add"
+                                  value={partInput}
+                                  onChange={(e) => setPartInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
+                                      e.preventDefault();
+                                      if (!machineForm.part_name.includes(partInput.trim())) {
+                                        setMachineForm(prev => ({ 
+                                          ...prev, 
+                                          part_name: [...prev.part_name, partInput.trim()],
+                                          part_images: [...(prev.part_images || []), null]
+                                        }));
+                                      }
+                                      setPartInput('');
                                     }
-                                    setPartInput('');
-                                  }
-                                }}
-                                placeholder={machineForm.part_name.length === 0 ? "Type part name, press Enter" : "Add more..."}
-                                className="flex-1 min-w-[120px] outline-none text-sm py-1"
-                              />
+                                  }}
+                                  placeholder={machineForm.part_name.length === 0 ? "Type part name, press Enter" : "Add more..."}
+                                  className="flex-1 min-w-[120px] outline-none text-sm py-1"
+                                />
+                                <div className="flex items-center gap-1 border-l border-gray-200 pl-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (partInput.trim() && !machineForm.part_name.includes(partInput.trim())) {
+                                        setMachineForm(prev => ({ 
+                                          ...prev, 
+                                          part_name: [...prev.part_name, partInput.trim()],
+                                          part_images: [...(prev.part_images || []), null]
+                                        }));
+                                        setPartInput('');
+                                      }
+                                    }}
+                                    className="p-1 hover:bg-purple-100 text-purple-600 rounded transition-colors"
+                                    title="Add Part"
+                                  >
+                                    <Plus size={16} />
+                                  </button>
+                                  <label className="cursor-pointer p-1 hover:bg-purple-100 text-purple-600 rounded transition-colors" title="Direct Upload (New Part)">
+                                    <ImageIcon size={16} />
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*"
+                                      onChange={(e) => handleDirectPartImageUpload(e.target.files[0])}
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Part Images List */}
+                              {machineForm.part_name.length > 0 && (
+                                <div className="border border-gray-200 rounded-md p-2 bg-gray-50 max-h-40 overflow-y-auto">
+                                  <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Upload Part Images (Optional)</p>
+                                  <div className="space-y-2">
+                                    {machineForm.part_name.map((part, idx) => (
+                                      <div key={idx} className="flex items-center justify-between gap-2 p-1.5 bg-white border border-gray-100 rounded shadow-sm">
+                                        <span className="text-xs font-medium text-gray-700 truncate max-w-[150px]">{part}</span>
+                                        <div className="flex items-center gap-2">
+                                          {machineForm.part_images?.[idx] && (
+                                            <div className="relative h-8 w-8 hover:h-20 hover:w-20 hover:z-10 transition-all border border-gray-200 rounded overflow-hidden shadow-sm">
+                                              <img src={machineForm.part_images[idx]} alt={part} className="h-full w-full object-cover" />
+                                            </div>
+                                          )}
+                                          <label className="cursor-pointer p-1.5 hover:bg-purple-100 text-purple-600 rounded-full transition-colors" title="Upload Image">
+                                            <Upload size={14} />
+                                            <input 
+                                              type="file" 
+                                              className="hidden" 
+                                              accept="image/*"
+                                              onChange={(e) => handlePartImageUpload(idx, e.target.files[0])}
+                                            />
+                                          </label>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <p className="mt-1 text-xs text-gray-500">Press Enter or comma to add each part</p>
+                            <p className="mt-1 text-xs text-gray-500">Press Enter/comma to add part name, then click upload icon</p>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
@@ -3414,26 +3651,56 @@ const resetUserForm = () => {
                   </div>
                   <div className="mt-4">
                     <div className="space-y-4">
+                      {/* Task Category Selection */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Task Category <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="bulkLeaveCategory"
+                              value="Checklist"
+                              checked={bulkLeaveCategory === 'Checklist'}
+                              onChange={(e) => setBulkLeaveCategory(e.target.value)}
+                              className="text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-gray-700">Checklist</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="bulkLeaveCategory"
+                              value="Maintenance"
+                              checked={bulkLeaveCategory === 'Maintenance'}
+                              onChange={(e) => setBulkLeaveCategory(e.target.value)}
+                              className="text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-gray-700">Maintenance</span>
+                          </label>
+                        </div>
+                      </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Leave Start Date
+                          Leave Start Date <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="date"
                           value={leaveStartDate}
-                          readOnly
-                          className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 cursor-not-allowed text-sm"
+                          onChange={(e) => setLeaveStartDate(e.target.value)}
+                          className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 text-sm"
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Leave End Date
+                          Leave End Date <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="date"
                           value={leaveEndDate}
-                          readOnly
-                          className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 cursor-not-allowed text-sm"
+                          onChange={(e) => setLeaveEndDate(e.target.value)}
+                          className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 text-sm"
                         />
                       </div>
                       <div>
@@ -3542,6 +3809,36 @@ const resetUserForm = () => {
                   </div>
                   <div className="mt-4">
                     <div className="space-y-4">
+                      {/* Task Category Selection */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Task Category <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="popupLeaveCategory"
+                              value="Checklist"
+                              checked={popupLeaveCategory === 'Checklist'}
+                              onChange={(e) => setPopupLeaveCategory(e.target.value)}
+                              className="text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-gray-700">Checklist</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="popupLeaveCategory"
+                              value="Maintenance"
+                              checked={popupLeaveCategory === 'Maintenance'}
+                              onChange={(e) => setPopupLeaveCategory(e.target.value)}
+                              className="text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="text-sm text-gray-700">Maintenance</span>
+                          </label>
+                        </div>
+                      </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Leave Start Date <span className="text-red-500">*</span>
@@ -3583,23 +3880,67 @@ const resetUserForm = () => {
                             </div>
                           ) : (
                             <div>
-                              <h4 className="text-sm font-medium text-gray-900 mb-2">
-                                Tasks to Assign ({userTasks.length})
-                              </h4>
+                              <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-sm font-medium text-gray-900">
+                                  Tasks to Assign ({userTasks.length})
+                                </h4>
+                                {selectedTasksToDelete.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const tasks = userTasks.filter(t => selectedTasksToDelete.includes(t.task_id));
+                                      setTasksToBulkDelete(tasks);
+                                    }}
+                                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                  >
+                                    <Trash2 size={14} className="mr-1" />
+                                    Delete Selected ({selectedTasksToDelete.length})
+                                  </button>
+                                )}
+                              </div>
                               <div className="border border-gray-300 rounded-md overflow-hidden">
                                 <div className="max-h-64 overflow-y-auto">
                                   <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50 sticky top-0">
                                       <tr>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">
+                                          <input
+                                            type="checkbox"
+                                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                                            checked={userTasks.length > 0 && selectedTasksToDelete.length === userTasks.length}
+                                            onChange={(e) => {
+                                              if (e.target.checked) {
+                                                setSelectedTasksToDelete(userTasks.map(t => t.task_id));
+                                              } else {
+                                                setSelectedTasksToDelete([]);
+                                              }
+                                            }}
+                                          />
+                                        </th>
                                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
                                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
                                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assign To <span className="text-red-500">*</span></th>
+                                        <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                                       </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                       {userTasks.map((task) => (
                                         <tr key={task.task_id} className="hover:bg-gray-50">
+                                          <td className="px-3 py-2 w-8">
+                                            <input
+                                              type="checkbox"
+                                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                                              checked={selectedTasksToDelete.includes(task.task_id)}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedTasksToDelete(prev => [...prev, task.task_id]);
+                                                } else {
+                                                  setSelectedTasksToDelete(prev => prev.filter(id => id !== task.task_id));
+                                                }
+                                              }}
+                                            />
+                                          </td>
                                           <td className="px-3 py-2 text-xs text-gray-900">{task.task_id}</td>
                                           <td className="px-3 py-2 text-xs text-gray-900" title={task.task_description}>
                                             <div className="max-w-xs truncate">{task.task_description}</div>
@@ -3641,6 +3982,22 @@ const resetUserForm = () => {
                                                 <option value="" disabled>No users available</option>
                                               )}
                                             </select>
+                                          </td>
+                                          <td className="px-3 py-2 text-center">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                // Check if it's already selected
+                                                if (!selectedTasksToDelete.includes(task.task_id)) {
+                                                  setSelectedTasksToDelete(prev => [...prev, task.task_id]);
+                                                }
+                                                setTaskToDelete(task);
+                                              }}
+                                              className="text-red-500 hover:text-red-700 transition-colors p-1"
+                                              title="Permanently Delete Task"
+                                            >
+                                              <Trash2 size={16} />
+                                            </button>
                                           </td>
                                         </tr>
                                       ))}
@@ -3698,6 +4055,100 @@ const resetUserForm = () => {
             </div>
           </div>
         )}
+
+        {/* Custom Toast Confirmation for Task Deletion */}
+        {(taskToDelete || tasksToBulkDelete.length > 0) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 transition-opacity">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4 transform transition-all">
+              <div className="mb-4 text-center relative">
+                <button
+                  onClick={() => {
+                    setTaskToDelete(null);
+                    setTasksToBulkDelete([]);
+                  }}
+                  className="absolute -top-2 -right-2 text-gray-400 hover:text-gray-500"
+                >
+                  <X size={20} />
+                </button>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {tasksToBulkDelete.length > 0 ? `Delete ${tasksToBulkDelete.length} Tasks?` : 'Delete Task?'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {tasksToBulkDelete.length > 0 ? (
+                    <>Are you sure you want to PERMANENTLY delete <strong>{tasksToBulkDelete.length}</strong> selected tasks from <strong>{currentLeaveUser?.user_name}</strong>'s checklist? This action cannot be undone.</>
+                  ) : (
+                    <>Are you sure you want to PERMANENTLY delete task <strong>{taskToDelete?.task_id}</strong> from <strong>{taskToDelete?.name}</strong>'s checklist? This action cannot be undone.</>
+                  )}
+                </p>
+              </div>
+              <div className="flex justify-center gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTaskToDelete(null);
+                    setTasksToBulkDelete([]);
+                  }}
+                  disabled={isDeletingTask}
+                  className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingTask}
+                  onClick={async () => {
+                    setIsDeletingTask(true);
+                    
+                    try {
+                      const isBulk = tasksToBulkDelete.length > 0;
+                      const taskIds = isBulk 
+                        ? tasksToBulkDelete.map(t => t.task_id) 
+                        : [taskToDelete.task_id];
+                      
+                      const endpoint = isBulk 
+                        ? `${import.meta.env.VITE_API_BASE_URL}/leave/bulk-delete-tasks`
+                        : `${import.meta.env.VITE_API_BASE_URL}/leave/delete-task/${taskToDelete.task_id}?category=${popupLeaveCategory}`;
+                        
+                      const options = isBulk ? {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ taskIds, category: popupLeaveCategory })
+                      } : {
+                        method: "DELETE"
+                      };
+
+                      const response = await fetch(endpoint, options);
+                      const result = await response.json();
+                      
+                      if (response.ok && result.success) {
+                        setUserTasks(prev => prev.filter(t => !taskIds.includes(t.task_id)));
+                        setSelectedTasksToDelete([]);
+                        setTaskAssignments(prev => {
+                          const newState = { ...prev };
+                          taskIds.forEach(id => { delete newState[id]; });
+                          return newState;
+                        });
+                      } else {
+                        alert(result.message || "Failed to delete task(s).");
+                      }
+                    } catch (err) {
+                      console.error("Error deleting task(s):", err);
+                      alert("An error occurred while deleting the task(s).");
+                    } finally {
+                      setIsDeletingTask(false);
+                      setTaskToDelete(null);
+                      setTasksToBulkDelete([]);
+                    }
+                  }}
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                >
+                  {isDeletingTask ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </AdminLayout>
   );
