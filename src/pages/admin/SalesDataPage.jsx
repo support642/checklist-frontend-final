@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { CheckCircle2, Upload, X, Search, History, ArrowLeft } from "lucide-react"
+import { CheckCircle2, Upload, X, Search, History, ArrowLeft, Plus } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 import { useDispatch, useSelector } from "react-redux"
 import { checklistData, checklistHistoryData, updateChecklist } from "../../redux/slice/checklistSlice"
@@ -38,6 +38,17 @@ function AccountDataPage() {
   const [statusFilter, setStatusFilter] = useState("all") // Filter for Today/Overdue/Upcoming
   const [frequencyFilter, setFrequencyFilter] = useState("all") // Filter for Frequency
   const [nameFilter, setNameFilter] = useState("all") // Filter for Name
+  const [nameDropdownOpen, setNameDropdownOpen] = useState(false)
+  const [nameSearchTerm, setNameSearchTerm] = useState("")
+  const nameDropdownRef = useRef(null)
+  const [divisionFilter, setDivisionFilter] = useState("all")
+  const [divisionDropdownOpen, setDivisionDropdownOpen] = useState(false)
+  const [divisionSearchTerm, setDivisionSearchTerm] = useState("")
+  const divisionDropdownRef = useRef(null)
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [departmentDropdownOpen, setDepartmentDropdownOpen] = useState(false)
+  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("")
+  const departmentDropdownRef = useRef(null)
   const [error, setError] = useState(null)
   const [remarksData, setRemarksData] = useState({})
   const [historyData, setHistoryData] = useState([])
@@ -49,9 +60,6 @@ function AccountDataPage() {
   const [userRole, setUserRole] = useState("")
   const [username, setUsername] = useState("")
   const [userDept, setUserDept] = useState("");
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMoreHistory, setHasMoreHistory] = useState(true);
-  const [initialHistoryLoading, setInitialHistoryLoading] = useState(false)
   const [isMobile, setIsMobile] = useState(false);
   const [activeView, setActiveView] = useState('checklist');
 
@@ -71,7 +79,6 @@ function AccountDataPage() {
   const [maintAdditionalData, setMaintAdditionalData] = useState({});
   const [maintRemarksData, setMaintRemarksData] = useState({});
   const [maintUploadedImages, setMaintUploadedImages] = useState({});
-  const [maintIsFetchingMore, setMaintIsFetchingMore] = useState(false);
   const maintTableContainerRef = useRef(null);
 
   const { doerName } = useSelector((state) => state.assignTask)
@@ -79,10 +86,19 @@ function AccountDataPage() {
   // Track search for API calls
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  // Initial data load
+  // Sentinel for infinite scroll
+  const loaderRef = useRef(null);
+
+  // Debounce search term update
   useEffect(() => {
-    dispatch(checklistData({ page: 1, search: '' }))
-    dispatch(checklistHistoryData(1))
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Initial data load - Reset all
+  useEffect(() => {
     dispatch(uniqueDoerNameData());
 
     const view = searchParams.get('view');
@@ -91,33 +107,65 @@ function AccountDataPage() {
     }
   }, [dispatch, searchParams])
 
-  // Module visibility fallback logic
+  // Re-fetch data when filters or search change
   useEffect(() => {
-    if (!canAccessModule(activeView)) {
-      const availableViews = ["checklist", "maintenance"].filter(canAccessModule);
-      if (availableViews.length > 0) {
-        setActiveView(availableViews[0]);
-      }
-    }
-  }, [activeView]);
+    const filters = {
+      page: 1,
+      search: debouncedSearch,
+      status: statusFilter,
+      frequency: frequencyFilter,
+      name: nameFilter,
+      division: divisionFilter,
+      departmentFilter: departmentFilter
+    };
 
-  // Debounce search term and re-fetch data
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
-
-  // Re-fetch data when debounced search changes
-  useEffect(() => {
     if (activeView === 'checklist') {
-      dispatch(checklistData({ page: 1, search: debouncedSearch }));
+      dispatch(checklistData(filters));
     } else {
-      dispatch(maintenanceData({ page: 1, search: debouncedSearch }));
+      dispatch(maintenanceData(filters));
     }
-  }, [debouncedSearch, activeView, dispatch]);
+  }, [debouncedSearch, activeView, statusFilter, frequencyFilter, nameFilter, divisionFilter, departmentFilter, dispatch]);
+
+  // Infinite Scroll Observer
+  useEffect(() => {
+    const currentLoader = loaderRef.current;
+    if (!currentLoader) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const target = entries[0];
+      if (target.isIntersecting) {
+        if (activeView === 'checklist' && hasMore && !loading) {
+          dispatch(checklistData({
+            page: currentPage + 1,
+            search: debouncedSearch,
+            status: statusFilter,
+            frequency: frequencyFilter,
+            name: nameFilter,
+            division: divisionFilter,
+            departmentFilter: departmentFilter
+          }));
+        } else if (activeView === 'maintenance' && maintHasMore && !maintLoading) {
+          dispatch(maintenanceData({
+            page: maintCurrentPage + 1,
+            search: debouncedSearch,
+            status: statusFilter,
+            frequency: frequencyFilter,
+            name: nameFilter,
+            division: divisionFilter,
+            departmentFilter: departmentFilter
+          }));
+        }
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(currentLoader);
+    return () => observer.disconnect();
+  }, [
+    activeView, hasMore, loading, currentPage, 
+    maintHasMore, maintLoading, maintCurrentPage,
+    debouncedSearch, statusFilter, frequencyFilter, nameFilter, divisionFilter, departmentFilter,
+    dispatch
+  ]);
 
   useEffect(() => {
     if (activeView === 'maintenance' && maintenance?.length === 0) {
@@ -134,6 +182,42 @@ function AccountDataPage() {
     window.addEventListener('resize', checkMobile);
 
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Close name dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (nameDropdownRef.current && !nameDropdownRef.current.contains(e.target)) {
+        setNameDropdownOpen(false);
+        setNameSearchTerm('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close division dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (divisionDropdownRef.current && !divisionDropdownRef.current.contains(e.target)) {
+        setDivisionDropdownOpen(false);
+        setDivisionSearchTerm('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close department dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (departmentDropdownRef.current && !departmentDropdownRef.current.contains(e.target)) {
+        setDepartmentDropdownOpen(false);
+        setDepartmentSearchTerm('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Removed infinite scroll and pagination state handlers since all tasks render on a single page.
@@ -413,186 +497,29 @@ function AccountDataPage() {
     }
   };
 
-  // Filtered data for pending tasks
+  // With backend filtering and infinite scroll, we use Redux data directly
   const filteredAccountData = useMemo(() => {
-    if (!Array.isArray(checklist)) return [];
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    // Helper function to get upcoming days based on frequency
-    const getUpcomingDays = (frequency) => {
-      switch (frequency?.toLowerCase()) {
-        case 'daily':
-          return 1; // Show today + 1 day (tomorrow)
-        case 'tertiary':
-          return 3; // Show 3 days ahead for tertiary
-        case 'weekly':
-          return 7; // Show 7 days ahead for weekly
-        case 'fortnightly':
-          return 14;
-        case 'monthly':
-          return 30;
-        case 'quarterly':
-          return 90;
-        case 'yearly':
-          return 365;
-        default:
-          return 1;
-      }
-    };
-
-    // Helper function to get past days to show based on frequency
-    const getPastDays = (frequency) => {
-      switch (frequency?.toLowerCase()) {
-        case 'daily':
-          return 0; // Only today
-        case 'tertiary':
-          return 2; // 2 days previous
-        case 'weekly':
-          return 5; // 5 days previous
-        case 'monthly':
-          return 23; // 23 days ago
-        case 'quarterly':
-          return 75; // 75 days ago
-        case 'yearly':
-          return 330; // 330 days ago
-        default:
-          return 0;
-      }
-    };
-
-    let filtered = searchTerm
-      ? checklist.filter((account) =>
-        Object.values(account).some(
-          (value) =>
-            value &&
-            value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      )
-      : checklist;
-
-    // Apply date filter based on frequency
-    filtered = filtered.filter((account) => {
-      if (!account.task_start_date) return false;
-
-      const taskDate = new Date(account.task_start_date);
-      taskDate.setHours(0, 0, 0, 0);
-      if (isNaN(taskDate.getTime())) return false;
-
-      const frequency = account.frequency || 'daily';
-      const upcomingDays = getUpcomingDays(frequency);
-
-      // Calculate future limit based on frequency
-      const futureLimit = new Date(today);
-      futureLimit.setDate(futureLimit.getDate() + upcomingDays);
-
-      // Always show ALL overdue tasks (before today) + today + upcoming tasks based on frequency
-      // This means: taskDate <= futureLimit (no past limit restriction)
-      return taskDate <= futureLimit;
-    });
-
-    // Apply status filter (Today/Overdue/Upcoming)
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((account) => {
-        const taskDate = new Date(account.task_start_date);
-        taskDate.setHours(0, 0, 0, 0);
-        
-        const diffTime = taskDate.getTime() - today.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (statusFilter === 'today') {
-          return diffDays === 0;
-        } else if (statusFilter === 'overdue') {
-          return diffDays < 0;
-        } else if (statusFilter === 'upcoming') {
-          return diffDays > 0;
-        }
-        return true;
-      });
-    }
-
-    // Apply frequency filter
-    if (frequencyFilter !== 'all') {
-      filtered = filtered.filter((account) => {
-        return account.frequency?.toLowerCase() === frequencyFilter.toLowerCase();
-      });
-    }
-
-    // Apply name filter
-    if (nameFilter !== 'all') {
-      filtered = filtered.filter((account) => {
-        return account.name === nameFilter;
-      });
-    }
-
-    return [...filtered].sort((a, b) => {
-      const dateA = new Date(a.task_start_date || "");
-      const dateB = new Date(b.task_start_date || "");
-
-      return dateA.getTime() - dateB.getTime();
-    });
-  }, [checklist, searchTerm, statusFilter, frequencyFilter, nameFilter, userRole, userDept]);
+    return checklist || [];
+  }, [checklist]);
 
   const filteredMaintenanceData = useMemo(() => {
-    if (!Array.isArray(maintenance)) return [];
-    
-    let filtered = searchTerm
-      ? maintenance.filter((item) =>
-        Object.entries(item).some(([key, value]) => {
-          if (['image', 'admin_done'].includes(key)) return false;
-          return value && value.toString().toLowerCase().includes(searchTerm.toLowerCase());
-        })
-      )
-      : maintenance;
-      
-    // Apply status and frequency filters for Maintenance
-    if (statusFilter !== 'all') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      filtered = filtered.filter((item) => {
-        const taskDate = new Date(item.task_start_date || item.planned_date || "");
-        taskDate.setHours(0, 0, 0, 0);
-        
-        const diffTime = taskDate.getTime() - today.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (statusFilter === 'today') return diffDays === 0;
-        if (statusFilter === 'overdue') return diffDays < 0;
-        if (statusFilter === 'upcoming') return diffDays > 0;
-        return true;
-      });
-    }
+    return maintenance || [];
+  }, [maintenance]);
 
-    if (frequencyFilter !== 'all') {
-      filtered = filtered.filter((item) => {
-        return item.frequency?.toLowerCase() === frequencyFilter.toLowerCase();
-      });
-    }
+  // Compute unique divisions and departments from checklist + maintenance data
+  const uniqueDivisions = useMemo(() => {
+    const divs = new Set();
+    if (Array.isArray(checklist)) checklist.forEach(item => item.division && divs.add(item.division));
+    if (Array.isArray(maintenance)) maintenance.forEach(item => item.division && divs.add(item.division));
+    return [...divs].sort();
+  }, [checklist, maintenance]);
 
-    // Apply name filter for Maintenance
-    if (nameFilter !== 'all') {
-      filtered = filtered.filter((item) => {
-        return item.name === nameFilter;
-      });
-    }
-
-    // Member filter
-    if (selectedMembers.length > 0) {
-      filtered = filtered.filter((item) => {
-        return selectedMembers.includes(item.name);
-      });
-    }
-
-    return [...filtered].sort((a, b) => {
-      const dateA = new Date(a.task_start_date || "");
-      const dateB = new Date(b.task_start_date || "");
-      return dateA.getTime() - dateB.getTime();
-    });
-  }, [maintenance, searchTerm, statusFilter, frequencyFilter, nameFilter, selectedMembers, userRole, userDept]);
+  const uniqueDepartments = useMemo(() => {
+    const depts = new Set();
+    if (Array.isArray(checklist)) checklist.forEach(item => item.department && depts.add(item.department));
+    if (Array.isArray(maintenance)) maintenance.forEach(item => item.department && depts.add(item.department));
+    return [...depts].sort();
+  }, [checklist, maintenance]);
 
   // Helper function to determine task status (Today, Upcoming, Overdue)
   const getTaskStatus = (taskStartDate) => {
@@ -714,30 +641,6 @@ function AccountDataPage() {
     }
   }
 
-  const fetchSheetData = useCallback(async () => {
-    try {
-      const pendingAccounts = []
-      const historyRows = []
-
-      const currentUsername = localStorage.getItem("username")
-      const currentUserRole = localStorage.getItem("role")
-      const today = new Date()
-      const tomorrow = new Date(today)
-      tomorrow.setDate(today.getDate() + 1)
-      const todayStr = formatDateToDDMMYYYY(today)
-      const tomorrowStr = formatDateToDDMMYYYY(tomorrow)
-      console.log("Filtering dates:", { todayStr, tomorrowStr })
-
-      const membersSet = new Set()
-      let rows = []
-
-      setAccountData(checklist)
-      setHistoryData(history)
-    } catch (error) {
-      console.error("Error fetching sheet data:", error)
-      setError("Failed to load account data: " + error.message)
-    }
-  }, [])
 
   // Checkbox handlers with better state management
   const handleSelectItem = useCallback((id, isChecked) => {
@@ -808,29 +711,37 @@ function AccountDataPage() {
 
   // Update the handleImageUpload function
   const handleImageUpload = async (id, e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const newFiles = Array.from(e.target.files);
+    if (newFiles.length === 0) return;
 
-    // Create a preview URL for the image
-    const previewUrl = URL.createObjectURL(file);
-
-    // Update the uploadedImages state
-    setUploadedImages(prev => ({
-      ...prev,
-      [id]: {
-        file,
-        previewUrl
+    setUploadedImages(prev => {
+      const existingFiles = prev[id] || [];
+      const totalCount = existingFiles.length + newFiles.length;
+      
+      if (totalCount > 5) {
+        alert("Maximum 5 files allowed per task.");
+        return prev;
       }
-    }));
 
-    // Also update the accountData if needed
-    setAccountData(prev =>
-      prev.map(item =>
-        item.task_id === id
-          ? { ...item, image: file }
-          : item
-      )
-    );
+      const fileDataArray = newFiles.map(file => ({
+        file,
+        previewUrl: URL.createObjectURL(file)
+      }));
+
+      const mergedFiles = [...existingFiles, ...fileDataArray];
+
+      // Also update the accountData if needed
+      setAccountData(currentAcc => 
+        currentAcc.map(item => 
+          item.task_id === id ? { ...item, image: mergedFiles.map(f => f.file) } : item
+        )
+      );
+
+      return {
+        ...prev,
+        [id]: mergedFiles
+      };
+    });
   };
 
   // Maintenance Handlers
@@ -854,13 +765,28 @@ function AccountDataPage() {
   }
 
   const handleMaintImageUpload = (id, e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const previewUrl = URL.createObjectURL(file);
-    setMaintUploadedImages(prev => ({
-      ...prev,
-      [id]: { file, previewUrl }
-    }));
+    const newFiles = Array.from(e.target.files);
+    if (newFiles.length === 0) return;
+    
+    setMaintUploadedImages(prev => {
+      const existingFiles = prev[id] || [];
+      const totalCount = existingFiles.length + newFiles.length;
+      
+      if (totalCount > 5) {
+        alert("Maximum 5 files allowed per task.");
+        return prev;
+      }
+
+      const fileDataArray = newFiles.map(file => ({
+        file,
+        previewUrl: URL.createObjectURL(file)
+      }));
+
+      return {
+        ...prev,
+        [id]: [...existingFiles, ...fileDataArray]
+      };
+    });
   };
 
   const handleMaintSubmit = async () => {
@@ -873,18 +799,20 @@ function AccountDataPage() {
       const submissionData = await Promise.all(
         selected.map(async (id) => {
           const item = maintenance.find((m) => m.task_id === id);
-          const imageData = maintUploadedImages[id];
-          let finalBase64Image = null;
+          const imageDataArray = maintUploadedImages[id];
+          let finalBase64Images = [];
 
-          if (imageData?.file) {
-            finalBase64Image = await fileToBase64(imageData.file);
+          if (imageDataArray && Array.isArray(imageDataArray)) {
+            finalBase64Images = await Promise.all(
+              imageDataArray.map(data => fileToBase64(data.file))
+            );
           }
 
           return {
             taskId: item.task_id,
             status: maintAdditionalData[id] || "",
             remarks: maintRemarksData[id] || "",
-            image: finalBase64Image || item.image || null,
+            images: finalBase64Images.length > 0 ? finalBase64Images : (item.image ? [item.image] : []),
           };
         })
       );
@@ -927,72 +855,6 @@ const fileToBase64 = (file) => {
 
 
 
-  const LoadingIndicator = () => (
-    <div className="text-center py-4 bg-gray-50">
-      {isLoadingMore ? (
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-500 mr-2"></div>
-          <span className="text-purple-600 text-sm">Loading more items...</span>
-        </div>
-      ) : null}
-    </div>
-  );
-
-
-  const hasMoreItems = () => {
-    if (showHistory) {
-      const totalFilteredItems = history.filter((item) => {
-        // Apply same filters as in filteredHistoryData
-        const matchesSearch = searchTerm
-          ? Object.entries(item).some(([key, value]) => {
-            if (['image', 'admin_done'].includes(key)) return false;
-            return value && value.toString().toLowerCase().includes(searchTerm.toLowerCase());
-          })
-          : true;
-
-        const matchesMember = selectedMembers.length > 0
-          ? selectedMembers.includes(item.name)
-          : true;
-
-        let matchesDateRange = true;
-        if (startDate || endDate) {
-          const itemDate = parseSupabaseDate(item.task_start_date);
-          if (!itemDate || isNaN(itemDate.getTime())) return false;
-
-          const itemDateOnly = new Date(
-            itemDate.getFullYear(),
-            itemDate.getMonth(),
-            itemDate.getDate()
-          );
-
-          const start = startDate ? new Date(startDate) : null;
-          if (start) start.setHours(0, 0, 0, 0);
-
-          const end = endDate ? new Date(endDate) : null;
-          if (end) end.setHours(23, 59, 59, 999);
-
-          if (start && itemDateOnly < start) matchesDateRange = false;
-          if (end && itemDateOnly > end) matchesDateRange = false;
-        }
-
-        return matchesSearch && matchesMember && matchesDateRange;
-      }).length;
-
-      return currentPageHistory * ITEMS_PER_PAGE < totalFilteredItems;
-    } else {
-      const totalFilteredItems = checklist.filter((account) =>
-        searchTerm
-          ? Object.values(account).some(
-            (value) =>
-              value &&
-              value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-          )
-          : true
-      ).length;
-
-      return currentPagePending * ITEMS_PER_PAGE < totalFilteredItems;
-    }
-  };
 
 
 
@@ -1049,71 +911,63 @@ const handleSubmit = async () => {
 
   setIsSubmitting(true);
 
-  // 🔥 FIXED: Convert image to BASE64
-const submissionData = await Promise.all(
-  selectedItemsArray.map(async (id) => {
-    const item = checklist.find((acc) => acc.task_id === id);
-    const imageData = uploadedImages[id];
+    // 🔥 FIXED: Convert image to BASE64
+    const submissionData = await Promise.all(
+      selectedItemsArray.map(async (id) => {
+        const item = checklist.find((acc) => acc.task_id === id);
+        const imageDataArray = uploadedImages[id];
 
-    let finalBase64Image = null;
+        let finalBase64Images = [];
 
-    if (imageData?.file) {
-      finalBase64Image = await fileToBase64(imageData.file); // <– FileReader se base64
-    }
+        if (imageDataArray && Array.isArray(imageDataArray)) {
+          finalBase64Images = await Promise.all(
+            imageDataArray.map(data => fileToBase64(data.file))
+          );
+        }
 
-    return {
-      taskId: item.task_id,
-      status: additionalData[id] || "",
-      remarks: remarksData[id] || "",
-      image: finalBase64Image || item.image || null, // <– yahi backend ko milega
-    };
-  })
-);
-
-
-  console.log("Submission Data:", submissionData);
-
-  await dispatch(updateChecklist(submissionData));
-
-  setTimeout(() => {
-    setIsSubmitting(false);
-    setSuccessMessage(
-      `Successfully logged ${selectedItemsArray.length} task records!`
+        return {
+          taskId: item.task_id,
+          status: additionalData[id] || "",
+          remarks: remarksData[id] || "",
+          images: finalBase64Images.length > 0 ? finalBase64Images : (item.image ? [item.image] : []), // <– yahi backend ko milega
+        };
+      })
     );
 
-    // Reset
-    setSelectedItems(new Set());
-    setAdditionalData({});
-    setRemarksData({});
-    setUploadedImages({});
+    console.log("Submission Data:", submissionData);
+
+    await dispatch(updateChecklist(submissionData));
 
     setTimeout(() => {
-      window.location.reload();
-    }, 1000);
-  }, 1500);
-};
+      setIsSubmitting(false);
+      setSuccessMessage(
+        `Successfully logged ${selectedItemsArray.length} task records!`
+      );
+
+      // Reset
+      setSelectedItems(new Set());
+      setAdditionalData({});
+      setRemarksData({});
+      setUploadedImages({});
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }, 1500);
+  };
 
 
   // Convert Set to Array for display
   const selectedItemsCount = selectedItems.size
 
-  // Load all tasks on a single page
-  const currentPendingData = filteredAccountData;
-  const totalPendingPages = 1;
-
-  const currentHistoryData = filteredHistoryData;
-  const totalHistoryPages = 1;
-
-  const currentMaintData = filteredMaintenanceData;
-  const totalMaintPages = 1;
-
   return (
     <AdminLayout>
-        <div className="flex flex-col gap-3 sm:gap-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700">
-              {showHistory ? CONFIG[activeView].historyTitle : CONFIG[activeView].title}
-            </h1>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          {/* Main Title hidden on mobile to prioritize card header */}
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700 hidden sm:block">
+            {showHistory ? CONFIG[activeView].historyTitle : CONFIG[activeView].title}
+          </h1>
             
             {/* Checklist / Maintenance Toggle */}
             <div className="flex bg-gray-200 rounded-lg p-1">
@@ -1143,9 +997,12 @@ const submissionData = await Promise.all(
               )}
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4">
+          {/* Row 1: Search + Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="text-gray-400" size={18} />
+              </div>
               <input
                 type="text"
                 placeholder={showHistory ? "Search history..." : "Search tasks..."}
@@ -1154,56 +1011,20 @@ const submissionData = await Promise.all(
                 className="w-full pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base"
               />
             </div>
-            {!showHistory && (
-              <>
-                <select
-                  value={nameFilter}
-                  onChange={(e) => setNameFilter(e.target.value)}
-                  className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base bg-white"
+            <div className="flex gap-2 flex-shrink-0">
+              {userRole === "super_admin" && (
+                <button
+                  onClick={() => navigate('/dashboard/history')}
+                  className="flex-1 sm:flex-none rounded-md gradient-bg py-2 px-3 sm:px-4 text-white hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm sm:text-base"
                 >
-                  <option value="all">All Names</option>
-                  {doerName && doerName.map((name, index) => (
-                    <option key={index} value={name}>{name}</option>
-                  ))}
-                </select>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base bg-white"
-                >
-                  <option value="all">All Tasks</option>
-                  <option value="today">Today</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="upcoming">Upcoming</option>
-                </select>
-                <select
-                  value={frequencyFilter}
-                  onChange={(e) => setFrequencyFilter(e.target.value)}
-                  className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base bg-white"
-                >
-                  <option value="all">All Frequencies</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="fortnightly">Fortnightly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
-              </>
-            )}
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate('/dashboard/history')}
-                className="flex-1 sm:flex-none rounded-md gradient-bg py-2 px-3 sm:px-4 text-white hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm sm:text-base"
-              >
-                <div className="flex items-center justify-center">
-                  <History className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">View History</span>
-                  <span className="sm:hidden">History</span>
-                </div>
-              </button>
-              {/* Submit Selected Button - Only for Users with Modify Access */}
-              {!showHistory && (userRole === "user" || (userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && hasModifyAccess('pending_task') && (
+                  <div className="flex items-center justify-center">
+                    <History className="h-4 w-4 mr-1" />
+                    <span className="hidden sm:inline">View History</span>
+                    <span className="sm:hidden">History</span>
+                  </div>
+                </button>
+              )}
+              {!showHistory && (userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && hasModifyAccess('pending_task') && (
                 <button
                   onClick={activeView === 'checklist' ? handleSubmit : handleMaintSubmit}
                   disabled={(activeView === 'checklist' ? selectedItemsCount === 0 : maintSelectedItems.size === 0) || isSubmitting}
@@ -1217,22 +1038,103 @@ const submissionData = await Promise.all(
                   )}
                 </button>
               )}
-              {/* WhatsApp Button - For Admin and Super Admin */}
-              {/* {!showHistory && ((userRole === "admin" || userRole === "div_admin") || userRole === "super_admin") && selectedItems.size > 0 && (
-                <button
-                  onClick={handleSendWhatsApp}
-                  disabled={sendingWhatsApp}
-                  className="flex-1 sm:flex-none rounded-md bg-green-500 py-2 px-3 sm:px-4 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                >
-                  {sendingWhatsApp ? "Sending..." : (
-                    <>
-                      <span className="hidden sm:inline">📱 WhatsApp ({selectedItems.size})</span>
-                      <span className="sm:hidden">📱 ({selectedItems.size})</span>
-                    </>
-                  )}
-                </button>
-              )} */}
             </div>
+          </div>
+
+          {/* Row 2: All Filter Dropdowns */}
+          {!showHistory && (
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mt-1">
+              {/* Name searchable dropdown */}
+              <div className="relative w-full sm:w-auto" ref={nameDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setNameDropdownOpen(!nameDropdownOpen)}
+                  className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white w-full sm:min-w-[140px] text-left flex items-center justify-between gap-2 shadow-sm"
+                >
+                  <span className="truncate">{nameFilter === 'all' ? 'All Names' : nameFilter}</span>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${nameDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {nameDropdownOpen && (
+                  <div className="absolute z-50 mt-1 w-full sm:w-64 bg-white border border-gray-200 rounded-lg shadow-xl">
+                    <div className="p-2 border-b border-gray-100">
+                      <input type="text" placeholder="Search name..." value={nameSearchTerm} onChange={(e) => setNameSearchTerm(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500" autoFocus />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <button type="button" onClick={() => { setNameFilter('all'); setNameDropdownOpen(false); setNameSearchTerm(''); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 transition-colors ${nameFilter === 'all' ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700'}`}>All Names</button>
+                      {doerName && doerName.filter(name => name.toLowerCase().includes(nameSearchTerm.toLowerCase())).map((name, index) => (
+                        <button type="button" key={index} onClick={() => { setNameFilter(name); setNameDropdownOpen(false); setNameSearchTerm(''); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 transition-colors ${nameFilter === name ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700'}`}>{name}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Division searchable dropdown */}
+              <div className="relative w-full sm:w-auto" ref={divisionDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setDivisionDropdownOpen(!divisionDropdownOpen)}
+                  className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white w-full sm:min-w-[140px] text-left flex items-center justify-between gap-2 shadow-sm"
+                >
+                  <span className="truncate">{divisionFilter === 'all' ? 'All Divisions' : divisionFilter}</span>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${divisionDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {divisionDropdownOpen && (
+                  <div className="absolute z-50 mt-1 w-full sm:w-64 bg-white border border-gray-200 rounded-lg shadow-xl">
+                    <div className="p-2 border-b border-gray-100">
+                      <input type="text" placeholder="Search division..." value={divisionSearchTerm} onChange={(e) => setDivisionSearchTerm(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500" autoFocus />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <button type="button" onClick={() => { setDivisionFilter('all'); setDivisionDropdownOpen(false); setDivisionSearchTerm(''); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 transition-colors ${divisionFilter === 'all' ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700'}`}>All Divisions</button>
+                      {uniqueDivisions.filter(d => d.toLowerCase().includes(divisionSearchTerm.toLowerCase())).map((div, index) => (
+                        <button type="button" key={index} onClick={() => { setDivisionFilter(div); setDivisionDropdownOpen(false); setDivisionSearchTerm(''); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 transition-colors ${divisionFilter === div ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700'}`}>{div}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Department searchable dropdown */}
+              <div className="relative w-full sm:w-auto" ref={departmentDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setDepartmentDropdownOpen(!departmentDropdownOpen)}
+                  className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white w-full sm:min-w-[140px] text-left flex items-center justify-between gap-2 shadow-sm"
+                >
+                  <span className="truncate">{departmentFilter === 'all' ? 'All Departments' : departmentFilter}</span>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${departmentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {departmentDropdownOpen && (
+                  <div className="absolute z-50 mt-1 w-full sm:w-64 bg-white border border-gray-200 rounded-lg shadow-xl">
+                    <div className="p-2 border-b border-gray-100">
+                      <input type="text" placeholder="Search department..." value={departmentSearchTerm} onChange={(e) => setDepartmentSearchTerm(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-purple-500" autoFocus />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      <button type="button" onClick={() => { setDepartmentFilter('all'); setDepartmentDropdownOpen(false); setDepartmentSearchTerm(''); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 transition-colors ${departmentFilter === 'all' ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700'}`}>All Departments</button>
+                      {uniqueDepartments.filter(d => d.toLowerCase().includes(departmentSearchTerm.toLowerCase())).map((dept, index) => (
+                        <button type="button" key={index} onClick={() => { setDepartmentFilter(dept); setDepartmentDropdownOpen(false); setDepartmentSearchTerm(''); }} className={`w-full text-left px-3 py-2 text-sm hover:bg-purple-50 transition-colors ${departmentFilter === dept ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-700'}`}>{dept}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Status filter */}
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white w-full sm:w-auto shadow-sm">
+                <option value="all">All Tasks</option>
+                <option value="today">Today</option>
+                <option value="overdue">Overdue</option>
+                <option value="upcoming">Upcoming</option>
+              </select>
+              {/* Frequency filter */}
+              <select value={frequencyFilter} onChange={(e) => setFrequencyFilter(e.target.value)} className="col-span-2 sm:col-auto px-3 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm bg-white w-full sm:w-auto shadow-sm">
+                <option value="all">All Frequencies</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="fortnightly">Fortnightly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          )}
 
             {/* Admin Submit Button for History View */}
             {showHistory && (userRole === "admin" || userRole === "div_admin") && selectedHistoryItems.length > 0 && (
@@ -1252,7 +1154,6 @@ const submissionData = await Promise.all(
               </div>
             )}
           </div>
-        </div>
 
         {successMessage && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-3 sm:px-4 py-3 rounded-md flex items-center justify-between text-sm sm:text-base">
@@ -1400,7 +1301,7 @@ const submissionData = await Promise.all(
 
               {/* History Table - Mobile Responsive */}
               <div ref={historyTableContainerRef} className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 280px)' }}>
-                {initialHistoryLoading ? (
+                {loading && currentPage === 1 ? (
                   <div className="text-center py-10">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500 mb-4"></div>
                     <p className="text-purple-600 text-sm sm:text-base">Loading history data...</p>
@@ -1567,21 +1468,21 @@ const submissionData = await Promise.all(
                               </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-4">
                                 {history.image ? (
-                                  <a
-                                    href={history.image}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 underline flex items-center break-words text-xs sm:text-sm"
-                                  >
-                                    <img
-                                      src={history.image || "/placeholder.svg?height=32&width=32"}
-                                      alt="Attachment"
-                                      className="h-6 w-6 sm:h-8 sm:w-8 object-cover rounded-md mr-2 flex-shrink-0"
-                                    />
-                                    <span className="break-words">View</span>
-                                  </a>
+                                  <div className="flex flex-col gap-1">
+                                    {history.image.split(',').map((imgUrl, i) => (
+                                      <a
+                                        key={i}
+                                        href={imgUrl.trim()}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 underline flex items-center break-words text-xs sm:text-sm"
+                                      >
+                                        <span className="break-words">View {i + 1}</span>
+                                      </a>
+                                    ))}
+                                  </div>
                                 ) : (
-                                  <span className="text-gray-400 text-xs sm:text-sm">No file</span>
+                                  <span className="text-gray-400 text-xs sm:text-sm">No files</span>
                                 )}
                               </td>
 
@@ -1600,40 +1501,16 @@ const submissionData = await Promise.all(
                     </table>
 
                     {/* Pagination Controls Array History */}
-                    {totalHistoryPages > 1 && (
-                      <div className="flex justify-between items-center py-4 px-6 border-t border-gray-200 bg-white">
-                        <button
-                          onClick={handlePrevPageHistory}
-                          disabled={currentPageHistory === 1}
-                          className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Previous
-                        </button>
-                        <span className="text-sm text-gray-700">
-                          Page <span className="font-medium">{currentPageHistory}</span> of <span className="font-medium">{totalHistoryPages}</span>
-                        </span>
-                        <button
-                          onClick={handleNextPageHistory}
-                          disabled={currentPageHistory === totalHistoryPages}
-                          className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
-
-                    {isLoadingMoreHistory && (
-                      <div className="sticky bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200">
-                        <div className="flex justify-center items-center py-3">
-                          <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-500 mr-2"></div>
-                          <span className="text-purple-600 text-xs sm:text-sm">Loading more history...</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {!hasMoreHistory && history.length > 0 && (
-                      <div className="text-center py-4 text-gray-500 text-xs sm:text-sm">
-                        No more history to load
+                    {hasMoreHistory && (
+                      <div ref={loaderRef} className="h-10 flex items-center justify-center bg-gray-50 border-t border-gray-100">
+                        {loading && (
+                          <div className="flex items-center gap-2 text-purple-600 animate-pulse">
+                            <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                            <div className="w-2 h-2 bg-purple-600 rounded-full animation-delay-200"></div>
+                            <div className="w-2 h-2 bg-purple-600 rounded-full animation-delay-400"></div>
+                            <span className="text-xs font-medium ml-1">Loading more history...</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
@@ -1649,7 +1526,7 @@ const submissionData = await Promise.all(
               {/* Mobile Card View for Maintenance */}
               <div className="lg:hidden space-y-3 p-3">
                 {/* Mobile Select All for Maintenance */}
-                {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && currentMaintData.length > 0 && (
+                {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && filteredMaintenanceData.length > 0 && (
                   <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
                     <input
                       type="checkbox"
@@ -1673,8 +1550,11 @@ const submissionData = await Promise.all(
                     <span className="text-xs font-medium text-purple-700">Select All ({filteredMaintenanceData.length})</span>
                   </div>
                 )}
-                {currentMaintData.length > 0 ? (
-                  currentMaintData.map((item, index) => {
+                {filteredMaintenanceData.length > 0 ? (
+                  filteredMaintenanceData.map((item, index) => {
+                    // Skip items with no description (potential header rows or corrupt data)
+                    if (!item.task_description && !item.task_id) return null;
+
                     const isSelected = maintSelectedItems.has(item.task_id);
                     const taskStatus = getTaskStatus(item.task_start_date || item.planned_date);
                     return (
@@ -1744,24 +1624,35 @@ const submissionData = await Promise.all(
                                 <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
                                   <img
                                     src={
-                                      maintUploadedImages[item.task_id]?.previewUrl ||
-                                      (typeof item.image === 'string' ? item.image : '')
+                                      (maintUploadedImages[item.task_id] && maintUploadedImages[item.task_id][0]?.previewUrl) ||
+                                      (typeof item.image === 'string' ? item.image.split(',')[0] : '')
                                     }
                                     alt="Receipt"
                                     className="h-10 w-10 object-cover rounded-md flex-shrink-0"
                                   />
                                   <div className="flex flex-col flex-1 min-w-0">
+                                    <span className="text-xs text-gray-600 truncate mb-1">
+                                      {maintUploadedImages[item.task_id] 
+                                        ? `${maintUploadedImages[item.task_id].length} file(s) ready` 
+                                        : (typeof item.image === 'string' ? `${item.image.split(',').length} file(s) uploaded` : "Uploaded")}
+                                    </span>
                                     {maintUploadedImages[item.task_id] ? (
                                       <span className="text-xs text-green-600">Ready to upload</span>
                                     ) : (
                                       <button
                                         className="text-xs text-purple-600 hover:text-purple-800 text-left"
-                                        onClick={() => window.open(item.image, "_blank")}
+                                        onClick={() => window.open(item.image.split(',')[0], "_blank")}
                                       >
                                         View Image
                                       </button>
                                     )}
                                   </div>
+                                  {maintUploadedImages[item.task_id] && maintUploadedImages[item.task_id].length < 5 && (
+                                    <label className="cursor-pointer ml-auto bg-purple-100 text-purple-600 rounded-full p-2 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
+                                      <Plus className="h-4 w-4" />
+                                      <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleMaintImageUpload(item.task_id, e)} />
+                                    </label>
+                                  )}
                                 </div>
                               ) : (
                                 <label
@@ -1781,13 +1672,14 @@ const submissionData = await Promise.all(
                                   <span className="text-xs">
                                     {item.require_attachment?.toUpperCase() === "YES" &&
                                     maintAdditionalData[item.task_id] !== "No"
-                                      ? "Upload Image (Required)"
-                                      : "Upload Image"}
+                                      ? "Upload File (Required)"
+                                      : "Upload File"}
                                   </span>
                                   <input
                                     type="file"
+                                    multiple
                                     className="hidden"
-                                    accept="image/*"
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
                                     onChange={(e) => handleMaintImageUpload(item.task_id, e)}
                                   />
                                 </label>
@@ -1837,7 +1729,7 @@ const submissionData = await Promise.all(
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b bg-yellow-50">Status</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] border-b">Task Description</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] border-b bg-orange-50">Remark</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b bg-green-50">Image</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b bg-green-50">File</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Unit</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Division</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap border-b">Dept</th>
@@ -1855,8 +1747,8 @@ const submissionData = await Promise.all(
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {currentMaintData.length > 0 ? (
-                    currentMaintData.map((item, index) => {
+                  {filteredMaintenanceData.length > 0 ? (
+                    filteredMaintenanceData.map((item, index) => {
                       const isSelected = maintSelectedItems.has(item.task_id);
                       const taskStatus = getTaskStatus(item.task_start_date || item.planned_date);
                       return (
@@ -1918,22 +1810,31 @@ const submissionData = await Promise.all(
                             {maintUploadedImages[item.task_id] || item.image ? (
                               <div className="flex items-center">
                                 <img
-                                  src={maintUploadedImages[item.task_id]?.previewUrl || (typeof item.image === 'string' ? item.image : '')}
+                                  src={(maintUploadedImages[item.task_id] && maintUploadedImages[item.task_id][0]?.previewUrl) || (typeof item.image === 'string' ? item.image.split(',')[0] : '')}
                                   alt="Preview"
                                   className="h-8 w-8 sm:h-10 sm:w-10 object-cover rounded-md mr-2 flex-shrink-0"
                                 />
                                 <div className="flex flex-col min-w-0">
+                                  <span className="text-xs text-gray-500 break-words mb-1">
+                                    {maintUploadedImages[item.task_id] ? `${maintUploadedImages[item.task_id].length} files` : "Uploaded"}
+                                  </span>
                                   {maintUploadedImages[item.task_id] ? (
                                     <span className="text-xs text-green-600">Ready</span>
                                   ) : (
                                     <button
                                       className="text-xs text-purple-600 hover:text-purple-800 whitespace-nowrap"
-                                      onClick={() => window.open(item.image, "_blank")}
+                                      onClick={() => window.open(item.image.split(',')[0], "_blank")}
                                     >
                                       View
                                     </button>
                                   )}
                                 </div>
+                                {maintUploadedImages[item.task_id] && maintUploadedImages[item.task_id].length < 5 && (
+                                  <label className="cursor-pointer ml-2 bg-purple-100 text-purple-600 rounded-full p-1 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
+                                    <Plus className="h-4 w-4" />
+                                    <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleMaintImageUpload(item.task_id, e)} />
+                                  </label>
+                                )}
                               </div>
                             ) : (
                               <label
@@ -1980,48 +1881,28 @@ const submissionData = await Promise.all(
                 </tbody>
               </table>
 
-              {/* Pagination Controls Current Maintenance */}
-              {totalMaintPages > 1 && (
-                <div className="flex justify-between items-center py-4 px-6 border-t border-gray-200 bg-white">
-                  <button
-                    onClick={handlePrevPageMaint}
-                    disabled={currentPageMaint === 1}
-                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700">
-                    Page <span className="font-medium">{currentPageMaint}</span> of <span className="font-medium">{totalMaintPages}</span>
-                  </span>
-                  <button
-                    onClick={handleNextPageMaint}
-                    disabled={currentPageMaint === totalMaintPages}
-                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
-              {maintIsFetchingMore && (
-                <div className="sticky bottom-0 left-0 right-0 bg-gray-50 border-t border-gray-200">
-                  <div className="flex justify-center items-center py-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-500 mr-2"></div>
-                    <span className="text-purple-600 text-xs sm:text-sm">Loading more tasks...</span>
+              <div ref={loaderRef} className="h-10 flex items-center justify-center bg-gray-50 border-t border-gray-100">
+                {maintLoading && (
+                  <div className="flex items-center gap-2 text-purple-600 animate-pulse">
+                    <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                    <div className="w-2 h-2 bg-purple-600 rounded-full animation-delay-200"></div>
+                    <div className="w-2 h-2 bg-purple-600 rounded-full animation-delay-400"></div>
+                    <span className="text-xs font-medium ml-1">Loading more maintenance...</span>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ) : (
             /* Regular Tasks Table - Mobile Responsive */
             <div
               ref={tableContainerRef}
               className="overflow-x-auto overflow-y-auto"
-              style={{ maxHeight: 'calc(100vh - 280px)' }}
+              style={{ maxHeight: isMobile ? 'calc(100vh - 200px)' : 'calc(100vh - 280px)' }}
             >
               {/* Mobile Card View */}
-              <div className="lg:hidden space-y-3 p-3">
+              <div className="lg:hidden space-y-4 p-4 bg-gray-50">
                 {/* Mobile Select All for Checklist */}
-                {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && currentPendingData.length > 0 && (
+                {(userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && filteredAccountData.length > 0 && (
                   <div className="flex items-center gap-2 p-2 bg-purple-50 border border-purple-200 rounded-lg">
                     <input
                       type="checkbox"
@@ -2046,8 +1927,11 @@ const submissionData = await Promise.all(
                     <span className="text-xs font-medium text-purple-700">Select All ({filteredAccountData.filter(item => isCheckboxEnabled(item.task_start_date)).length})</span>
                   </div>
                 )}
-                {currentPendingData.length > 0 ? (
-                  currentPendingData.map((account, index) => {
+                {filteredAccountData.length > 0 ? (
+                  filteredAccountData.map((account, index) => {
+                    // Skip items with no description (potential header rows or corrupt data)
+                    if (!account.task_description && !account.task_id) return null;
+                    
                     const isSelected = selectedItems.has(account.task_id);
                     const taskStatus = getTaskStatus(account.task_start_date);
                     const checkboxEnabled = isCheckboxEnabled(account.task_start_date);
@@ -2111,28 +1995,35 @@ const submissionData = await Promise.all(
                                 <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
                                   <img
                                     src={
-                                      uploadedImages[account.task_id]?.previewUrl ||
-                                      (typeof account.image === 'string' ? account.image : '')
+                                      (uploadedImages[account.task_id] && uploadedImages[account.task_id][0]?.previewUrl) ||
+                                      (typeof account.image === 'string' ? account.image.split(',')[0] : '')
                                     }
                                     alt="Receipt"
                                     className="h-10 w-10 object-cover rounded-md flex-shrink-0"
                                   />
                                   <div className="flex flex-col flex-1 min-w-0">
                                     <span className="text-xs text-gray-600 truncate">
-                                      {uploadedImages[account.task_id]?.file.name ||
-                                        (account.image instanceof File ? account.image.name : "Uploaded")}
+                                      {uploadedImages[account.task_id] 
+                                        ? `${uploadedImages[account.task_id].length} file(s) ready` 
+                                        : (typeof account.image === 'string' ? `${account.image.split(',').length} file(s) uploaded` : "Uploaded")}
                                     </span>
                                     {uploadedImages[account.task_id] ? (
                                       <span className="text-xs text-green-600">Ready to upload</span>
                                     ) : (
                                       <button
                                         className="text-xs text-purple-600 hover:text-purple-800 text-left"
-                                        onClick={() => window.open(account.image, "_blank")}
+                                        onClick={() => window.open(account.image.split(',')[0], "_blank")}
                                       >
                                         View Image
                                       </button>
                                     )}
                                   </div>
+                                  {uploadedImages[account.task_id] && uploadedImages[account.task_id].length < 5 && (
+                                    <label className="cursor-pointer ml-auto bg-purple-100 text-purple-600 rounded-full p-2 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
+                                      <Plus className="h-4 w-4" />
+                                      <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleImageUpload(account.task_id, e)} />
+                                    </label>
+                                  )}
                                 </div>
                               ) : (
                                 <label
@@ -2152,13 +2043,14 @@ const submissionData = await Promise.all(
                                   <span className="text-xs">
                                     {account.require_attachment?.toUpperCase() === "YES" &&
                                     additionalData[account.task_id] !== "No"
-                                      ? "Upload Image (Required)"
-                                      : "Upload Image"}
+                                      ? "Upload File (Required)"
+                                      : "Upload File"}
                                   </span>
                                   <input
                                     type="file"
+                                    multiple
                                     className="hidden"
-                                    accept="image/*"
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
                                     onChange={(e) => handleImageUpload(account.task_id, e)}
                                   />
                                 </label>
@@ -2222,7 +2114,7 @@ const submissionData = await Promise.all(
                       Remarks
                     </th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                      Upload Image
+                      Upload File
                     </th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                       Task ID
@@ -2257,8 +2149,8 @@ const submissionData = await Promise.all(
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {currentPendingData.length > 0 ? (
-                    currentPendingData.map((account, index) => {
+                  {filteredAccountData.length > 0 ? (
+                    filteredAccountData.map((account, index) => {
                       const isSelected = selectedItems.has(account.task_id);
                       const sequenceNumber = index + 1;
                       const taskStatus = getTaskStatus(account.task_start_date);
@@ -2336,28 +2228,33 @@ const submissionData = await Promise.all(
                               <div className="flex items-center">
                                 <img
                                   src={
-                                    uploadedImages[account.task_id]?.previewUrl ||
-                                    (typeof account.image === 'string' ? account.image : '')
+                                    (uploadedImages[account.task_id] && uploadedImages[account.task_id][0]?.previewUrl) ||
+                                    (typeof account.image === 'string' ? account.image.split(',')[0] : '')
                                   }
                                   alt="Receipt"
                                   className="h-8 w-8 sm:h-10 sm:w-10 object-cover rounded-md mr-2 flex-shrink-0"
                                 />
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-xs text-gray-500 break-words">
-                                    {uploadedImages[account.task_id]?.file.name ||
-                                      (account.image instanceof File ? account.image.name : "Uploaded")}
+                                  <span className="text-xs text-gray-500 break-words mb-1">
+                                    {uploadedImages[account.task_id] ? `${uploadedImages[account.task_id].length} files` : "Uploaded"}
                                   </span>
                                   {uploadedImages[account.task_id] ? (
                                     <span className="text-xs text-green-600">Ready</span>
                                   ) : (
                                     <button
                                       className="text-xs text-purple-600 hover:text-purple-800 break-words"
-                                      onClick={() => window.open(account.image, "_blank")}
+                                      onClick={() => window.open(account.image.split(',')[0], "_blank")}
                                     >
                                       View
                                     </button>
                                   )}
                                 </div>
+                                {uploadedImages[account.task_id] && uploadedImages[account.task_id].length < 5 && (
+                                  <label className="cursor-pointer ml-2 bg-purple-100 text-purple-600 rounded-full p-1 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
+                                    <Plus className="h-4 w-4" />
+                                    <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleImageUpload(account.task_id, e)} />
+                                  </label>
+                                )}
                               </div>
                             ) : (
                               <label
@@ -2432,28 +2329,16 @@ const submissionData = await Promise.all(
                 </tbody>
               </table>
 
-              {/* Pagination Controls Pending Checklist */}
-              {totalPendingPages > 1 && (
-                <div className="flex justify-between items-center py-4 px-6 border-t border-gray-200 bg-white">
-                  <button
-                    onClick={handlePrevPagePending}
-                    disabled={currentPagePending === 1}
-                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700">
-                    Page <span className="font-medium">{currentPagePending}</span> of <span className="font-medium">{totalPendingPages}</span>
-                  </span>
-                  <button
-                    onClick={handleNextPagePending}
-                    disabled={currentPagePending === totalPendingPages}
-                    className="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
+              <div ref={loaderRef} className="h-10 flex items-center justify-center bg-gray-50 border-t border-gray-100">
+                {loading && (
+                  <div className="flex items-center gap-2 text-purple-600 animate-pulse">
+                    <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                    <div className="w-2 h-2 bg-purple-600 rounded-full animation-delay-200"></div>
+                    <div className="w-2 h-2 bg-purple-600 rounded-full animation-delay-400"></div>
+                    <span className="text-xs font-medium ml-1">Loading more tasks...</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

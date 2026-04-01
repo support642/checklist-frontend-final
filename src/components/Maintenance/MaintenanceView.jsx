@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { hasPageAccess } from '../../utils/permissionUtils';
 import { 
   maintenanceData, 
   maintenanceHistoryData, 
@@ -176,43 +177,62 @@ const MaintenanceView = ({ startDate = "", endDate = "" }) => {
     // 1. Total Unique Tasks
     const totalTasks = allMaintenanceTasks.length;
 
-    // 2. Identify Pending (Unique)
-    const pendingTasksList = allMaintenanceTasks.filter(task => 
-      (task.status || "").toLowerCase() === "pending"
-    );
+    // Helper to determine task category
+    const getTaskCategory = (task) => {
+      const adminDone = task.admin_done === 'true' || task.admin_done === 'Done' || task.admin_done === true;
+      const isSubmitted = !!(task.submission_date || task.status === 'yes' || task.status === 'no');
 
-    // 3. Count Overdue (Subset of Pending, due before today)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+      if (adminDone) return 'completed';
+      if (isSubmitted) return 'pending_approval';
 
-    const overdueCount = pendingTasksList.filter(task => {
-      const dStr = (task.task_start_date || task.planned_date || task.dueDate || "").toString().trim();
-      if (!dStr) return false;
-      const d = parseDate(dStr);
-      d.setHours(0, 0, 0, 0);
-      return !isNaN(d.getTime()) && d.getTime() < today.getTime();
-    }).length;
+      // Unsubmitted - check for overdue
+      const dStr = task.planned_date || task.dueDate || task.task_start_date;
+      const taskDate = parseDate(dStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    // 3b. Count Pending (Subset of Pending, due exactly today)
-    const pendingTodayCount = pendingTasksList.filter(task => {
-      const dStr = (task.task_start_date || task.planned_date || task.dueDate || "").toString().trim();
-      if (!dStr) return false;
-      const d = parseDate(dStr);
-      d.setHours(0, 0, 0, 0);
-      return !isNaN(d.getTime()) && d.getTime() === today.getTime();
-    }).length;
+      if (!isNaN(taskDate.getTime())) {
+        const compareDate = new Date(taskDate);
+        compareDate.setHours(0, 0, 0, 0);
+        if (compareDate < today) return 'overdue';
+      }
+      return 'pending';
+    };
 
-    // 4. Count Completed/History (Unique)
-    const completedCount = allMaintenanceTasks.filter(task => 
-      ['approved', 'completed'].includes((task.status || "").toLowerCase())
-    ).length;
+    let completedCount = 0;
+    let pendingApprovalCount = 0;
+    let pendingTodayCount = 0;
+    let overdueCount = 0;
+
+    const todayDay = new Date();
+    todayDay.setHours(0, 0, 0, 0);
+
+    allMaintenanceTasks.forEach(task => {
+      const category = getTaskCategory(task);
+      if (category === 'completed') {
+        completedCount++;
+      } else if (category === 'pending_approval') {
+        pendingApprovalCount++;
+      } else if (category === 'overdue') {
+        overdueCount++;
+      } else if (category === 'pending') {
+        const dStr = task.planned_date || task.dueDate || task.task_start_date;
+        const taskDate = parseDate(dStr);
+        if (!isNaN(taskDate.getTime())) {
+          taskDate.setHours(0, 0, 0, 0);
+          if (taskDate.getTime() === todayDay.getTime()) {
+            pendingTodayCount++;
+          }
+        }
+      }
+    });
 
     return {
       totalMachines: machineParts.length || 0,
       totalTasks: totalTasks,
       completedTasks: completedCount,
-      pendingTasks: pendingTodayCount, // Only today's tasks
-      overdueTasks: overdueCount    // Only tasks before today
+      pendingTasks: pendingTodayCount + pendingApprovalCount, 
+      overdueTasks: overdueCount
     };
   }, [allMaintenanceTasks, machineParts]);
 
@@ -314,7 +334,7 @@ const MaintenanceView = ({ startDate = "", endDate = "" }) => {
         navigate('/dashboard/data/sales?view=maintenance');
         break;
       case 'completed':
-        if (userRole === 'user') {
+        if (userRole === 'user' || 'admin' ||!hasPageAccess('admin_approval')) {
           navigate('/dashboard/data/sales?view=maintenance');
         } else {
           navigate('/dashboard/history?tab=maintenance');

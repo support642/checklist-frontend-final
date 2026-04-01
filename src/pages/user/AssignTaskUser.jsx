@@ -1,3 +1,4 @@
+import { authFetch } from "../../utils/authFetch";
 import { useState, useEffect, useMemo } from "react";
 import { BellRing, FileCheck, Calendar, Clock, Download, ClipboardList, Users, ArrowLeft, Settings } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
@@ -385,8 +386,8 @@ useEffect(() => {
   const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/assign-task`;
   const fetchWorkingDays = async () => {
     try {
-      // const res = await fetch("http://localhost:5050/api/assign-task/working-days");
-      const res = await fetch(`${BASE_URL}/working-days`);
+      // const res = await authFetch("http://localhost:5050/api/assign-task/working-days");
+      const res = await authFetch(`${BASE_URL}/working-days`);
       const data = await res.json();
 
       const formattedDays = data.map((day) => {
@@ -1061,7 +1062,7 @@ useEffect(() => {
             )}
           </div>
         ) : (
-          <div className="rounded-lg border border-purple-200 bg-white shadow-md overflow-hidden">
+          <div className={`rounded-lg border border-purple-200 bg-white shadow-md transition-all duration-300 ${showCalendar || showStartCalendar ? 'pb-10' : 'overflow-hidden'}`}>
             <form onSubmit={handleSubmit}>
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-3 border-b border-purple-100">
                 <h2 className="text-base font-semibold text-purple-700">

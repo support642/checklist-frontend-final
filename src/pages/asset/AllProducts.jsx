@@ -1,0 +1,374 @@
+import React, { useState } from 'react';
+import { Plus, Search, Filter, RefreshCw, ChevronLeft, ChevronRight, QrCode, FileText, Pencil } from 'lucide-react';
+import { useGetProductsQuery } from '../../redux/asset-redux/slices/productApi';
+import AddProductModal from '../../components/asset-components/AddProductModal';
+import QRCodeModal from '../../components/asset-components/QRCodeModal';
+import BulkQRModal from '../../components/asset-components/BulkQRModal';
+import Footer from '../../components/asset-components/Footer';
+import { formatTimestampToDDMMYYYY } from '../../utils/dateUtils';
+
+// Product Card for Mobile View - RICH & DETAILED
+const ProductCard = ({ product, onShowQR, onEdit }) => (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 space-y-4">
+        {/* Header: SN & Actions */}
+        <div className="flex items-center justify-between">
+            <span className="font-mono font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded text-sm">{product.sn}</span>
+            <div className="flex items-center gap-1">
+                <button onClick={() => onEdit(product)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full">
+                    <Pencil size={16} />
+                </button>
+                <button onClick={() => onShowQR(product)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-full">
+                    <QrCode size={16} />
+                </button>
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${product.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {product.status}
+                </span>
+            </div>
+        </div>
+
+        {/* Title & Brand */}
+        <div>
+            <h3 className="font-bold text-slate-900 text-base leading-tight">{product.productName}</h3>
+            <p className="text-xs text-slate-500 mt-0.5">{product.brand} • {product.model}</p>
+        </div>
+
+        {/* 3-Column Key Stats */}
+        <div className="grid grid-cols-3 gap-2 py-3 border-t border-b border-slate-50">
+            <div className="text-center">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wide">Location</p>
+                <p className="text-xs font-semibold text-slate-700 truncate">{product.location}</p>
+            </div>
+            <div className="text-center border-l border-slate-100">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wide">Dept</p>
+                <p className="text-xs font-semibold text-slate-700 truncate">{product.department}</p>
+            </div>
+            <div className="text-center border-l border-slate-100">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wide">Value</p>
+                <p className="text-xs font-semibold text-green-700">₹{product.assetValue}</p>
+            </div>
+        </div>
+
+        {/* Details List */}
+        <div className="space-y-2 text-xs">
+            <div className="flex justify-between">
+                <span className="text-slate-500">Asset Date:</span>
+                <span className="text-slate-700 font-medium">{formatTimestampToDDMMYYYY(product.assetDate)}</span>
+            </div>
+            <div className="flex justify-between">
+                <span className="text-slate-500">Warranty:</span>
+                <span className={`font-medium ${product.warrantyAvailable === 'Yes' ? 'text-green-600' : 'text-slate-400'}`}>
+                    {product.warrantyAvailable === 'Yes' ? `Yes (Till ${formatTimestampToDDMMYYYY(product.warrantyEnd)})` : 'No'}
+                </span>
+            </div>
+
+            {/* Repair Highlight Section */}
+            <div className="bg-slate-50 rounded-lg p-2 mt-2 space-y-1.5">
+                <div className="flex justify-between items-center border-b border-slate-200 pb-1 mb-1">
+                    <span className="font-semibold text-slate-600">Repair History</span>
+                    <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-bold">{product.repairCount} Repairs</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-slate-500">Last Repair:</span>
+                    <span className="text-slate-700">{formatTimestampToDDMMYYYY(product.lastRepairDate) || 'Never'}</span>
+                </div>
+                {product.repairCost && (
+                    <div className="flex justify-between">
+                        <span className="text-slate-500">Last Cost:</span>
+                        <span className="text-red-600 font-medium">₹{product.repairCost}</span>
+                    </div>
+                )}
+                {product.partChanged === 'Yes' && (
+                    <div className="pt-1">
+                        <span className="text-slate-500 block mb-1">Parts Changed:</span>
+                        <div className="flex flex-wrap gap-1">
+                            {(product.partNames || []).slice(0, 3).map((p, i) => (
+                                <span key={i} className="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600">
+                                    {p}
+                                </span>
+                            ))}
+                            {(product.partNames?.length > 3) && <span className="text-[10px] text-slate-400 self-center">+{product.partNames.length - 3} more</span>}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    </div>
+);
+
+const AllProducts = () => {
+    const { data: products = [], isLoading, isError, refetch: clearAndReloadDummy } = useGetProductsQuery();
+    
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+    const [isBulkQROpen, setIsBulkQROpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [editingProduct, setEditingProduct] = useState(null);
+
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredProducts = products.filter(product =>
+        product.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.sn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
+    if (isLoading) return <div className="p-8 text-center flex-1 mt-20">Loading products...</div>;
+    if (isError) return <div className="p-8 text-center text-red-500 flex-1">Error fetching products.</div>;
+
+    const handleReloadDummy = () => {
+        if (confirm('This will replace all products with fresh dummy data. Continue?')) {
+            clearAndReloadDummy();
+        }
+    };
+
+    const handleShowQR = (product) => {
+        setSelectedProduct(product);
+        setIsQRModalOpen(true);
+    };
+
+    const handleEditProduct = (product) => {
+        setEditingProduct(product);
+        setIsModalOpen(true);
+    };
+
+    const handleAddProduct = () => {
+        setEditingProduct(null);
+        setIsModalOpen(true);
+    };
+
+    return (
+        <div className="flex flex-col h-full bg-slate-50">
+            <div className="flex-1 w-full min-h-0 flex flex-col gap-4 p-4 lg:p-6 overflow-hidden">
+                {/* Top Toolbar */}
+                <div className="flex flex-col gap-3 shrink-0">
+                    <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3">
+                    {/* Title hidden on mobile to avoid double header */}
+                    <h1 className="text-2xl font-bold text-slate-900 hidden lg:block">All Products</h1>
+
+                    {/* Actions Group */}
+                    <div className="flex items-center gap-2 w-full lg:w-auto">
+                        <button
+                            onClick={handleReloadDummy}
+                            className="bg-white hover:bg-slate-50 text-slate-600 p-2.5 rounded-xl flex items-center justify-center transition-colors border border-slate-200 shadow-sm"
+                            title="Reload Data"
+                        >
+                            <RefreshCw size={20} />
+                        </button>
+
+                        <button
+                            onClick={() => setIsBulkQROpen(true)}
+                            className="bg-purple-50 text-purple-700 hover:bg-purple-100 p-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors border border-purple-100 shadow-sm"
+                            title="Generate QR PDF"
+                        >
+                            <FileText size={20} />
+                            <span className="hidden sm:inline font-medium">QR PDF</span>
+                        </button>
+
+                        <button
+                            onClick={handleAddProduct}
+                            className="flex-1 lg:flex-none bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors font-medium shadow-purple-200/50"
+                        >
+                            <Plus size={20} />
+                            <span>Add Product</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Search & Filter */}
+                <div className="flex gap-3">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder="Search products..."
+                            value={searchTerm}
+                            onChange={(e) => { setSearchTerm(e.target.value); }}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-medium text-slate-700 placeholder:text-slate-400"
+                        />
+                    </div>
+                    <button className="px-3.5 py-2.5 border border-slate-200 bg-white rounded-xl text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors shadow-sm">
+                        <Filter size={20} />
+                    </button>
+                </div>
+            </div>
+
+
+            {/* Mobile Card View (Scrollable) */}
+            <div className="md:hidden flex-1 overflow-y-auto space-y-4 pr-1">
+                {filteredProducts.length > 0 ? (
+                    filteredProducts.map((product) => (
+                        <ProductCard key={product.id} product={product} onShowQR={handleShowQR} onEdit={handleEditProduct} />
+                    ))
+                ) : (
+                    <div className="bg-white rounded-xl p-8 text-center text-slate-500">
+                        No products found.
+                    </div>
+                )}
+            </div>
+
+            {/* Desktop Table View - Full Width with Horizontal Scroll */}
+            <div className="hidden md:flex flex-1 min-h-0 flex-col bg-white rounded-t-xl shadow-sm border-x border-t border-slate-100 border-b overflow-hidden">
+                <div className="flex-1 overflow-auto w-full relative custom-scrollbar">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100 sticky top-0 z-20 shadow-sm">
+                            <tr>
+                                {/* Actions */}
+                                <th className="px-4 py-3 sticky left-0 top-0 z-30 bg-slate-50 drop-shadow-sm">Actions</th>
+                                {/* Section 1: Basic Info */}
+                                <th className="px-4 py-3">Serial No</th>
+                                <th className="px-4 py-3">Product Name</th>
+                                <th className="px-4 py-3">Category</th>
+                                <th className="px-4 py-3">Type</th>
+                                <th className="px-4 py-3">Brand</th>
+                                <th className="px-4 py-3">Model</th>
+                                <th className="px-4 py-3">SKU</th>
+                                <th className="px-4 py-3">Mfg Date</th>
+                                <th className="px-4 py-3">Origin</th>
+                                <th className="px-4 py-3">Status</th>
+                                {/* Section 2: Asset Info */}
+                                <th className="px-4 py-3">Asset Date</th>
+                                <th className="px-4 py-3">Invoice No</th>
+                                <th className="px-4 py-3 text-right">Cost</th>
+                                <th className="px-4 py-3">Qty</th>
+                                <th className="px-4 py-3">Supplier</th>
+                                <th className="px-4 py-3">Payment</th>
+                                {/* Section 3: Location */}
+                                <th className="px-4 py-3">Location</th>
+                                <th className="px-4 py-3">Department</th>
+                                <th className="px-4 py-3">Assigned To</th>
+                                <th className="px-4 py-3">Responsible</th>
+                                {/* Section 4: Warranty */}
+                                <th className="px-4 py-3">Warranty</th>
+                                <th className="px-4 py-3">AMC</th>
+                                {/* Section 5: Maintenance */}
+                                <th className="px-4 py-3">Maintenance</th>
+                                <th className="px-4 py-3">Priority</th>
+                                {/* Section 10: Repair History */}
+                                <th className="px-4 py-3">Last Repair</th>
+                                <th className="px-4 py-3 text-right">Last Cost</th>
+                                <th className="px-4 py-3">Part Chg?</th>
+                                <th className="px-4 py-3">Part 1</th>
+                                <th className="px-4 py-3">Part 2</th>
+                                <th className="px-4 py-3">Part 3</th>
+                                <th className="px-4 py-3">Part 4</th>
+                                <th className="px-4 py-3">Part 5</th>
+                                <th className="px-4 py-3 text-center">Count</th>
+                                <th className="px-4 py-3 text-right">Total Cost</th>
+                                {/* Section 8: Financial */}
+                                <th className="px-4 py-3 text-right">Asset Value</th>
+                                <th className="px-4 py-3">Dep. Method</th>
+                                {/* Section 10: System */}
+                                <th className="px-4 py-3">Created By</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {filteredProducts.length > 0 ? (
+                                filteredProducts.map((product) => (
+                                    <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                                        {/* Actions - QR Code Button */}
+                                        <td className="px-4 py-3 sticky left-0 bg-white flex items-center gap-1">
+                                            <button
+                                                onClick={() => handleEditProduct(product)}
+                                                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                                title="Edit Product"
+                                            >
+                                                <Pencil size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleShowQR(product)}
+                                                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                title="View QR Code"
+                                            >
+                                                <QrCode size={18} />
+                                            </button>
+                                        </td>
+                                        {/* Section 1 */}
+                                        <td className="px-4 py-3 font-medium text-purple-700">{product.sn}</td>
+                                        <td className="px-4 py-3 text-slate-900 font-medium">{product.productName}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.category}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.type}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.brand}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.model}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.sku}</td>
+                                        <td className="px-4 py-3 text-slate-600">{formatTimestampToDDMMYYYY(product.mfgDate)}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.origin}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${product.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
+                                                {product.status}
+                                            </span>
+                                        </td>
+                                        {/* Section 2 */}
+                                        <td className="px-4 py-3 text-slate-600">{formatTimestampToDDMMYYYY(product.assetDate)}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.invoiceNo}</td>
+                                        <td className="px-4 py-3 text-right text-slate-900">₹{product.cost}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.quantity}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.supplierName}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.paymentMode}</td>
+                                        {/* Section 3 */}
+                                        <td className="px-4 py-3 text-slate-600">{product.location}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.department}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.assignedTo}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.responsiblePerson}</td>
+                                        {/* Section 4 */}
+                                        <td className="px-4 py-3 text-slate-600">{product.warrantyAvailable}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.amc}</td>
+                                        {/* Section 5 */}
+                                        <td className="px-4 py-3 text-slate-600">{product.maintenanceRequired}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.priority || '-'}</td>
+                                        {/* Section 10: Repair History */}
+                                        <td className="px-4 py-3 text-slate-600">{formatTimestampToDDMMYYYY(product.lastRepairDate)}</td>
+                                        <td className="px-4 py-3 text-right text-slate-900">{product.repairCost ? `₹${product.repairCost}` : '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.partChanged}</td>
+
+                                        <td className="px-4 py-3 text-slate-600 font-normal border-l border-slate-50">{product.partNames?.[0] || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600 font-normal">{product.partNames?.[1] || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600 font-normal">{product.partNames?.[2] || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600 font-normal">{product.partNames?.[3] || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-600 font-normal border-r border-slate-50">{product.partNames?.[4] || '-'}</td>
+
+                                        <td className="px-4 py-3 text-center text-slate-600">{product.repairCount}</td>
+                                        <td className="px-4 py-3 text-right text-slate-900 font-medium">₹{product.totalRepairCost}</td>
+                                        {/* Section 8 */}
+                                        <td className="px-4 py-3 text-right text-slate-900">₹{product.assetValue}</td>
+                                        <td className="px-4 py-3 text-slate-600">{product.depMethod}</td>
+                                        {/* Section 10 */}
+                                        <td className="px-4 py-3 text-slate-600">{product.createdBy}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="28" className="px-4 py-12 text-center text-slate-500">
+                                        No products found.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+
+
+            <AddProductModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                product={editingProduct}
+            />
+            <QRCodeModal
+                isOpen={isQRModalOpen}
+                onClose={() => setIsQRModalOpen(false)}
+                product={selectedProduct}
+            />
+            <BulkQRModal
+                isOpen={isBulkQROpen}
+                onClose={() => setIsBulkQROpen(false)}
+                products={products}
+            />
+            </div>
+            {/* <Footer className="pb-8 pt-4 shrink-0" /> */}
+        </div>
+    );
+};
+
+export default AllProducts;

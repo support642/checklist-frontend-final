@@ -1,5 +1,6 @@
+import { authFetch as baseAuthFetch } from "../authFetch";
 // Centralized API client that automatically attaches JWT token
-// Use authFetch() instead of fetch() for all authenticated API calls
+// Use authFetch() for all authenticated API calls
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5050/api';
 
@@ -15,7 +16,8 @@ function getToken(): string | null {
 }
 
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
-    const token = getToken();
+    const username = localStorage.getItem('user-name');
+    const role = localStorage.getItem('role');
 
     const headers: Record<string, string> = {
         ...Object.fromEntries(
@@ -23,8 +25,14 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
         ),
     };
 
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+    const sessionId = localStorage.getItem('session_id');
+    if (sessionId) {
+        headers['x-session-id'] = sessionId;
+    }
+
+    if (username) {
+        headers['x-user-name'] = username;
+        if (role) headers['x-user-role'] = role;
     }
 
     // Auto-set Content-Type for JSON if body is present and not FormData
@@ -32,7 +40,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
         headers['Content-Type'] = 'application/json';
     }
 
-    return fetch(url, {
+    return baseAuthFetch(url, {
         ...options,
         headers,
     });

@@ -1,72 +1,67 @@
 // checkListApi.js
+import { authFetch } from "../../utils/authFetch";
 // const BASE_URL = "http://localhost:5050/api/checklist";
 const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/checklist`;
 
 // =======================================================
 // 1️⃣ Fetch Pending Checklist (AWS Backend)
 // =======================================================
-export const fetchChechListDataSortByDate = async (page = 1, search = '') => {
+export const fetchChechListDataSortByDate = async (page = 1, search = '', status = 'all', frequency = 'all', name = 'all', division = 'all', departmentFilter = 'all') => {
   const username = localStorage.getItem("user-name");
   const role = localStorage.getItem("role");
   const department = localStorage.getItem("department");
   const unit = localStorage.getItem("unit");
-  const division = localStorage.getItem("division");
+  const divisionLocal = localStorage.getItem("division");
 
-  const firstRes = await fetch(
-    `${BASE_URL}/pending?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`
-  );
+  let url = `${BASE_URL}/pending?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${divisionLocal}&search=${encodeURIComponent(search)}`;
+  
+  if (status !== 'all') url += `&status=${status}`;
+  if (frequency !== 'all') url += `&frequency=${frequency}`;
+  if (name !== 'all') url += `&name=${encodeURIComponent(name)}`;
+  if (division !== 'all') url += `&divisionFilter=${encodeURIComponent(division)}`;
+  if (departmentFilter !== 'all') url += `&departmentFilter=${encodeURIComponent(departmentFilter)}`;
 
-  if (!firstRes.ok) {
-    const contentType = firstRes.headers.get("content-type");
+  const response = await authFetch(url);
+
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
-      const errJson = await firstRes.json();
-      throw new Error(errJson.error || `Server error ${firstRes.status}`);
+      const errJson = await response.json();
+      throw new Error(errJson.error || `Server error ${response.status}`);
     } else {
-      throw new Error(`Server returned non-JSON response (${firstRes.status}). This often means the API URL or Port is incorrect.`);
+      throw new Error(`Server returned non-JSON response (${response.status}).`);
     }
   }
 
-  const contentType = firstRes.headers.get("content-type");
-  if (!contentType || !contentType.includes("application/json")) {
-    throw new Error("Expected JSON response but received HTML/Text. Check your API configuration.");
-  }
-
-  const firstJson = await firstRes.json();
-  const totalCount = firstJson.totalCount || 0;
-  let allData = firstJson.data || [];
-  const PAGE_SIZE = 50;
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-
-  if (totalPages > 1) {
-    const remaining = await Promise.all(
-      Array.from({ length: totalPages - 1 }, (_, i) =>
-        fetch(`${BASE_URL}/pending?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`)
-          .then(r => r.json())
-          .then(j => j.data || [])
-      )
-    );
-    allData = [...allData, ...remaining.flat()];
-  }
-
-  return { data: allData, totalCount, page: 1 };
+  const json = await response.json();
+  return { 
+    data: json.data || [], 
+    totalCount: json.totalCount || 0, 
+    page: json.page || page 
+  };
 };
 
 
 // =======================================================
 // 2️⃣ Fetch Checklist History (AWS Backend)
 // =======================================================
-export const fetchChechListDataForHistory = async (search = "") => {
+export const fetchChechListDataForHistory = async (search = "", name = 'all', division = 'all', departmentFilter = 'all') => {
   const username = localStorage.getItem("user-name");
   const role = localStorage.getItem("role");
   const department = localStorage.getItem("department");
+  const unit = localStorage.getItem("unit");
+  const divisionLocal = localStorage.getItem("division");
   const PAGE_SIZE = 50;
 
   const encodedSearch = encodeURIComponent(search);
+  let baseUrl = `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${divisionLocal}&search=${encodedSearch}`;
+
+  if (name !== 'all') baseUrl += `&nameFilter=${encodeURIComponent(name)}`;
+  if (division !== 'all') baseUrl += `&divisionFilter=${encodeURIComponent(division)}`;
+  if (departmentFilter !== 'all') baseUrl += `&departmentFilter=${encodeURIComponent(departmentFilter)}`;
 
   // Fetch page 1 to get totalCount
-  const firstRes = await fetch(
-    `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&search=${encodedSearch}`
-  );
+  const firstRes = await authFetch(baseUrl);
 
   if (!firstRes.ok) {
     const contentType = firstRes.headers.get("content-type");
@@ -93,7 +88,7 @@ export const fetchChechListDataForHistory = async (search = "") => {
   if (totalPages > 1) {
     const remaining = await Promise.all(
       Array.from({ length: totalPages - 1 }, (_, i) =>
-        fetch(`${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&department=${department}&search=${encodedSearch}`)
+        authFetch(`${baseUrl.replace('page=1', `page=${i + 2}`)}`)
           .then(r => r.json())
           .then(j => j.data || [])
       )
@@ -110,7 +105,7 @@ export const fetchChechListDataForHistory = async (search = "") => {
 // =======================================================
 export const updateChecklistData = async (submissionData) => {
   try {
-    const response = await fetch(`${BASE_URL}/update`, {
+    const response = await authFetch(`${BASE_URL}/update`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(submissionData),
@@ -133,7 +128,7 @@ export const updateChecklistData = async (submissionData) => {
 // =======================================================
 export const postChecklistAdminDoneAPI = async (selectedItems) => {
   try {
-    const response = await fetch(`${BASE_URL}/admin-done`, {
+    const response = await authFetch(`${BASE_URL}/admin-done`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(selectedItems),
@@ -152,7 +147,7 @@ export const postChecklistAdminDoneAPI = async (selectedItems) => {
 // =======================================================
 export const sendChecklistWhatsAppAPI = async (selectedItems) => {
   try {
-    const response = await fetch(`${BASE_URL}/send-whatsapp`, {
+    const response = await authFetch(`${BASE_URL}/send-whatsapp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ items: selectedItems }),

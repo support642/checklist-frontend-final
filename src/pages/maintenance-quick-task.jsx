@@ -10,7 +10,7 @@ const CONFIG = {
   },
 };
 
-function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv, userName }) {
+function MaintenanceQuickTaskPage({ searchTerm, nameFilter, deptFilter, divFilter, freqFilter, userRole, userDept, userDiv, userName }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -32,6 +32,8 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
       page: 0, 
       pageSize: 50, 
       nameFilter: nameFilter, 
+      deptFilter: deptFilter,
+      divFilter: divFilter,
       freqFilter: freqFilter, 
       append: false,
       userRole,
@@ -39,7 +41,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
       userDiv,
       userName
     }));
-  }, [dispatch, nameFilter, freqFilter, userRole, userDept, userDiv, userName]);
+  }, [dispatch, nameFilter, deptFilter, divFilter, freqFilter, userRole, userDept, userDiv, userName]);
 
   useEffect(() => {
     setIsInitialized(true);
@@ -58,6 +60,8 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
           page: uniqueMaintenancePage, 
           pageSize: 50, 
           nameFilter,
+          deptFilter,
+          divFilter,
           freqFilter,
           append: true,
           userRole,
@@ -67,7 +71,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
         }));
       }
     }
-  }, [loading, uniqueMaintenanceHasMore, uniqueMaintenancePage, nameFilter, freqFilter, dispatch, userRole, userDept, userDiv, userName]);
+  }, [loading, uniqueMaintenanceHasMore, uniqueMaintenancePage, nameFilter, deptFilter, divFilter, freqFilter, dispatch, userRole, userDept, userDiv, userName]);
 
   useEffect(() => {
     const container = tableContainerRef.current;
@@ -130,7 +134,19 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
       setEditFormData({});
 
       // Refresh
-      dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter, append: false }));
+      dispatch(uniqueMaintenanceTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter, 
+        deptFilter,
+        divFilter,
+        freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName
+      }));
 
     } catch (error) {
       console.error("Failed to update task:", error);
@@ -170,7 +186,19 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
       setSuccessMessage("Tasks deleted successfully");
       
       // Refresh
-      dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter, append: false }));
+      dispatch(uniqueMaintenanceTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter, 
+        deptFilter,
+        divFilter,
+        freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName
+      }));
       
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) {
@@ -184,6 +212,28 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
   const filteredTasks = useMemo(() => {
     let filtered = [...(uniqueMaintenanceTasks || [])]; // Create a copy to sort
     
+    // 1. Role-based restrictions (Enforce organizational boundaries)
+    const role = userRole?.toLowerCase()?.trim();
+    const targetDept = userDept?.toLowerCase()?.trim();
+    const targetDiv = userDiv?.toLowerCase()?.trim();
+    const targetName = userName?.toLowerCase()?.trim();
+
+    filtered = filtered.filter(task => {
+      if (role === 'admin') {
+        // Admin: Only show tasks within their Division AND Department
+        return task.division?.toLowerCase()?.trim() === targetDiv && 
+               (task.department || task.user_access)?.toLowerCase()?.trim() === targetDept;
+      } else if (role === 'div_admin') {
+        // Division Admin: Only show tasks within their Division
+        return task.division?.toLowerCase()?.trim() === targetDiv;
+      } else if (role === 'user') {
+        // User: Only show tasks assigned to them
+        return task.name?.toLowerCase()?.trim() === targetName;
+      }
+      return true; // super_admin sees all
+    });
+
+    // 2. Applied Filters (Search, Name, Dept, etc.)
     if (searchTerm) {
         filtered = filtered.filter(task =>
             task.task_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -192,8 +242,12 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
         );
     }
     
-    if (nameFilter) {
-      filtered = filtered.filter(task => task.name === nameFilter);
+    if (deptFilter) {
+      filtered = filtered.filter(task => (task.department || task.user_access) === deptFilter);
+    }
+
+    if (divFilter) {
+      filtered = filtered.filter(task => task.division === divFilter);
     }
 
     if (freqFilter) {
@@ -201,7 +255,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
     }
 
     return filtered;
-  }, [uniqueMaintenanceTasks, searchTerm, nameFilter, freqFilter]);
+  }, [uniqueMaintenanceTasks, searchTerm, nameFilter, deptFilter, divFilter, freqFilter, userRole, userName, userDept, userDiv]);
 
   return (
     <>
@@ -219,7 +273,7 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, freqFilter, userRole
         <div className="mt-4 bg-red-50 p-4 rounded-md text-red-800 text-center">
           {error}{" "}
           <button 
-            onClick={() => dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter: '', freqFilter: '', append: false }))} 
+            onClick={() => dispatch(uniqueMaintenanceTaskData({ page: 0, pageSize: 50, nameFilter, deptFilter, divFilter, freqFilter, append: false, userRole, userDept, userDiv, userName }))} 
             className="underline ml-2 hover:text-red-600"
           >
             Try again

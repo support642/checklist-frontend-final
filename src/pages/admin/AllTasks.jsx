@@ -1,3 +1,4 @@
+import { authFetch } from "../../utils/authFetch";
 import { useState, useEffect, useRef, useCallback } from "react"
 
 const AllTasks = () => {
@@ -124,7 +125,7 @@ const AllTasks = () => {
         formData.append('sheetId', SHEET_ID)
         formData.append('sheetName', SHEET_NAME)
   
-        const response = await fetch(SCRIPT_URL, {
+        const response = await authFetch(SCRIPT_URL, {
           method: 'POST',
           body: formData
         })
@@ -380,7 +381,7 @@ const AllTasks = () => {
         formData.append('folderUrl', 'https://drive.google.com/drive/u/0/folders/1TBpIcv5bbAsmlje7lpnPFpJRDY5nekTE')
         
         try {
-          const response = await fetch(SCRIPT_URL, {
+          const response = await authFetch(SCRIPT_URL, {
             method: 'POST',
             body: formData
           })
@@ -450,7 +451,7 @@ const AllTasks = () => {
       formData.append('tasks', JSON.stringify(tasksToUpdate))
 
       // Make API call to update tasks
-      const response = await fetch(SCRIPT_URL, {
+      const response = await authFetch(SCRIPT_URL, {
         method: 'POST',
         body: formData
       })

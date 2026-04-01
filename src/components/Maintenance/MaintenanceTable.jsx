@@ -1,20 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Search, Filter, Edit2, Save, X, Eye, 
+  Search, Filter, X, 
   ChevronLeft, ChevronRight, Image as ImageIcon,
-  MoreVertical, CheckCircle2, AlertCircle, Clock, ClipboardList
+  CheckCircle2, AlertCircle, Clock
 } from 'lucide-react';
 
 const MaintenanceTable = ({ 
   tasks, 
-  onUpdateTask, 
   isLoading,
   onRefresh
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState('all');
-  const [editingRowId, setEditingRowId] = useState(null);
-  const [editFormData, setEditFormData] = useState({});
   const [selectedImage, setSelectedImage] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -149,57 +146,45 @@ const MaintenanceTable = ({
 
   const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
 
-  // --- Inline Editing ---
-  const handleEditClick = (task) => {
-    setEditingRowId(task.task_id || task.id);
-    setEditFormData({ ...task });
-  };
-
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSaveEdit = async () => {
-    try {
-      await onUpdateTask(editFormData);
-      setEditingRowId(null);
-    } catch (error) {
-      alert("Failed to update task");
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingRowId(null);
-    setEditFormData({});
-  };
-
   // --- Helpers ---
-  const getStatusBadge = (status) => {
-    const s = (status || '').toLowerCase();
-    if (s === 'approved' || s === 'completed') {
+  const getStatusBadge = (task) => {
+    const adminDone = task.admin_done === 'true' || task.admin_done === 'Done' || task.admin_done === true;
+    const isSubmitted = !!(task.submission_date || task.status === 'yes' || task.status === 'no');
+
+    if (adminDone) {
       return (
-        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
           <CheckCircle2 className="h-3 w-3" /> Approved
         </span>
       );
     }
-    if (s === 'pending approval') {
+    if (isSubmitted) {
       return (
-        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
           <Clock className="h-3 w-3" /> Pending Approval
         </span>
       );
     }
-    if (s === 'overdue') {
-      return (
-        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-          <AlertCircle className="h-3 w-3" /> Overdue
-        </span>
-      );
+    // Check for Overdue
+    const dStr = task.planned_date || task.dueDate || task.task_start_date;
+    const taskDate = parseDate(dStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!isNaN(taskDate.getTime())) {
+      const compareDate = new Date(taskDate);
+      compareDate.setHours(0, 0, 0, 0);
+      if (compareDate < today) {
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+            <AlertCircle className="h-3 w-3" /> Overdue
+          </span>
+        );
+      }
     }
+
     return (
-      <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+      <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
         <Clock className="h-3 w-3" /> Pending
       </span>
     );
@@ -270,19 +255,18 @@ const MaintenanceTable = ({
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Start Date & Time</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Freq</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  <td colSpan="11" className="px-6 py-4 animate-pulse bg-gray-50/50"></td>
+                  <td colSpan="12" className="px-6 py-4 animate-pulse bg-gray-50/50"></td>
                 </tr>
               ))
             ) : paginatedTasks.length === 0 ? (
               <tr>
-                <td colSpan="11" className="px-6 py-12 text-center text-gray-500">
+                <td colSpan="12" className="px-6 py-12 text-center text-gray-500">
                    <div className="flex flex-col items-center gap-2">
                      <p className="text-sm font-medium">No maintenance data found for the selected filters.</p>
                    </div>
@@ -290,76 +274,37 @@ const MaintenanceTable = ({
               </tr>
             ) : (
               paginatedTasks.map((task, index) => {
-                const isEditing = editingRowId === (task.task_id || task.id);
                 return (
                   <tr 
                     key={task.task_id || task.id} 
-                    onDoubleClick={() => !isEditing && handleEditClick(task)}
-                    className={`hover:bg-gray-50 transition-colors ${isEditing ? 'bg-purple-50' : ''}`}
+                    className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {(currentPage - 1) * itemsPerPage + index + 1}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {isEditing ? (
-                        <input
-                          name="machine_name"
-                          value={editFormData.machine_name || ''}
-                          onChange={handleEditChange}
-                          className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
-                        />
-                      ) : (
-                        <div className="text-sm font-medium text-gray-900">{task.machine_name || '-'}</div>
-                      )}
+                      <div className="text-sm font-medium text-gray-900">{task.machine_name || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                        {Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '-')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-gray-500">
                        {task.part_area || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {isEditing ? (
-                        <input
-                          name="machine_department"
-                          value={editFormData.machine_department || ''}
-                          onChange={handleEditChange}
-                          className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
-                        />
-                      ) : (
-                        <div className="text-sm text-gray-900">{task.machine_department || '-'}</div>
-                      )}
+                      <div className="text-sm text-gray-900">{task.machine_department || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {isEditing ? (
-                        <input
-                          name="machine_division"
-                          value={editFormData.machine_division || ''}
-                          onChange={handleEditChange}
-                          className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
-                        />
-                      ) : (
-                        <div className="text-sm text-gray-900">{task.machine_division || '-'}</div>
-                      )}
+                      <div className="text-sm text-gray-900">{task.machine_division || '-'}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-gray-500">
                        {task.givenBy || task.given_by || '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                        <div className="text-sm font-medium text-gray-900">{task.name || '-'}</div>
                     </td>
                     <td className="px-6 py-4 max-w-xs">
-                      {isEditing ? (
-                        <textarea
-                          name="task_description"
-                          value={editFormData.task_description || ''}
-                          onChange={handleEditChange}
-                          rows={2}
-                          className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
-                        />
-                      ) : (
-                        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{task.task_description}</p>
-                      )}
+                      <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{task.task_description}</p>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {task.planned_date || task.dueDate || '-'}
@@ -370,32 +315,7 @@ const MaintenanceTable = ({
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(task.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {isEditing ? (
-                          <>
-                            <button onClick={handleSaveEdit} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Save">
-                              <Save className="h-4 w-4" />
-                            </button>
-                            <button onClick={handleCancelEdit} className="p-1 text-rose-600 hover:bg-rose-50 rounded" title="Cancel">
-                              <X className="h-4 w-4" />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button onClick={() => handleEditClick(task)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Edit">
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            {task.image_url && (
-                              <button onClick={() => setSelectedImage(task.image_url)} className="p-1 text-purple-500 hover:bg-purple-50 rounded" title="View Evidence">
-                                <Eye className="h-4 w-4" />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
+                      {getStatusBadge(task)}
                     </td>
                   </tr>
                 );
@@ -421,39 +341,27 @@ const MaintenanceTable = ({
           </div>
         ) : (
           paginatedTasks.map((task, index) => {
-            const isEditing = editingRowId === (task.task_id || task.id);
             return (
               <div 
                 key={task.task_id || task.id} 
-                className={`bg-white p-4 rounded-xl border transition-all duration-200 shadow-sm hover:shadow-md ${
-                  isEditing ? 'border-purple-300 ring-1 ring-purple-100' : 'border-gray-100'
-                }`}
+                className="bg-white p-4 rounded-xl border border-gray-100 transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 {/* Card Header: Seq & Machine */}
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">#{ (currentPage - 1) * itemsPerPage + index + 1 }</span>
-                    {isEditing ? (
-                      <input
-                        name="machine_name"
-                        value={editFormData.machine_name || ''}
-                        onChange={handleEditChange}
-                        className="mt-1 px-2 py-1 text-sm font-bold border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none"
-                      />
-                    ) : (
-                      <h4 className="font-bold text-gray-900">
-                        {task.machine_name || 'Unnamed Machine'}
-                      </h4>
-                    )}
+                    <h4 className="font-bold text-gray-900">
+                      {task.machine_name || 'Unnamed Machine'}
+                    </h4>
                   </div>
-                  {getStatusBadge(task.status)}
+                  {getStatusBadge(task)}
                 </div>
 
                 {/* Card Details Grid */}
                 <div className="grid grid-cols-2 gap-y-3 gap-x-4 mb-4">
                   <div className="space-y-0.5">
                     <p className="text-[10px] uppercase text-gray-400 font-bold">Part & Area</p>
-                    <p className="text-xs font-medium text-gray-700 truncate">
+                    <p className="text-xs font-medium text-gray-700">
                       {Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '-')} 
                       <span className="text-gray-400 mx-1">|</span> {task.part_area || '-'}
                     </p>
@@ -485,39 +393,13 @@ const MaintenanceTable = ({
                 {/* Task Description */}
                 <div className="mb-4 p-2.5 bg-gray-50 rounded-lg border border-gray-100">
                   <p className="text-[10px] uppercase text-gray-400 font-bold mb-1">Task Description</p>
-                  {isEditing ? (
-                    <textarea
-                      name="task_description"
-                      value={editFormData.task_description || ''}
-                      onChange={handleEditChange}
-                      rows={2}
-                      className="w-full px-2 py-1 text-xs border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 focus:outline-none bg-white"
-                    />
-                  ) : (
-                    <p className="text-xs text-gray-600 italic line-clamp-2 leading-relaxed">
-                      {task.task_description || 'No description provided'}
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-600 italic line-clamp-2 leading-relaxed">
+                    {task.task_description || 'No description provided'}
+                  </p>
                 </div>
 
                 {/* Card Actions */}
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                  <div className="flex items-center gap-2">
-                    {isEditing ? (
-                      <>
-                        <button onClick={handleSaveEdit} className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg shadow-sm font-bold text-xs active:scale-95 transition-all">
-                          <Save className="h-3.5 w-3.5" /> Save
-                        </button>
-                        <button onClick={handleCancelEdit} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-bold text-xs active:scale-95 transition-all">
-                          <X className="h-3.5 w-3.5" /> Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => handleEditClick(task)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-bold text-xs hover:bg-blue-100 active:scale-95 transition-all">
-                        <Edit2 className="h-3.5 w-3.5" /> Quick Edit
-                      </button>
-                    )}
-                  </div>
+                <div className="flex items-center justify-end pt-3 border-t border-gray-100">
                   {task.image_url && (
                     <button 
                       onClick={() => setSelectedImage(task.image_url)} 

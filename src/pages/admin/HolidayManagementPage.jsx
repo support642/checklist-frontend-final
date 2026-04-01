@@ -151,20 +151,23 @@ export default function HolidayManagementPage() {
 
   return (
     <AdminLayout>
-      <div className="h-full flex flex-col">
+      <div className="flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">Holiday & Working Day Management</h1>
-            <p className="text-sm text-gray-500">Manage holidays and working days</p>
+        <div className="flex flex-row items-start justify-between gap-2 mb-4">
+          <div className="flex-1">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-800 leading-tight">Holiday & Working Day Management</h1>
+            <p className="text-[10px] sm:text-sm text-gray-500">Manage holidays and working days</p>
           </div>
           {canManageHolidays && hasModifyAccess('holiday_management') && (
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors whitespace-nowrap shadow-sm active:scale-95 flex-shrink-0"
           >
-            <Plus className="h-4 w-4" />
-            Add {activeTab === "holidays" ? "Holiday" : "Working Day"}
+            <Plus className="h-3.5 w-3.5" />
+            <span className="text-[10px] sm:text-sm font-bold">
+              <span className="sm:hidden">Add {activeTab === "holidays" ? "Holiday" : "Work Day"}</span>
+              <span className="hidden sm:inline">Add {activeTab === "holidays" ? "Holiday" : "Working Day"}</span>
+            </span>
           </button>
           )}
         </div>
@@ -233,7 +236,7 @@ export default function HolidayManagementPage() {
         )}
 
         {/* Content */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex-1 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center h-48">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>

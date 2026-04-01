@@ -1,9 +1,10 @@
+import { authAxios, createAuthAxios } from "../../utils/authAxios";
 import axios from "axios";
 import { createAsyncThunk } from "@reduxjs/toolkit";
 // const API = "http://localhost:5050/api";
 const API = `${import.meta.env.VITE_API_BASE_URL}`;
 
-const api = axios.create({
+const api = createAuthAxios({
   baseURL: API,
   timeout: 30000, // 30 seconds timeout
   headers: {
@@ -86,7 +87,7 @@ export const fetchDelegationDataSortByDate = async (startDate = "", endDate = ""
   const division = localStorage.getItem("division");
   const department = localStorage.getItem("department");
 
-  const { data } = await axios.get(`${API}/delegation`, {
+  const { data } = await authAxios.get(`${API}/delegation`, {
     params: { role, username, user_access: userAccess, unit, division, department, startDate, endDate },
   });
 
@@ -94,16 +95,29 @@ export const fetchDelegationDataSortByDate = async (startDate = "", endDate = ""
 };
 
 // FETCH DONE
-export const fetchDelegation_DoneDataSortByDate = async (search = "", startDate = "", endDate = "") => {
+export const fetchDelegation_DoneDataSortByDate = async (search = "", startDate = "", endDate = "", name = 'all', division = 'all', departmentFilter = 'all') => {
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("user-name");
   const userAccess = localStorage.getItem("user_access");
   const unit = localStorage.getItem("unit");
-  const division = localStorage.getItem("division");
+  const divisionLocal = localStorage.getItem("division");
   const department = localStorage.getItem("department");
 
-  const { data } = await axios.get(`${API}/delegation-done`, {
-    params: { role, username, user_access: userAccess, search, unit, division, department, startDate, endDate },
+  const { data } = await authAxios.get(`${API}/delegation-done`, {
+    params: { 
+      role, 
+      username, 
+      user_access: userAccess, 
+      search, 
+      unit, 
+      division: divisionLocal, 
+      department, 
+      startDate, 
+      endDate,
+      nameFilter: name,
+      divisionFilter: division,
+      departmentFilter: departmentFilter
+    },
   });
 
   return data;
@@ -112,7 +126,7 @@ export const fetchDelegation_DoneDataSortByDate = async (search = "", startDate 
 // ADMIN DONE - Mark delegation items as approved
 export const postDelegationAdminDoneAPI = async (items) => {
   try {
-    const { data } = await axios.post(`${API}/delegation/admin-done`, items);
+    const { data } = await authAxios.post(`${API}/delegation/admin-done`, items);
     return { data, error: null };
   } catch (err) {
     return { data: null, error: err };
@@ -122,7 +136,7 @@ export const postDelegationAdminDoneAPI = async (items) => {
 // Send WhatsApp Notification for Delegation (Admin Only)
 export const sendDelegationWhatsAppAPI = async (selectedItems) => {
   try {
-    const response = await axios.post(`${API}/delegation/send-whatsapp`, {
+    const response = await authAxios.post(`${API}/delegation/send-whatsapp`, {
       items: selectedItems.map(item => ({
         task_id: item.task_id,
         name: item.name,
@@ -142,7 +156,7 @@ export const sendDelegationWhatsAppAPI = async (selectedItems) => {
 // REVERT TO PENDING (Admin Only)
 export const revertDelegationTaskAPI = async (items) => {
   try {
-    const { data } = await axios.post(`${API}/delegation/revert`, { items });
+    const { data } = await authAxios.post(`${API}/delegation/revert`, { items });
     return { data, error: null };
   } catch (err) {
     console.error("❌ Revert error:", err);
@@ -162,7 +176,7 @@ export const revertDelegationTaskAPI = async (items) => {
 //     formData.append(`image_${taskId}`, file);
 //   });
 
-//   const { data } = await axios.post(`${API}/delegation/submit`, formData);
+//   const { data } = await authAxios.post(`${API}/delegation/submit`, formData);
 //   return data;
 // };
 
@@ -173,7 +187,7 @@ export const revertDelegationTaskAPI = async (items) => {
 //   "delegation/submit",
 //   async ({ selectedDataArray }, { rejectWithValue }) => {
 //     try {
-//       const { data } = await axios.post(`${API}/delegation/submit`, {
+//       const { data } = await authAxios.post(`${API}/delegation/submit`, {
 //         selectedData: selectedDataArray,
 //       });
 

@@ -1,79 +1,69 @@
 // maintenanceApi.js
+import { authFetch } from "../../utils/authFetch";
 const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/maintenance`;
 
 // =======================================================
 // 1️⃣ Fetch Pending Maintenance Tasks
 // =======================================================
-export const fetchMaintenanceDataSortByDate = async (page = 1, search = '', startDate = "", endDate = "") => {
+export const fetchMaintenanceDataSortByDate = async (page = 1, search = '', startDate = "", endDate = "", status = 'all', frequency = 'all', name = 'all', division = 'all', departmentFilter = 'all') => {
     const username = localStorage.getItem("user-name");
     const role = localStorage.getItem("role");
     const department = localStorage.getItem("department");
     const unit = localStorage.getItem("unit");
-    const division = localStorage.getItem("division");
+    const divisionLocal = localStorage.getItem("division");
 
-    let url = `${BASE_URL}?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`;
+    let url = `${BASE_URL}?page=${page}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${divisionLocal}&search=${encodeURIComponent(search)}`;
+    
     if (startDate) url += `&startDate=${startDate}`;
     if (endDate) url += `&endDate=${endDate}`;
+    if (status !== 'all') url += `&status=${status}`;
+    if (frequency !== 'all') url += `&frequency=${frequency}`;
+    if (name !== 'all') url += `&name=${encodeURIComponent(name)}`;
+    if (division !== 'all') url += `&divisionFilter=${encodeURIComponent(division)}`;
+    if (departmentFilter !== 'all') url += `&departmentFilter=${encodeURIComponent(departmentFilter)}`;
 
-    const firstRes = await fetch(url);
+    const response = await authFetch(url);
 
-    if (!firstRes.ok) {
-        const contentType = firstRes.headers.get("content-type");
+    if (!response.ok) {
+        const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
-            const errJson = await firstRes.json();
-            throw new Error(errJson.error || `Server error ${firstRes.status}`);
+            const errJson = await response.json();
+            throw new Error(errJson.error || `Server error ${response.status}`);
         } else {
-            throw new Error(`Server returned non-JSON response (${firstRes.status}). This often means the API URL or Port is incorrect.`);
+            throw new Error(`Server returned non-JSON response (${response.status}).`);
         }
     }
 
-    const contentType = firstRes.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Expected JSON response but received HTML/Text. Check your API configuration.");
-    }
-
-    const firstJson = await firstRes.json();
-    const totalCount = firstJson.totalCount || 0;
-    let allData = firstJson.data || [];
-    const PAGE_SIZE = 50;
-    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-
-    if (totalPages > 1) {
-        const remaining = await Promise.all(
-            Array.from({ length: totalPages - 1 }, (_, i) => {
-                let pUrl = `${BASE_URL}?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodeURIComponent(search)}`;
-                if (startDate) pUrl += `&startDate=${startDate}`;
-                if (endDate) pUrl += `&endDate=${endDate}`;
-                return fetch(pUrl)
-                    .then(r => r.json())
-                    .then(j => j.data || []);
-            })
-        );
-        allData = [...allData, ...remaining.flat()];
-    }
-
-    return { data: allData, totalCount, page: 1 };
+    const json = await response.json();
+    return { 
+        data: json.data || [], 
+        totalCount: json.totalCount || 0, 
+        page: json.page || page 
+    };
 };
 
 // =======================================================
 // 2️⃣ Fetch Maintenance History
 // =======================================================
-export const fetchMaintenanceDataForHistory = async (search = "", startDate = "", endDate = "") => {
+export const fetchMaintenanceDataForHistory = async (search = "", startDate = "", endDate = "", name = 'all', division = 'all', departmentFilter = 'all') => {
     const username = localStorage.getItem("user-name");
     const role = localStorage.getItem("role");
     const department = localStorage.getItem("department");
     const unit = localStorage.getItem("unit");
-    const division = localStorage.getItem("division");
+    const divisionLocal = localStorage.getItem("division");
     const PAGE_SIZE = 50;
 
     const encodedSearch = encodeURIComponent(search);
 
     // Fetch page 1 to get totalCount
-    let url = `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`;
-    if (startDate) url += `&startDate=${startDate}`;
-    if (endDate) url += `&endDate=${endDate}`;
+    let baseUrl = `${BASE_URL}/history?page=1&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${divisionLocal}&search=${encodedSearch}`;
+    if (startDate) baseUrl += `&startDate=${startDate}`;
+    if (endDate) baseUrl += `&endDate=${endDate}`;
+    if (name !== 'all') baseUrl += `&nameFilter=${encodeURIComponent(name)}`;
+    if (division !== 'all') baseUrl += `&divisionFilter=${encodeURIComponent(division)}`;
+    if (departmentFilter !== 'all') baseUrl += `&departmentFilter=${encodeURIComponent(departmentFilter)}`;
 
-    const firstRes = await fetch(url);
+    const firstRes = await authFetch(baseUrl);
     const firstJson = await firstRes.json();
     const totalCount = firstJson.totalCount || 0;
     const approvedCount = firstJson.approvedCount || 0;
@@ -84,10 +74,8 @@ export const fetchMaintenanceDataForHistory = async (search = "", startDate = ""
     if (totalPages > 1) {
         const remaining = await Promise.all(
             Array.from({ length: totalPages - 1 }, (_, i) => {
-                let pUrl = `${BASE_URL}/history?page=${i + 2}&username=${username}&role=${role}&department=${department}&unit=${unit}&division=${division}&search=${encodedSearch}`;
-                if (startDate) pUrl += `&startDate=${startDate}`;
-                if (endDate) pUrl += `&endDate=${endDate}`;
-                return fetch(pUrl)
+                const pUrl = baseUrl.replace('page=1', `page=${i + 2}`);
+                return authFetch(pUrl)
                     .then(r => r.json())
                     .then(j => j.data || []);
             })
@@ -104,7 +92,7 @@ export const fetchMaintenanceDataForHistory = async (search = "", startDate = ""
 // =======================================================
 export const updateMaintenanceData = async (submissionData) => {
     try {
-        const response = await fetch(`${BASE_URL}/update`, {
+        const response = await authFetch(`${BASE_URL}/update`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(submissionData),
@@ -127,7 +115,7 @@ export const updateMaintenanceData = async (submissionData) => {
 // =======================================================
 export const postMaintenanceAdminDoneAPI = async (selectedItems) => {
     try {
-        const response = await fetch(`${BASE_URL}/admin-done`, {
+        const response = await authFetch(`${BASE_URL}/admin-done`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(selectedItems),
@@ -146,7 +134,7 @@ export const postMaintenanceAdminDoneAPI = async (selectedItems) => {
 // =======================================================
 export const fetchMaintenanceDropdownOptions = async () => {
     try {
-        const response = await fetch(`${BASE_URL}/dropdown-options`);
+        const response = await authFetch(`${BASE_URL}/dropdown-options`);
         if (!response.ok) {
             throw new Error("Failed to fetch dropdown options");
         }
@@ -164,7 +152,7 @@ const SETTINGS_BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/settings`;
 
 export const fetchMachineParts = async () => {
     try {
-        const response = await fetch(`${SETTINGS_BASE_URL}/machines`);
+        const response = await authFetch(`${SETTINGS_BASE_URL}/machines`);
         if (!response.ok) {
             throw new Error("Failed to fetch machine parts");
         }
@@ -181,11 +169,11 @@ export const fetchMachineParts = async () => {
 // =======================================================
 // 6️⃣ Fetch Unique Maintenance Tasks (QuickTask Dashboard)
 // =======================================================
-export const fetchUniqueMaintenanceData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "", userRole = "", userDept = "", userDiv = "", userName = "") => {
-    const res = await fetch(`${BASE_URL}/unique`, {
+export const fetchUniqueMaintenanceData = async (page = 0, pageSize = 50, nameFilter = "", freqFilter = "", userRole = "", userDept = "", userDiv = "", userName = "", deptFilter = "", divFilter = "") => {
+    const res = await authFetch(`${BASE_URL}/unique`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv, userName }),
+        body: JSON.stringify({ page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv, userName, deptFilter, divFilter }),
     });
     return res.json();
 };
@@ -194,7 +182,7 @@ export const fetchUniqueMaintenanceData = async (page = 0, pageSize = 50, nameFi
 // 6b️⃣ Fetch Unique Maintenance Task Count
 // =======================================================
 export const fetchMaintenanceUniqueCountApi = async (userRole, userDept, userDiv, userName) => {
-    const res = await fetch(`${BASE_URL}/unique-count`, {
+    const res = await authFetch(`${BASE_URL}/unique-count`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userRole, userDept, userDiv, userName }),
@@ -206,7 +194,7 @@ export const fetchMaintenanceUniqueCountApi = async (userRole, userDept, userDiv
 // 7️⃣ Delete Unique Maintenance Tasks
 // =======================================================
 export const deleteUniqueMaintenanceTasksApi = async (tasks) => {
-    const res = await fetch(`${BASE_URL}/delete-unique`, {
+    const res = await authFetch(`${BASE_URL}/delete-unique`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tasks }),
@@ -218,7 +206,7 @@ export const deleteUniqueMaintenanceTasksApi = async (tasks) => {
 // 8️⃣ Update Unique Maintenance Task
 // =======================================================
 export const updateUniqueMaintenanceTaskApi = async (updatedTask, originalTask) => {
-    const res = await fetch(`${BASE_URL}/update-unique`, {
+    const res = await authFetch(`${BASE_URL}/update-unique`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ updatedTask, originalTask }),

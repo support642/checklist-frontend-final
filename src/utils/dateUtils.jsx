@@ -11,63 +11,26 @@ export function formatTimestampWithTime(timestamp) {
   }
 
   try {
-    // Convert timestamp to string for processing
-    let dateStr = String(timestamp);
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return timestamp; // Fallback to raw string if invalid
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
     
-    // Clean up the string: remove 'T', milliseconds, timezone indicators
-    dateStr = dateStr
-      .replace('T', ' ')
-      .replace(/\\.\\d+Z?$/, '') // remove .000 or .000Z
-      .replace(/Z$/, '') // remove trailing Z
-      .replace(/[+-]\\d{2}:\\d{2}$/, ''); // remove timezone offset like +05:30
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    const formattedDate = `${day}/${month}/${year}`;
+    const formattedTime = `${hours}:${minutes}:${seconds}`;
     
-    // Try to parse as "YYYY-MM-DD HH:MM:SS" format
-    const parts = dateStr.trim().split(' ');
-    
-    if (parts.length >= 2) {
-      const datePart = parts[0];
-      const timePart = parts[1];
-      
-      const dateComponents = datePart.split('-');
-      if (dateComponents.length === 3) {
-        const [year, month, day] = dateComponents;
-        
-        // Validate and format
-        const y = parseInt(year, 10);
-        const m = parseInt(month, 10);
-        const d = parseInt(day, 10);
-        
-        if (!isNaN(y) && !isNaN(m) && !isNaN(d) && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-          const formattedDate = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-          const formattedTime = timePart || '00:00:00';
-          
-          return (
-            <div>
-              <div className="font-medium">{formattedDate}</div>
-              <div className="text-xs text-gray-500">{formattedTime}</div>
-            </div>
-          );
-        }
-      }
-    }
-    
-    // If single part (date only), try to parse just the date
-    if (parts.length === 1) {
-      const dateComponents = parts[0].split('-');
-      if (dateComponents.length === 3) {
-        const [year, month, day] = dateComponents;
-        const y = parseInt(year, 10);
-        const m = parseInt(month, 10);
-        const d = parseInt(day, 10);
-        
-        if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-          return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-        }
-      }
-    }
-    
-    // Last resort: return the timestamp as-is
-    return timestamp;
+    return (
+      <div>
+        <div className="font-medium">{formattedDate}</div>
+        <div className="text-xs text-gray-500">{formattedTime}</div>
+      </div>
+    );
   } catch (error) {
     console.error('Error formatting timestamp:', error, timestamp);
     return "—";
@@ -169,47 +132,27 @@ export function formatTaskStartDate(dateStr) {
   if (!dateStr) return "—";
   
   try {
-    let cleanStr = String(dateStr);
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr; // Fallback to raw string if invalid
+
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
     
-    // Clean up the string: remove 'T', milliseconds, timezone indicators
-    cleanStr = cleanStr
-      .replace('T', ' ')
-      .replace(/\\.\\d+Z?$/, '')
-      .replace(/Z$/, '')
-      .replace(/[+-]\\d{2}:\\d{2}$/, '');
-    
-    const parts = cleanStr.trim().split(' ');
-    
-    if (parts.length >= 2) {
-      const [datePart, timePart] = parts;
-      const dateComponents = datePart.split('-');
-      
-      if (dateComponents.length === 3) {
-        const [y, m, d] = dateComponents;
-        
-        return (
-          <div>
-            <div className="font-medium break-words">
-              {d}/{m}/{y}
-            </div>
-            <div className="text-xs text-gray-500 break-words">
-              {timePart}
-            </div>
-          </div>
-        );
-      }
-    }
-    
-    // If just date without time
-    if (parts.length === 1) {
-      const dateComponents = parts[0].split('-');
-      if (dateComponents.length === 3) {
-        const [y, m, d] = dateComponents;
-        return `${d}/${m}/${y}`;
-      }
-    }
-    
-    return dateStr;
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return (
+      <div>
+        <div className="font-medium break-words">
+          {day}/{month}/{year}
+        </div>
+        <div className="text-xs text-gray-500 break-words">
+          {hours}:{minutes}:{seconds}
+        </div>
+      </div>
+    );
   } catch (error) {
     console.error('Error formatting task start date:', error, dateStr);
     return "—";

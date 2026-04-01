@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { loginUser } from "../redux/slice/loginSlice"
 import { LoginCredentialsApi } from "../redux/api/loginApi"
 import { Eye, EyeOff } from "lucide-react"
+import { getDefaultDashboardRoute } from "../utils/permissionUtils"
 
 const LoginPage = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isLoggedIn, userData, error } = useSelector((state) => state.login);
   const dispatch = useDispatch();
 
@@ -48,10 +50,15 @@ const LoginPage = () => {
 
       localStorage.setItem('system_access', JSON.stringify(systemAccess));
       localStorage.setItem('page_access', JSON.stringify(pageAccess));
+      const subscriptionAccess = typeof userData.subscription_access_system === 'string' ? JSON.parse(userData.subscription_access_system || '{}') : (userData.subscription_access_system || {});
+      localStorage.setItem('subscription_access_system', JSON.stringify(subscriptionAccess));
+      localStorage.setItem('session_id', userData.session_id || "");
 
       console.log("Stored email:", userEmail);
-
-      navigate("/dashboard/admin")
+      
+      // Check if there's a redirect location in state
+      const from = location.state?.from?.pathname || getDefaultDashboardRoute();
+      navigate(from, { replace: true });
     } else if (error) {
       showToast(error, "error");
       setIsLoginLoading(false);

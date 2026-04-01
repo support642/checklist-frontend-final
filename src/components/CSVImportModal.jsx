@@ -1,3 +1,4 @@
+import { authFetch } from "../utils/authFetch";
 import { useState, useEffect } from 'react';
 import { X, Upload, FileText, CheckCircle, AlertCircle, Table } from 'lucide-react';
 import { canAccessModule } from '../utils/permissionUtils';
@@ -132,7 +133,7 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
           ? `${BASE_URL}/maintenance`
           : `${BASE_URL}/delegation`;
 
-      const response = await fetch(endpoint, {
+      const response = await authFetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -162,8 +163,14 @@ const CSVImportModal = ({ isOpen, onClose, onSuccess }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div 
+      className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-purple-100 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-purple-700">Import Tasks from CSV</h2>

@@ -6,6 +6,7 @@ import {
   X,
   Search,
   LayoutDashboard,
+  ClipboardList,
 } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
 import { hasModifyAccess } from "../utils/permissionUtils";
@@ -55,6 +56,9 @@ function DelegationDataPage() {
   const [userRole, setUserRole] = useState("");
   const [username, setUsername] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
+  const [nameFilter, setNameFilter] = useState("");
+  const [deptFilter, setDeptFilter] = useState("");
+  const [divisionFilter, setDivisionFilter] = useState("");
 
   const filterOptions = [
     { value: "all", label: "All Tasks" },
@@ -63,13 +67,38 @@ function DelegationDataPage() {
     { value: "upcoming", label: "Upcoming" },
   ];
 
-  // Debounced search term
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-
   const { loading, delegation } = useSelector(
     (state) => state.delegation
   );
   const dispatch = useDispatch();
+
+  // Unique options for datalists (search suggestions)
+  const nameOptions = useMemo(() => {
+    if (!delegation) return [];
+    return [...new Set(delegation.map(task => task.name).filter(Boolean))].sort();
+  }, [delegation]);
+
+  const divisionOptions = useMemo(() => {
+    if (!delegation) return [];
+    return [...new Set(delegation.map(task => task.division).filter(Boolean))].sort();
+  }, [delegation]);
+
+  const deptOptions = useMemo(() => {
+    if (!delegation) return [];
+    // Only show departments matching the selected division
+    const filteredByDiv = divisionFilter 
+      ? delegation.filter(task => task.division === divisionFilter)
+      : delegation;
+    return [...new Set(filteredByDiv.map(task => task.department).filter(Boolean))].sort();
+  }, [delegation, divisionFilter]);
+
+  // Reset department filter when division changes
+  useEffect(() => {
+    setDeptFilter("");
+  }, [divisionFilter]);
+
+  // Debounced search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   useEffect(() => {
     dispatch(delegationData());
@@ -172,11 +201,15 @@ function DelegationDataPage() {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     return delegation.filter((task) => {
-      const matchesSearch = debouncedSearchTerm
+      const matchesGlobalSearch = debouncedSearchTerm
         ? Object.values(task).some(
           (value) => value && value.toString().toLowerCase().includes(debouncedSearchTerm.toLowerCase())
         )
         : true;
+
+      const matchesName = !nameFilter || task.name?.toLowerCase().includes(nameFilter.toLowerCase());
+      const matchesDept = !deptFilter || task.department?.toLowerCase().includes(deptFilter.toLowerCase());
+      const matchesDiv = !divisionFilter || task.division?.toLowerCase().includes(divisionFilter.toLowerCase());
 
       let matchesDateFilter = true;
       if (dateFilter !== "all" && task.planned_date) {
@@ -191,9 +224,9 @@ function DelegationDataPage() {
         }
       }
 
-      return matchesSearch && matchesDateFilter;
+      return matchesGlobalSearch && matchesDateFilter && matchesName && matchesDept && matchesDiv;
     });
-  }, [delegation, debouncedSearchTerm, dateFilter]);
+  }, [delegation, debouncedSearchTerm, dateFilter, nameFilter, deptFilter, divisionFilter]);
 
   const unifiedData = useMemo(() => {
     return filteredDelegationTasks.map(task => ({
@@ -244,7 +277,11 @@ function DelegationDataPage() {
   const handleImageUpload = useCallback((id, e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setUploadedImages((prev) => ({ ...prev, [id]: file }));
+    const previewUrl = URL.createObjectURL(file);
+    setUploadedImages((prev) => ({ 
+      ...prev, 
+      [id]: { file, previewUrl } 
+    }));
   }, []);
 
   const handleStatusChange = useCallback((id, value) => {
@@ -305,7 +342,8 @@ function DelegationDataPage() {
       const selectedData = await Promise.all(
         selectedItemsArray.map(async (id) => {
           const item = delegation.find((x) => x.task_id === id);
-          const file = uploadedImages[id];
+          const imageData = uploadedImages[id];
+          const file = imageData?.file;
           let base64Image = file ? await fileToBase64(file) : null;
 
           return {
@@ -371,7 +409,7 @@ function DelegationDataPage() {
   return (
     <>
     <AdminLayout>
-      <div className="space-y-6 p-2 sm:p-4 pb-20">
+      <div className="space-y-4 p-2 sm:p-4 pb-20">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-purple-700">
@@ -380,39 +418,93 @@ function DelegationDataPage() {
             <p className="text-gray-500 text-sm italic">{CONFIG.PAGE_CONFIG.description}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Search tasks..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:ring-2 focus:ring-purple-500 text-sm"
-              />
-            </div>
-            
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="border border-gray-300 rounded-md px-2 py-1 text-xs bg-white focus:ring-2 focus:ring-purple-500 outline-none"
-            >
-              {filterOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-
+          <div className="flex items-center gap-2">
             {hasModifyAccess('delegation') && (
               <button
                 onClick={handleSubmit}
                 disabled={selectedItems.size === 0 || isSubmitting}
-                className="rounded-md bg-purple-600 py-2 px-3 text-white hover:bg-purple-700 disabled:opacity-50 text-xs font-medium whitespace-nowrap"
+                className="rounded-md bg-purple-600 py-2 px-4 text-white hover:bg-purple-700 disabled:opacity-50 shadow-md text-sm font-bold whitespace-nowrap transition-all active:scale-95"
               >
                 {isSubmitting ? "..." : `Submit Tasks (${selectedItems.size})`}
               </button>
             )}
           </div>
         </div>
+
+        {/* Filter Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="text-gray-400 group-focus-within:text-purple-500 transition-colors" size={14} />
+            </div>
+            <select
+              value={divisionFilter}
+              onChange={(e) => setDivisionFilter(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-purple-50/30 border border-purple-100 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none text-xs transition-all"
+            >
+              <option value="">All Divisions</option>
+              {divisionOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="text-gray-400 group-focus-within:text-purple-500 transition-colors" size={14} />
+            </div>
+            <select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-purple-50/30 border border-purple-100 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none text-xs transition-all"
+            >
+              <option value="">{divisionFilter ? `Departments in ${divisionFilter}` : "All Departments"}</option>
+              {deptOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="text-gray-400 group-focus-within:text-purple-500 transition-colors" size={14} />
+            </div>
+            <select
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-purple-50/30 border border-purple-100 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none text-xs transition-all"
+            >
+              <option value="">All Names</option>
+              {nameOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="w-full px-3 py-2 bg-purple-50/30 border border-purple-100 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 outline-none text-xs transition-all"
+          >
+            {filterOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Global Search Searchable Header Row if needed, but since we have Global Search inside filter bar, we'll ensure it is present or unified */}
+         <div className="relative group w-full mb-2">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="text-gray-400 group-focus-within:text-purple-500 transition-colors" size={16} />
+            </div>
+            <input
+              type="text"
+              placeholder="Search across all fields..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-3 py-2.5 bg-white border border-purple-100 rounded-xl shadow-xs focus:ring-2 focus:ring-purple-500/10 focus:border-purple-500 outline-none text-sm transition-all"
+            />
+          </div>
 
 
         <div className="rounded-lg border border-purple-200 shadow-md bg-white overflow-hidden">
@@ -472,7 +564,7 @@ function DelegationDataPage() {
                             />
                           </td>
                           <td className="px-3 py-4">
-                            <StatusBadge status="pending" />
+                            <StatusBadge status={item.status || "pending"} />
                           </td>
                           <td className="px-3 py-4">
                             {isSelected ? (
@@ -520,8 +612,16 @@ function DelegationDataPage() {
                           <td className="px-3 py-4 text-xs font-bold text-purple-700">{item.task_id}</td>
                           <td className="px-3 py-4 text-center">
                             {isSelected ? (
-                              <label className="cursor-pointer bg-purple-100 text-purple-700 hover:bg-purple-200 p-2 rounded-full transition-colors inline-flex items-center justify-center" title={uploadedImages[item.task_id] ? "Image Uploaded" : "Upload Proof"}>
+                              <label className="relative cursor-pointer bg-purple-100 text-purple-700 hover:bg-purple-200 p-2 rounded-full transition-colors inline-flex items-center justify-center min-w-[36px] min-h-[36px]" title={uploadedImages[item.task_id] ? "Image Uploaded" : "Upload Proof"}>
+                                {uploadedImages[item.task_id] ? (
+                                  <img 
+                                    src={uploadedImages[item.task_id].previewUrl} 
+                                    alt="Preview" 
+                                    className="w-8 h-8 rounded-full object-cover border-2 border-purple-400"
+                                  />
+                                ) : (
                                 <Upload size={18} />
+                                )}
                                 {uploadedImages[item.task_id] && <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>}
                                 <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(item.task_id, e)} />
                               </label>
@@ -564,16 +664,28 @@ function DelegationDataPage() {
                            <input type="checkbox" checked={isSelected} onChange={(e) => toggleRowSelection(item, e.target.checked)} className="h-4 w-4 rounded cursor-pointer" />
                            <span className="text-xs font-bold text-gray-400">#{index+1}</span>
                          </div>
-                         <StatusBadge status="pending" />
+                          <StatusBadge status={item.status || "pending"} />
                       </div>
-                       <div className="text-sm font-medium mb-1">{item.task_description}</div>
-                       <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-gray-500 mb-2">
-                          <div><span className="font-semibold text-gray-400">ID:</span> {item.task_id}</div>
-                          <div><span className="font-semibold text-gray-400">Target:</span> {formatDateTimeForDisplay(item.planned_date)}</div>
-                          <div><span className="font-semibold text-gray-400">Unit:</span> {item.unit || "—"}</div>
-                          <div><span className="font-semibold text-gray-400">Div:</span> {item.division || "—"}</div>
-                          <div><span className="font-semibold text-gray-400">Given By:</span> {item.given_by || "—"}</div>
-                          <div><span className="font-semibold text-gray-400">Admin Rem:</span> {item.adminremarks || "—"}</div>
+                       <div className="text-sm font-semibold mb-2 text-purple-900 leading-snug">{item.task_description}</div>
+                       <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[10px] mb-3">
+                          <div className="flex flex-col">
+                             <span className="font-bold text-gray-400 uppercase tracking-tighter text-[9px]">Given By</span>
+                             <span className="text-gray-700 font-medium truncate" title={item.given_by}>{item.given_by || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                             <span className="font-bold text-gray-400 uppercase tracking-tighter text-[9px]">Name</span>
+                             <span className="text-gray-700 font-medium truncate" title={item.name}>{item.name || "—"}</span>
+                          </div>
+                          <div className="flex flex-col">
+                             <span className="font-bold text-gray-400 uppercase tracking-tighter text-[9px]">Target Date</span>
+                             <span className="text-gray-700 font-medium">{formatDateTimeForDisplay(item.planned_date)}</span>
+                          </div>
+                          <div className="flex flex-col">
+                             <span className="font-bold text-gray-400 uppercase tracking-tighter text-[9px]">Details</span>
+                             <div className="text-gray-600 line-clamp-1">
+                                <span className="font-semibold">ID:</span> {item.task_id} | {item.unit || "—"} | {item.division || "—"}
+                             </div>
+                          </div>
                        </div>
                       {isSelected && (
                         <div className="pt-2 border-t space-y-2">
@@ -585,10 +697,17 @@ function DelegationDataPage() {
                               <input type="datetime-local" value={nextTargetDate[item.task_id] || ""} onChange={(e) => handleNextTargetDateChange(item.task_id, e.target.value)} className="w-full border rounded text-xs p-1" />
                             )}
                             <textarea className="w-full border rounded text-xs p-1" rows="2" placeholder="Remarks..." value={remarksData[item.task_id] || ""} onChange={(e) => setRemarksData(prev => ({ ...prev, [item.task_id]: e.target.value }))} />
-                            <div className="mt-2 text-center border border-dashed border-gray-300 rounded p-2 bg-gray-50">
+                            <div className="mt-2 text-center border border-dashed border-gray-300 rounded p-2 bg-gray-50 flex flex-col items-center gap-2">
+                             {uploadedImages[item.task_id] && (
+                               <img 
+                                 src={uploadedImages[item.task_id].previewUrl} 
+                                 alt="Preview" 
+                                 className="w-16 h-16 rounded-md object-cover border border-purple-200 shadow-sm"
+                               />
+                             )}
                              <label className="cursor-pointer text-purple-600 hover:text-purple-800 flex items-center justify-center gap-1">
                                <Upload size={14} />
-                               <span className="text-xs font-bold uppercase">{uploadedImages[item.task_id] ? "Done" : "Upload image"}</span>
+                               <span className="text-xs font-bold uppercase">{uploadedImages[item.task_id] ? "Change image" : "Upload image"}</span>
                                <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(item.task_id, e)} />
                              </label>
                            </div>

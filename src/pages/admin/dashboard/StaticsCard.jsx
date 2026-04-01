@@ -447,8 +447,9 @@ export default function StatisticsCards({
             {modalTasks.length === 0 ? (
               <p className="text-center text-gray-500 py-8">No tasks found for this category.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left border-collapse">
+              <div className="space-y-4">
+                {/* Desktop Table View */}
+                <table className="w-full text-sm text-left border-collapse hidden md:table">
                   <thead className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-300">
                     <tr>
                       <th className="px-4 py-3">ID</th>
@@ -489,6 +490,50 @@ export default function StatisticsCards({
                     ))}
                   </tbody>
                 </table>
+
+                {/* Mobile Card View */}
+                <div className="grid grid-cols-1 gap-4 md:hidden">
+                  {modalTasks.map((task, idx) => (
+                    <div 
+                      key={task.id || idx} 
+                      className="p-4 border border-gray-100 rounded-2xl bg-white shadow-sm hover:shadow-md transition-all space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">
+                          ID: {task.id || "-"}
+                        </span>
+                        <span
+                          className={`px-2.5 py-1 text-[10px] uppercase tracking-wider rounded-full font-bold border ${
+                            task.status === "completed"
+                              ? "bg-green-50 text-green-600 border-green-100"
+                              : task.status === "overdue"
+                              ? "bg-red-50 text-red-600 border-red-100"
+                              : "bg-amber-50 text-amber-600 border-amber-100"
+                          }`}
+                        >
+                          {task.status}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-bold text-gray-800 leading-snug">
+                          {task.title || "No Description Provided"}
+                        </h4>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-50 flex items-center justify-between text-[11px] text-gray-500 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={14} className="text-gray-400" />
+                          <span>{task.taskStartDate || "-"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Clock size={14} className="text-gray-400" />
+                          <span className="capitalize">{task.frequency || "-"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

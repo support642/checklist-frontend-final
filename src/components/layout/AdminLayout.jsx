@@ -23,8 +23,19 @@ import {
   History,
   Video,
   Calendar,
+  Banknote,
+  LayoutDashboard,
+  FileText,
+  RefreshCw,
+  CreditCard,
+  Share2,
+  CheckCircle2,
+  DollarSign,
+  Ban,
+  List,
+  Landmark,
 } from "lucide-react";
-import { hasPageAccess } from "../../utils/permissionUtils";
+import { hasPageAccess, hasSystemAccess } from "../../utils/permissionUtils";
 
 export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
   const location = useLocation();
@@ -34,6 +45,9 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
   const [userRole, setUserRole] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [hasDocsAccess, setHasDocsAccess] = useState(false);
+  const [hasAssetsAccess, setHasAssetsAccess] = useState(false);
+  const [hasRepairAccess, setHasRepairAccess] = useState(false);
 
   const [isUserPopupOpen, setIsUserPopupOpen] = useState(false);
 
@@ -52,6 +66,11 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
     setUsername(storedUsername);
     setUserRole(storedRole || "user");
     setUserEmail(storedEmail);
+    
+    // Use unified permission check for sidebar visibility
+    setHasDocsAccess(hasSystemAccess("documentation"));
+    setHasAssetsAccess(hasSystemAccess("assets"));
+    setHasRepairAccess(hasSystemAccess("repair"));
 
     // Check if this is the super admin (username = 'admin')
     setIsSuperAdmin(storedUsername === "admin");
@@ -84,28 +103,65 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
             { name: "Admin Approval", route: "/dashboard/history", page: "admin_approval", icon: History },
             { name: "Calendar", route: "/dashboard/calendar", page: "calendar", icon: Calendar },
             { name: "Holiday List", route: "/dashboard/holidays", page: "holiday_management", icon: CalendarCheck },
-            { name: "Settings", route: "/dashboard/setting", page: "settings", icon: Settings },
           ]
-        }
-        // {
-        //   title: "Documentation & Subscription",
-        //   key: "docs",
-        //   children: [
-        //     { name: "Documentation", route: "/docs", page: "documentation", icon: ClipboardList },
-        //     { name: "Subscription", route: "/subscription", page: "subscription", icon: BookmarkCheck }
-        //   ]
-        // },
-        // {
-        //   title: "Repair",
-        //   key: "repair",
-        //   children: [
-        //     { name: "Dashboard", route: "/repair/dashboard", page: "dashboard", icon: Database },
-        //     { name: "Request Form", route: "/repair/request-form", page: "request_form", icon: CheckSquare },
-        //     { name: "Pending Request", route: "/repair/pending-request", page: "pending_request", icon: ClipboardList },
-        //     { name: "Request Approval", route: "/repair/request-approval", page: "request_approval", icon: History },
-        //     { name: "Settings", route: "/repair/repair-setting", page: "repair_setting", icon: Settings },
-        //   ]
-        // }
+        },
+        ...(hasDocsAccess ? [{
+          title: "Documentation & Subscription",
+          key: "docs",
+          children: [
+            { name: "Dashboard", route: "/doc-sub/dashboard", page: "documentation", icon: LayoutDashboard },
+            {
+              title: "Resource Manager",
+              key: "resource_manager",
+              icon: FileText,
+              children: [
+                { name: "All Resources", route: "/doc-sub/resource-manager", page: "resource_manager", icon: List },
+                {
+                  title: "Renewals",
+                  key: "renewals",
+                  icon: RefreshCw,
+                  children: [
+                    { name: "Document Renewal", route: "/document/renewal", page: "document_renewal", icon: FileText },
+                    { name: "Subscription Renewal", route: "/subscription/renewal", page: "subscription_renewal", icon: CreditCard },
+                  ]
+                },
+                { name: "Document Shared", route: "/document/shared", page: "document_shared", icon: Share2 },
+                { name: "Subscription Approval", route: "/subscription/approval", page: "subscription_approval", icon: CheckCircle2 },
+                { name: "Subscription Payment", route: "/subscription/payment", page: "subscription_payment", icon: DollarSign },
+              ]
+            },
+            {
+              title: "Loan",
+              key: "loan_group",
+              icon: Landmark,
+              children: [
+                { name: "All Loan", route: "/loan/all", page: "loan", icon: List },
+                { name: "Request Forecloser", route: "/loan/foreclosure", page: "loan_foreclosure", icon: Ban },
+              ]
+            },
+            { name: "Master", route: "/master", page: "master", icon: Database },
+          ]
+        }] : []),
+        ...(hasAssetsAccess ? [{
+          title: "Asset Management",
+          key: "assets",
+          children: [
+            { name: "Dashboard", route: "/asset/dashboard", page: "asset_dashboard", icon: LayoutDashboard },
+            { name: "All Products", route: "/asset/products", page: "all_products", icon: List },
+          ]
+        }] : []),
+
+        ...(hasRepairAccess ? [{
+          title: "Repair",
+          key: "repair",
+          children: [
+            { name: "Dashboard", route: "/repair/dashboard", page: "repair_dashboard", icon: Database },
+            { name: "Request Form", route: "/repair/request-form", page: "repair_request_form", icon: CheckSquare },
+            { name: "Pending Request", route: "/repair/pending-request", page: "repair_pending_request", icon: ClipboardList },
+            { name: "Request Approval", route: "/repair/request-approval", page: "repair_request_approval", icon: History },
+          ]
+        }] : []),
+        { name: "Settings", route: "/dashboard/setting", page: "settings", icon: Settings },
       ]
     }
   ];
@@ -113,7 +169,14 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
   const [openMenus, setOpenMenus] = useState({
     systems: true,
     checklist: true,
-    docs: false
+    docs: false,
+    resource_manager: false,
+    renewals: false,
+    subscription_group: false,
+    payment_group: false,
+    loan_group: false,
+    assets: false,
+    repair: false
   });
 
   const toggleMenu = (key) => {
@@ -148,7 +211,8 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       return false;
     };
     findAndExpand(sidebarStructure);
-  }, [location.pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, hasDocsAccess]);
 
   const renderNavItem = (item, depth = 0) => {
     const isAccessible = hasAccessibleChildren(item);
@@ -238,16 +302,18 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
                     {username ? username.charAt(0).toUpperCase() : "U"}
                   </span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-blue-700 truncate">
-                    {username || "User"}{" "}
+                <div className="min-w-0 flex-1 flex flex-col items-start px-1 overflow-hidden">
+                  <p className="text-sm font-medium text-blue-700 break-words w-full">
+                    {username || "User"}
+                  </p>
+                  <p className="text-sm font-medium text-blue-700">
                     {userRole === "super_admin"
                       ? "(Super Admin)"
                       : (userRole === "admin" || userRole === "div_admin")
                       ? "(Admin)"
                       : ""}
                   </p>
-                  <p className="text-xs text-blue-600 truncate">
+                  <p className="text-xs text-blue-600 break-all">
                     {userEmail || "user@example.com"}
                   </p>
                 </div>
@@ -340,7 +406,7 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
             className="fixed inset-0 bg-black/20"
             onClick={() => setIsMobileMenuOpen(false)}
           ></div>
-          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
+          <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg flex flex-col">
             <div className="flex h-14 items-center border-b border-blue-200 px-4 bg-gradient-to-r from-blue-100 to-purple-100">
               <Link
                 to="/dashboard/admin"
@@ -364,16 +430,18 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
                       {username ? username.charAt(0).toUpperCase() : "U"}
                     </span>
                   </div>
-                  <div>
+                  <div className="flex flex-col items-start px-1 overflow-hidden">
+                    <p className="text-sm font-medium text-blue-700 break-words w-full">
+                      {username || "User"}
+                    </p>
                     <p className="text-sm font-medium text-blue-700">
-                      {username || "User"}{" "}
                       {userRole === "super_admin"
                         ? "(Super Admin)"
                         : (userRole === "admin" || userRole === "div_admin")
                         ? "(Admin)"
                         : ""}
                     </p>
-                    <p className="text-xs text-blue-600">
+                    <p className="text-xs text-blue-600 break-all">
                       {userEmail || "user@example.com"}
                     </p>
                   </div>
@@ -550,8 +618,14 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
 
         {/* User Popup */}
         {isUserPopupOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-lg p-6 w-80 shadow-xl">
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => setIsUserPopupOpen(false)}
+          >
+            <div 
+              className="bg-white rounded-lg p-6 w-80 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* <div onClick={() => setIsUserPopupOpen(false)}  className="flex justify-end"><X size={25}/></div> */}
 
               <div className="flex flex-col items-center justify-between">
@@ -561,16 +635,18 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
                       {username ? username.charAt(0).toUpperCase() : "U"}
                     </span>
                   </div>
-                  <div>
+                  <div className="flex flex-col items-center text-center w-full px-4 overflow-hidden">
+                    <p className="text-sm font-medium text-blue-700 break-words w-full">
+                      {username || "User"}
+                    </p>
                     <p className="text-sm font-medium text-blue-700">
-                      {username || "User"}{" "}
                       {userRole === "super_admin"
                         ? "(Super Admin)"
                         : (userRole === "admin" || userRole === "div_admin")
                         ? "(Admin)"
                         : ""}
                     </p>
-                    <p className="text-xs text-blue-600">
+                    <p className="text-xs text-blue-600 break-all">
                       {userEmail || "user@example.com"}
                     </p>
                   </div>

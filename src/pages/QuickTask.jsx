@@ -33,10 +33,14 @@ export default function QuickTask() {
     return 'checklist';
   });
   const [nameFilter, setNameFilter] = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
+  const [divFilter, setDivFilter] = useState('');
   const [freqFilter, setFreqFilter] = useState('');
     const tableContainerRef = useRef(null);
   const [dropdownOpen, setDropdownOpen] = useState({
     name: false,
+    department: false,
+    division: false,
     frequency: false
   });
   const [selectedTasks, setSelectedTasks] = useState([]);
@@ -99,6 +103,8 @@ useEffect(() => {
       page: 0, 
       pageSize: 50, 
       nameFilter: '', 
+      deptFilter: '',
+      divFilter: '',
       freqFilter: '',
       ...params
     }));
@@ -123,6 +129,8 @@ const handleScroll = useCallback(() => {
         page: checklistPage, 
         pageSize: 50, 
         nameFilter,
+        deptFilter,
+        divFilter,
         freqFilter,
         append: true,
         userRole,
@@ -135,6 +143,8 @@ const handleScroll = useCallback(() => {
         page: delegationPage, 
         pageSize: 50, 
         nameFilter,
+        deptFilter,
+        divFilter,
         freqFilter,
         append: true,
         userRole,
@@ -144,7 +154,7 @@ const handleScroll = useCallback(() => {
       }));
     }
   }
-}, [loading, activeTab, checklistHasMore, delegationHasMore, checklistPage, delegationPage, nameFilter, freqFilter, dispatch, userRole, userDept, userDiv, loginUserData.user_name]);
+}, [loading, activeTab, checklistHasMore, delegationHasMore, checklistPage, delegationPage, nameFilter, deptFilter, divFilter, freqFilter, dispatch, userRole, userDept, userDiv, loginUserData.user_name]);
 
 // Add scroll listener
 useEffect(() => {
@@ -222,6 +232,8 @@ useEffect(() => {
         page: 0, 
         pageSize: 50, 
         nameFilter, 
+        deptFilter,
+        divFilter,
         freqFilter, 
         append: false,
         userRole,
@@ -280,6 +292,8 @@ useEffect(() => {
         page: 0, 
         pageSize: 50, 
         nameFilter, 
+        deptFilter,
+        divFilter,
         freqFilter, 
         append: false,
         userRole,
@@ -342,6 +356,8 @@ const handleNameFilterSelect = (name) => {
         page: 0, 
         pageSize: 50, 
         nameFilter: name,
+        deptFilter: deptFilter,
+        divFilter: divFilter,
         freqFilter: freqFilter,
         append: false,
         userRole,
@@ -355,6 +371,8 @@ const handleNameFilterSelect = (name) => {
         page: 0, 
         pageSize: 50, 
         nameFilter: name,
+        deptFilter: deptFilter,
+        divFilter: divFilter,
         freqFilter: freqFilter,
         append: false,
         userRole,
@@ -367,48 +385,16 @@ const handleNameFilterSelect = (name) => {
   setDropdownOpen({ ...dropdownOpen, name: false });
 };
 
-  const handleFrequencyFilterSelect = (freq) => {
-    setFreqFilter(freq);
-    
-    if (activeTab === 'checklist') {
-      dispatch(resetChecklistPagination());
-      dispatch(uniqueChecklistTaskData({ 
-        page: 0, 
-        pageSize: 50, 
-        nameFilter: nameFilter,
-        freqFilter: freq,
-        append: false,
-        userRole,
-        userDept,
-        userDiv,
-        userName: loginUserData.user_name
-      }));
-    } else if (activeTab === 'delegation') {
-      dispatch(resetDelegationPagination());
-      dispatch(uniqueDelegationTaskData({ 
-        page: 0, 
-        pageSize: 50, 
-        nameFilter: nameFilter,
-        freqFilter: freq,
-        append: false,
-        userRole,
-        userDept,
-        userDiv,
-        userName: loginUserData.user_name
-      }));
-    }
-    
-    setDropdownOpen({ ...dropdownOpen, frequency: false });
-  };
-
-const clearNameFilter = () => {
-  setNameFilter('');
+const handleDeptFilterSelect = (dept) => {
+  setDeptFilter(dept);
   
   if (activeTab === 'checklist') {
       dispatch(uniqueChecklistTaskData({ 
         page: 0, 
         pageSize: 50, 
-        nameFilter: '',
+        nameFilter: nameFilter,
+        deptFilter: dept,
+        divFilter: divFilter,
         freqFilter: freqFilter,
         append: false,
         userRole,
@@ -421,8 +407,122 @@ const clearNameFilter = () => {
       dispatch(uniqueDelegationTaskData({ 
         page: 0, 
         pageSize: 50, 
-        nameFilter: '',
+        nameFilter: nameFilter,
+        deptFilter: dept,
+        divFilter: divFilter,
         freqFilter: freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
+      }));
+    }
+  
+  setDropdownOpen({ ...dropdownOpen, department: false });
+};
+
+const handleDivFilterSelect = (div) => {
+  setDivFilter(div);
+  
+  if (activeTab === 'checklist') {
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: nameFilter,
+        deptFilter: deptFilter,
+        divFilter: div,
+        freqFilter: freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
+      }));
+    } else {
+      dispatch(resetDelegationPagination());
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: nameFilter,
+        deptFilter: deptFilter,
+        divFilter: div,
+        freqFilter: freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
+      }));
+    }
+  
+  setDropdownOpen({ ...dropdownOpen, division: false });
+};
+
+  const handleFrequencyFilterSelect = (freq) => {
+  setFreqFilter(freq);
+  
+  if (activeTab === 'checklist') {
+    dispatch(resetChecklistPagination());
+    dispatch(uniqueChecklistTaskData({ 
+      page: 0, 
+      pageSize: 50, 
+      nameFilter,
+      deptFilter,
+      divFilter,
+      freqFilter: freq,
+      append: false,
+      userRole,
+      userDept,
+      userDiv,
+      userName: loginUserData.user_name
+    }));
+  } else if (activeTab === 'delegation') {
+    dispatch(resetDelegationPagination());
+    dispatch(uniqueDelegationTaskData({ 
+      page: 0, 
+      pageSize: 50, 
+      nameFilter,
+      deptFilter,
+      divFilter,
+      freqFilter: freq,
+      append: false,
+      userRole,
+      userDept,
+      userDiv,
+      userName: loginUserData.user_name
+    }));
+  }
+  
+  setDropdownOpen({ ...dropdownOpen, frequency: false });
+};
+
+const clearNameFilter = () => {
+  setNameFilter('');
+  
+  if (activeTab === 'checklist') {
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: '',
+        deptFilter,
+        divFilter,
+        freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
+      }));
+    } else {
+      dispatch(resetDelegationPagination());
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter: '',
+        deptFilter,
+        divFilter,
+        freqFilter,
         append: false,
         userRole,
         userDept,
@@ -434,29 +534,32 @@ const clearNameFilter = () => {
   setDropdownOpen({ ...dropdownOpen, name: false });
 };
 
-  const clearFrequencyFilter = () => {
-    setFreqFilter('');
-    
-    if (activeTab === 'checklist') {
-      dispatch(resetChecklistPagination());
+const clearDeptFilter = () => {
+  setDeptFilter('');
+  
+  if (activeTab === 'checklist') {
       dispatch(uniqueChecklistTaskData({ 
         page: 0, 
         pageSize: 50, 
-        nameFilter: nameFilter,
-        freqFilter: '',
+        nameFilter,
+        deptFilter: '',
+        divFilter,
+        freqFilter,
         append: false,
         userRole,
         userDept,
         userDiv,
         userName: loginUserData.user_name
       }));
-    } else if (activeTab === 'delegation') {
+    } else {
       dispatch(resetDelegationPagination());
       dispatch(uniqueDelegationTaskData({ 
         page: 0, 
         pageSize: 50, 
-        nameFilter: nameFilter,
-        freqFilter: '',
+        nameFilter,
+        deptFilter: '',
+        divFilter,
+        freqFilter,
         append: false,
         userRole,
         userDept,
@@ -464,14 +567,99 @@ const clearNameFilter = () => {
         userName: loginUserData.user_name
       }));
     }
-    
-    setDropdownOpen({ ...dropdownOpen, frequency: false });
-  };
+  
+  setDropdownOpen({ ...dropdownOpen, department: false });
+};
+
+const clearDivFilter = () => {
+  setDivFilter('');
+  
+  if (activeTab === 'checklist') {
+      dispatch(uniqueChecklistTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter,
+        deptFilter,
+        divFilter: '',
+        freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
+      }));
+    } else {
+      dispatch(resetDelegationPagination());
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter,
+        deptFilter,
+        divFilter: '',
+        freqFilter,
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName: loginUserData.user_name
+      }));
+    }
+  
+  setDropdownOpen({ ...dropdownOpen, division: false });
+};
+
+const clearFrequencyFilter = () => {
+  setFreqFilter('');
+  
+  if (activeTab === 'checklist') {
+    dispatch(resetChecklistPagination());
+    dispatch(uniqueChecklistTaskData({ 
+      page: 0, 
+      pageSize: 50, 
+      nameFilter,
+      deptFilter,
+      divFilter,
+      freqFilter: '',
+      append: false,
+      userRole,
+      userDept,
+      userDiv,
+      userName: loginUserData.user_name
+    }));
+  } else if (activeTab === 'delegation') {
+    dispatch(resetDelegationPagination());
+    dispatch(uniqueDelegationTaskData({ 
+      page: 0, 
+      pageSize: 50, 
+      nameFilter,
+      deptFilter,
+      divFilter,
+      freqFilter: '',
+      append: false,
+      userRole,
+      userDept,
+      userDiv,
+      userName: loginUserData.user_name
+    }));
+  }
+  
+  setDropdownOpen({ ...dropdownOpen, frequency: false });
+};
 
   // FIXED: Added proper null/undefined checks and string validation
 const allNames = [
   ...new Set(users.map(user => user.user_name))
 ].filter(name => name && typeof name === 'string' && name.trim() !== '')
+ .sort();
+
+const allDepartments = [
+  ...new Set(users.map(user => user.department || user.user_access))
+].filter(dept => dept && typeof dept === 'string' && dept.trim() !== '')
+ .sort();
+
+const allDivisions = [
+  ...new Set(users.map(user => user.division))
+].filter(div => div && typeof div === 'string' && div.trim() !== '')
  .sort();
 
   // Static frequency options - always available regardless of loaded data
@@ -496,11 +684,14 @@ const filteredChecklistTasks = useMemo(() => {
 
     // 2. Search and Frequency filters
     const freqFilterPass = !freqFilter || task.frequency === freqFilter;
+    const nameFilterPass = !nameFilter || task.name?.toLowerCase() === nameFilter.toLowerCase();
+    const deptFilterPass = !deptFilter || (task.department || task.user_access)?.toLowerCase() === deptFilter.toLowerCase();
+    const divFilterPass = !divFilter || task.division?.toLowerCase() === divFilter.toLowerCase();
     const searchTermPass = !searchTerm || task.task_description
       ?.toLowerCase()
       .includes(searchTerm.toLowerCase());
       
-    return freqFilterPass && searchTermPass;
+    return freqFilterPass && nameFilterPass && deptFilterPass && divFilterPass && searchTermPass;
   });
 
   // 3. Sorting
@@ -510,7 +701,7 @@ const filteredChecklistTasks = useMemo(() => {
     if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;
   });
-}, [quickTask, userRole, loginUserData, freqFilter, searchTerm, sortConfig]);
+}, [quickTask, userRole, loginUserData, freqFilter, nameFilter, deptFilter, divFilter, searchTerm, sortConfig]);
 
 const filteredDelegationTasks = useMemo(() => {
   const role = userRole?.toLowerCase();
@@ -541,11 +732,17 @@ const filteredDelegationTasks = useMemo(() => {
   if (nameFilter) {
     filtered = filtered.filter(task => task.name === nameFilter);
   }
+  if (deptFilter) {
+    filtered = filtered.filter(task => (task.department || task.user_access) === deptFilter);
+  }
+  if (divFilter) {
+    filtered = filtered.filter(task => task.division === divFilter);
+  }
   if (freqFilter) {
     filtered = filtered.filter(task => task.frequency === freqFilter);
   }
   return filtered;
-}, [delegationTasks, userRole, loginUserData, searchTerm, nameFilter, freqFilter]);
+}, [delegationTasks, userRole, loginUserData, searchTerm, nameFilter, deptFilter, divFilter, freqFilter]);
 
 const filteredMaintenanceTasks = useMemo(() => {
   const role = userRole?.toLowerCase();
@@ -578,11 +775,17 @@ const filteredMaintenanceTasks = useMemo(() => {
   if (nameFilter) {
     filtered = filtered.filter(task => task.name === nameFilter);
   }
+  if (deptFilter) {
+    filtered = filtered.filter(task => (task.department || task.user_access) === deptFilter);
+  }
+  if (divFilter) {
+    filtered = filtered.filter(task => task.division === divFilter);
+  }
   if (freqFilter) {
     filtered = filtered.filter(task => task.frequency === freqFilter);
   }
   return filtered;
-}, [uniqueMaintenanceTasks, userRole, loginUserData, searchTerm, nameFilter, freqFilter]);
+}, [uniqueMaintenanceTasks, userRole, loginUserData, searchTerm, nameFilter, deptFilter, divFilter, freqFilter]);
 
   function formatTimestampToDDMMYYYY(timestamp) {
     if (!timestamp || timestamp === "" || timestamp === null) {
@@ -678,6 +881,8 @@ const filteredMaintenanceTasks = useMemo(() => {
                       page: 0, 
                       pageSize: 50, 
                       nameFilter, 
+                      deptFilter,
+                      divFilter,
                       freqFilter,
                       userRole,
                       userDept,
@@ -695,7 +900,18 @@ const filteredMaintenanceTasks = useMemo(() => {
                   onClick={() => {
                     setActiveTab('delegation');
                     dispatch(resetDelegationPagination());
-                    dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter, freqFilter }));
+                    dispatch(uniqueDelegationTaskData({ 
+                      page: 0, 
+                      pageSize: 50, 
+                      nameFilter, 
+                      deptFilter,
+                      divFilter,
+                      freqFilter,
+                      userRole,
+                      userDept,
+                      userDiv,
+                      userName: loginUserData.user_name
+                    }));
                   }}
                 >
                   Delegation
@@ -714,7 +930,9 @@ const filteredMaintenanceTasks = useMemo(() => {
             </div>
 
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="text-gray-400" size={18} />
+              </div>
               <input
                 type="text"
                 placeholder="Search tasks..."
@@ -730,8 +948,10 @@ const filteredMaintenanceTasks = useMemo(() => {
                 <div className="flex items-center gap-2">
                   {/* Input with datalist for autocomplete */}
                  <div className="relative">
-  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-  <input
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="text-gray-400" size={16} />
+                  </div>
+                  <input
     type="text"
     list="nameOptions"
     placeholder="Type or select name..."
@@ -777,15 +997,17 @@ const filteredMaintenanceTasks = useMemo(() => {
 
   {/* Clear button for input */}
   {nameFilter && (
-    <button
-      onClick={() => {
-        setNameFilter('');
-        clearNameFilter();
-      }}
-      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-    >
-      <X size={16} />
-    </button>
+    <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+      <button
+        onClick={() => {
+          setNameFilter('');
+          clearNameFilter();
+        }}
+        className="text-gray-400 hover:text-gray-600"
+      >
+        <X size={16} />
+      </button>
+    </div>
   )}
 </div>
 
@@ -818,6 +1040,170 @@ const filteredMaintenanceTasks = useMemo(() => {
                           className={`block w-full text-left px-4 py-2 text-sm ${nameFilter === name ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
                         >
                           {name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Department Filter */}
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="text-gray-400" size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      list="deptOptions"
+                      placeholder="Type or select department..."
+                      value={deptFilter}
+                      onChange={(e) => {
+                        const typedDept = e.target.value;
+                        setDeptFilter(typedDept);
+                        if (typedDept === '') clearDeptFilter();
+                        else if (allDepartments.includes(typedDept)) handleDeptFilterSelect(typedDept);
+                      }}
+                      onBlur={(e) => {
+                        const typedDept = e.target.value;
+                        if (typedDept && !allDepartments.includes(typedDept)) {}
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (deptFilter === '') clearDeptFilter();
+                          else handleDeptFilterSelect(deptFilter);
+                        }
+                      }}
+                      className="w-full sm:w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
+                    <datalist id="deptOptions">
+                      {allDepartments.map(dept => (
+                        <option key={dept} value={dept} />
+                      ))}
+                    </datalist>
+                    {deptFilter && (
+                      <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+                        <button
+                          onClick={() => {
+                            setDeptFilter('');
+                            clearDeptFilter();
+                          }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => toggleDropdown('department')}
+                    className="flex items-center gap-1 px-3 py-2 border border-purple-200 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <ChevronDown size={16} className={`transition-transform ${dropdownOpen.department ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+                {dropdownOpen.department && (
+                  <div className="absolute z-50 mt-1 w-56 rounded-md bg-white shadow-lg border border-gray-200 max-h-60 overflow-auto top-full right-0">
+                    <div className="py-1">
+                      <button
+                        onClick={clearDeptFilter}
+                        className={`block w-full text-left px-4 py-2 text-sm ${!deptFilter ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        All Departments
+                      </button>
+                      {allDepartments.map(dept => (
+                        <button
+                          key={dept}
+                          onClick={() => {
+                            handleDeptFilterSelect(dept);
+                            setDropdownOpen({ ...dropdownOpen, department: false });
+                          }}
+                          className={`block w-full text-left px-4 py-2 text-sm ${deptFilter === dept ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {dept}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Division Filter */}
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="text-gray-400" size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      list="divOptions"
+                      placeholder="Type or select division..."
+                      value={divFilter}
+                      onChange={(e) => {
+                        const typedDiv = e.target.value;
+                        setDivFilter(typedDiv);
+                        if (typedDiv === '') clearDivFilter();
+                        else if (allDivisions.includes(typedDiv)) handleDivFilterSelect(typedDiv);
+                      }}
+                      onBlur={(e) => {
+                        const typedDiv = e.target.value;
+                        if (typedDiv && !allDivisions.includes(typedDiv)) {}
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (divFilter === '') clearDivFilter();
+                          else handleDivFilterSelect(divFilter);
+                        }
+                      }}
+                      className="w-full sm:w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
+                    <datalist id="divOptions">
+                      {allDivisions.map(div => (
+                        <option key={div} value={div} />
+                      ))}
+                    </datalist>
+                    {divFilter && (
+                      <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+                        <button
+                          onClick={() => {
+                            setDivFilter('');
+                            clearDivFilter();
+                          }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => toggleDropdown('division')}
+                    className="flex items-center gap-1 px-3 py-2 border border-purple-200 rounded-md bg-white text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <ChevronDown size={16} className={`transition-transform ${dropdownOpen.division ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+                {dropdownOpen.division && (
+                  <div className="absolute z-50 mt-1 w-56 rounded-md bg-white shadow-lg border border-gray-200 max-h-60 overflow-auto top-full right-0">
+                    <div className="py-1">
+                      <button
+                        onClick={clearDivFilter}
+                        className={`block w-full text-left px-4 py-2 text-sm ${!divFilter ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
+                      >
+                        All Divisions
+                      </button>
+                      {allDivisions.map(div => (
+                        <button
+                          key={div}
+                          onClick={() => {
+                            handleDivFilterSelect(div);
+                            setDropdownOpen({ ...dropdownOpen, division: false });
+                          }}
+                          className={`block w-full text-left px-4 py-2 text-sm ${divFilter === div ? 'bg-purple-100 text-purple-900' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          {div}
                         </button>
                       ))}
                     </div>
@@ -1402,8 +1788,12 @@ const filteredMaintenanceTasks = useMemo(() => {
             <DelegationPage
               searchTerm={searchTerm}
               nameFilter={nameFilter}
+              deptFilter={deptFilter}
+              divFilter={divFilter}
               freqFilter={freqFilter}
               setNameFilter={setNameFilter}
+              setDeptFilter={setDeptFilter}
+              setDivFilter={setDivFilter}
               setFreqFilter={setFreqFilter}
               userRole={userRole}
               userDept={userDept}
@@ -1414,8 +1804,12 @@ const filteredMaintenanceTasks = useMemo(() => {
             <MaintenanceQuickTaskPage
               searchTerm={searchTerm}
               nameFilter={nameFilter}
+              deptFilter={deptFilter}
+              divFilter={divFilter}
               freqFilter={freqFilter}
               setNameFilter={setNameFilter}
+              setDeptFilter={setDeptFilter}
+              setDivFilter={setDivFilter}
               setFreqFilter={setFreqFilter}
               userRole={userRole}
               userDept={userDept}

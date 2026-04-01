@@ -1,10 +1,11 @@
 // // import supabase from "../../SupabaseClient";
+import { authFetch } from "../../utils/authFetch";
 
 
 
 // export const fetchUserDetailsApi = async () => {
 //   try {
-//     const response = await fetch("http://localhost:5050/api/settings/users");
+//     const response = await authFetch("http://localhost:5050/api/settings/users");
 //     const data = await response.json();
 //     return data;
 //   } catch (error) {
@@ -38,7 +39,7 @@
 
 // export const fetchDepartmentDataApi = async () => {
 //   try {
-//     const res = await fetch("http://localhost:5050/api/settings/departments");
+//     const res = await authFetch("http://localhost:5050/api/settings/departments");
 //     return await res.json();
 //   } catch (error) {
 //     console.log("Error fetching departments", error);
@@ -51,7 +52,7 @@
 
 // export const createUserApi = async (newUser) => {
 //   try {
-//     const res = await fetch("http://localhost:5050/api/settings/users", {
+//     const res = await authFetch("http://localhost:5050/api/settings/users", {
 //       method: "POST",
 //       headers: { "Content-Type": "application/json" },
 //       body: JSON.stringify(newUser)
@@ -67,7 +68,7 @@
 
 // export const updateUserDataApi = async ({ id, updatedUser }) => {
 //   try {
-//     const res = await fetch(`http://localhost:5050/api/settings/users/${id}`, {
+//     const res = await authFetch(`http://localhost:5050/api/settings/users/${id}`, {
 //       method: "PUT",
 //       headers: { "Content-Type": "application/json" },
 //       body: JSON.stringify(updatedUser)
@@ -83,7 +84,7 @@
 
 // export const createDepartmentApi = async (newDept) => {
 //   try {
-//     const res = await fetch("http://localhost:5050/api/settings/departments", {
+//     const res = await authFetch("http://localhost:5050/api/settings/departments", {
 //       method: "POST",
 //       headers: { "Content-Type": "application/json" },
 //       body: JSON.stringify(newDept)
@@ -98,7 +99,7 @@
 
 // export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
 //   try {
-//     const res = await fetch(`http://localhost:5050/api/settings/departments/${id}`, {
+//     const res = await authFetch(`http://localhost:5050/api/settings/departments/${id}`, {
 //       method: "PUT",
 //       headers: { "Content-Type": "application/json" },
 //       body: JSON.stringify(updatedDept)
@@ -114,7 +115,7 @@
 
 // export const deleteUserByIdApi = async (id) => {
 //   try {
-//     await fetch(`http://localhost:5050/api/settings/users/${id}`, {
+//     await authFetch(`http://localhost:5050/api/settings/users/${id}`, {
 //       method: "DELETE",
 //     });
 //   } catch (error) {
@@ -140,7 +141,7 @@ const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/settings`;
 // =======================================================
 export const fetchUserDetailsApi = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/users`);
+    const response = await authFetch(`${BASE_URL}/users`);
     return await response.json();
   } catch (error) {
     console.log("Error fetching users", error);
@@ -153,7 +154,7 @@ export const fetchUserDetailsApi = async () => {
 // =======================================================
 export const fetchDepartmentDataApi = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/departments`);
+    const response = await authFetch(`${BASE_URL}/departments`);
     return await response.json();
   } catch (error) {
     console.log("Error fetching departments", error);
@@ -167,7 +168,7 @@ export const fetchDepartmentDataApi = async () => {
 // =======================================================
 export const createUserApi = async (newUser) => {
   try {
-    const response = await fetch(`${BASE_URL}/users`, {
+    const response = await authFetch(`${BASE_URL}/users`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newUser),
@@ -192,7 +193,7 @@ export const createUserApi = async (newUser) => {
 // =======================================================
 export const updateUserDataApi = async ({ id, updatedUser }) => {
   try {
-    const response = await fetch(`${BASE_URL}/users/${id}`, {
+    const response = await authFetch(`${BASE_URL}/users/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedUser),
@@ -215,7 +216,7 @@ export const updateUserDataApi = async ({ id, updatedUser }) => {
 // =======================================================
 export const deleteUserByIdApi = async (id) => {
   try {
-    const response = await fetch(`${BASE_URL}/users/${id}`, {
+    const response = await authFetch(`${BASE_URL}/users/${id}`, {
       method: "DELETE",
     });
     if (!response.ok) {
@@ -233,7 +234,7 @@ export const deleteUserByIdApi = async (id) => {
 // =======================================================
 export const createDepartmentApi = async (newDept) => {
   try {
-    const response = await fetch(`${BASE_URL}/departments`, {
+    const response = await authFetch(`${BASE_URL}/departments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newDept),
@@ -251,7 +252,7 @@ export const createDepartmentApi = async (newDept) => {
 // =======================================================
 export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
   try {
-    const response = await fetch(`${BASE_URL}/departments/${id}`, {
+    const response = await authFetch(`${BASE_URL}/departments/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedDept),
@@ -266,7 +267,7 @@ export const updateDepartmentDataApi = async ({ id, updatedDept }) => {
 // Fetch only unique departments (without given_by)
 export const fetchDepartmentsOnlyApi = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/departments-only`);
+    const response = await authFetch(`${BASE_URL}/departments-only`);
     return await response.json();
   } catch (error) {
     console.log("Error fetching departments only", error);
@@ -277,7 +278,7 @@ export const fetchDepartmentsOnlyApi = async () => {
 // Fetch only given_by data
 export const fetchGivenByDataApi = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/given-by`);
+    const response = await authFetch(`${BASE_URL}/given-by`);
     return await response.json();
   } catch (error) {
     console.log("Error fetching given_by data", error);
@@ -289,7 +290,7 @@ export const fetchGivenByDataApi = async () => {
 // =======================================================
 export const extendTaskApi = async (taskId, newStartDate) => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/leave/extend-task`, {
+    const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/leave/extend-task`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ taskId, newStartDate }),
@@ -307,7 +308,7 @@ export const extendTaskApi = async (taskId, newStartDate) => {
 // =======================================================
 export const fetchMachinesApi = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/machines`);
+    const response = await authFetch(`${BASE_URL}/machines`);
     return await response.json();
   } catch (error) {
     console.log("Error fetching machines", error);
@@ -320,7 +321,7 @@ export const fetchMachinesApi = async () => {
 // =======================================================
 export const createMachineApi = async (newMachine) => {
   try {
-    const response = await fetch(`${BASE_URL}/machines`, {
+    const response = await authFetch(`${BASE_URL}/machines`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newMachine),
@@ -338,7 +339,7 @@ export const createMachineApi = async (newMachine) => {
 // =======================================================
 export const updateMachineApi = async ({ id, updatedMachine }) => {
   try {
-    const response = await fetch(`${BASE_URL}/machines/${id}`, {
+    const response = await authFetch(`${BASE_URL}/machines/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updatedMachine),
@@ -356,7 +357,7 @@ export const updateMachineApi = async ({ id, updatedMachine }) => {
 // =======================================================
 export const deleteMachineApi = async (id) => {
   try {
-    await fetch(`${BASE_URL}/machines/${id}`, {
+    await authFetch(`${BASE_URL}/machines/${id}`, {
       method: "DELETE",
     });
     return id;

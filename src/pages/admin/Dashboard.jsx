@@ -1221,57 +1221,59 @@ useEffect(() => {
     <AdminLayout>
       <div className="space-y-6">
         {/* Top Level Module Switcher (Segmented Control) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-2">
-          <div className="flex items-center gap-2">
-             {/* Left side empty or logo space */}
-          </div>
+        {(canAccessModule("checklist") || canAccessModule("delegation") || canAccessModule("maintenance")) && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-2">
+            <div className="flex items-center gap-2">
+               {/* Left side empty or logo space */}
+            </div>
 
-          <div className="flex w-full p-1 bg-white rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-            {canAccessModule("checklist") && (
-              <button
-                onClick={() => handleModuleChange("checklist")}
-                className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
-                  activeModule === "checklist"
-                    ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
-                    : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                }`}
-              >
-                <i className="fas fa-clipboard-list h-4 w-4 shrink-0" />
-                <span className="hidden min-[480px]:inline truncate">Checklist</span>
-              </button>
-            )}
-            {canAccessModule("delegation") && (
-              <button
-                onClick={() => handleModuleChange("delegation")}
-                className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
-                  activeModule === "delegation"
-                    ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
-                    : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                }`}
-              >
-                <i className="fas fa-handshake h-4 w-4 shrink-0" />
-                <span className="hidden min-[480px]:inline truncate">Delegation</span>
-              </button>
-            )}
-            {canAccessModule("maintenance") && (
-              <button
-                onClick={() => handleModuleChange("maintenance")}
-                className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
-                  activeModule === "maintenance"
-                    ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
-                    : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
-                }`}
-              >
-                <i className="fas fa-tools h-4 w-4 shrink-0" />
-                <span className="hidden min-[480px]:inline truncate">Maintenance</span>
-              </button>
-            )}
+            <div className="flex w-full p-1 bg-white rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+              {canAccessModule("checklist") && (
+                <button
+                  onClick={() => handleModuleChange("checklist")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
+                    activeModule === "checklist"
+                      ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
+                      : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                  }`}
+                >
+                  <i className="fas fa-clipboard-list h-4 w-4 shrink-0" />
+                  <span className="hidden min-[480px]:inline truncate">Checklist</span>
+                </button>
+              )}
+              {canAccessModule("delegation") && (
+                <button
+                  onClick={() => handleModuleChange("delegation")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
+                    activeModule === "delegation"
+                      ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
+                      : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                  }`}
+                >
+                  <i className="fas fa-handshake h-4 w-4 shrink-0" />
+                  <span className="hidden min-[480px]:inline truncate">Delegation</span>
+                </button>
+              )}
+              {canAccessModule("maintenance") && (
+                <button
+                  onClick={() => handleModuleChange("maintenance")}
+                  className={`flex-1 flex items-center justify-center gap-2 px-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 min-w-0 ${
+                    activeModule === "maintenance"
+                      ? "bg-blue-600 text-white shadow-lg scale-105 z-10"
+                      : "text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                  }`}
+                >
+                  <i className="fas fa-tools h-4 w-4 shrink-0" />
+                  <span className="hidden min-[480px]:inline truncate">Maintenance</span>
+                </button>
+              )}
+            </div>
+            
+            <div className="hidden sm:block">
+               {/* Spacing or other admin info */}
+            </div>
           </div>
-          
-          <div className="hidden sm:block">
-             {/* Spacing or other admin info */}
-          </div>
-        </div>
+        )}
 
         {/* Dashboard Title below switcher - only for Maintenance since Checklist has its own */}
         {activeModule === "maintenance" && (

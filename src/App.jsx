@@ -1,6 +1,4 @@
-"use client"
-
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { useState } from "react"
 import { useSelector } from "react-redux"
 import LoginPage from "./pages/LoginPage"
@@ -21,35 +19,92 @@ import TrainingVideoPage from "./pages/admin/TrainingVideoPage"
 import CalendarPage from "./pages/admin/CalendarPage"
 import HolidayManagementPage from "./pages/admin/HolidayManagementPage"
 import RealtimeLogoutListener from "./components/RealtimeLogoutListener"   // ✅ Added listener
-import { hasPageAccess } from "./utils/permissionUtils"
+import { hasPageAccess, getDefaultDashboardRoute } from "./utils/permissionUtils"
 
-// Repair Module Imports
-// import RepairDashboard from "./pages/repair/repairDashboard"
-// import RequestForm from "./pages/repair/requestForm"
-// import PendingRequest from "./pages/repair/pendingRequest"
-// import RequestApproval from "./pages/repair/requestApproval"
-// import RepairSetting from "./pages/repair/repairSetting"
+import AdminLayout from "./components/layout/AdminLayout.jsx"
+import useAuthStore from "./store/authStore";
+import { useEffect } from "react";
+
+// Documentation Module Imports
+import DocDashboard from "./pages/doc-sub/Dashboard";
+import DocResourceManager from "./pages/doc-sub/ResourceManager";
+import DocSettings from "./pages/doc-sub/Settings";
+
+import AllDocuments from "./pages/doc-sub/document/AllDocuments";
+import DocumentRenewal from "./pages/doc-sub/document/Renewal";
+import SharedDocuments from "./pages/doc-sub/document/Shared";
+
+import AllSubscriptions from "./pages/doc-sub/subscription/AllSubscriptions";
+import SubscriptionApproval from "./pages/doc-sub/subscription/Approval";
+import SubscriptionPayment from "./pages/doc-sub/subscription/Payment";
+import SubscriptionRenewal from "./pages/doc-sub/subscription/Renewal";
+
+import AllLoans from "./pages/doc-sub/loan/AllLoans";
+import LoanForeclosure from "./pages/doc-sub/loan/Foreclosure";
+import LoanNOC from "./pages/doc-sub/loan/NOC";
+
+import MasterPage from "./pages/doc-sub/master/MasterPage";
+
+// Asset Module Imports
+import AssetDashboard from "./pages/asset/Dashboard";
+import AssetAllProducts from "./pages/asset/AllProducts";
+import AssetProductView from "./pages/asset/ProductView";
+
+
+// import PaymentRequestForm from "./pages/doc-sub/payment/RequestForm";
+// import PaymentApproval from "./pages/doc-sub/payment/PaymentApproval";
+// import MakePayment from "./pages/doc-sub/payment/MakePayment";
+// import TallyEntry from "./pages/doc-sub/payment/TallyEntry";
+
+import AccountTallyData from "./pages/doc-sub/account/TallyData";
+import AccountAudit from "./pages/doc-sub/account/Audit";
+import AccountRectify from "./pages/doc-sub/account/Rectify";
+import AccountBillFiled from "./pages/doc-sub/account/BillFiled";
+import RepairDashboard from "./pages/repair/repairDashboard";
+import RequestForm from "./pages/repair/requestForm";
+import PendingRequest from "./pages/repair/pendingRequest";
+import RequestApproval from "./pages/repair/requestApproval";
 
 // Auth wrapper component to protect routes
 const ProtectedRoute = ({ children, page }) => {
   const username = localStorage.getItem("user-name")
+  const location = useLocation()
 
-  // If no user is logged in, redirect to login
+  // If no user is logged in, redirect to login and save current location
   if (!username) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace state={{ from: location }} />
   }
 
   // Permission check
   if (page && !hasPageAccess(page)) {
-    // If user doesn't even have dashboard access, don't redirect to dashboard (causes infinite loop)
+    // If user doesn't even have dashboard access, redirect to their default allowed dashboard or login
     if (page === "dashboard") {
-      return <Navigate to="/login" replace />
+      const defaultRoute = getDefaultDashboardRoute();
+      if (defaultRoute === "/dashboard/admin") {
+         return <Navigate to="/login" replace />
+      }
+      return <Navigate to={defaultRoute} replace />
     }
-    return <Navigate to="/dashboard/admin" replace />
+    return <Navigate to={getDefaultDashboardRoute()} replace />
   }
 
   return children
 }
+
+// Layout wrapper for Doc Module components
+const DocLayout = ({ children }) => {
+  const { fetchMe, currentUser } = useAuthStore();
+  
+  useEffect(() => {
+    // Sync with localStorage first (done automatically in authStore now)
+    // Then fetch full permissions from doc-sub backend
+    if (localStorage.getItem('user-name')) {
+      fetchMe();
+    }
+  }, [fetchMe]);
+
+  return <AdminLayout>{children}</AdminLayout>;
+};
 
 const AssignTaskRouter = () => {
   const reduxUserData = useSelector((state) => state.login.userData);
@@ -88,6 +143,263 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Documentation Module Routes */}
+        <Route
+          path="/document"
+          element={
+            <ProtectedRoute page="documentation">
+              <DocLayout><AllDocuments /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/document/all"
+          element={
+            <ProtectedRoute page="documentation">
+              <DocLayout><AllDocuments /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/document/renewal"
+          element={
+            <ProtectedRoute page="document_renewal">
+              <DocLayout><DocumentRenewal /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/document/shared"
+          element={
+            <ProtectedRoute page="document_shared">
+              <DocLayout><SharedDocuments /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Subscription Routes */}
+        <Route
+          path="/subscription"
+          element={
+            <ProtectedRoute page="subscription">
+              <DocLayout><AllSubscriptions /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/subscription/all"
+          element={
+            <ProtectedRoute page="subscription">
+              <DocLayout><AllSubscriptions /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/subscription/approval"
+          element={
+            <ProtectedRoute page="subscription_approval">
+              <DocLayout><SubscriptionApproval /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/subscription/payment"
+          element={
+            <ProtectedRoute page="subscription_payment">
+              <DocLayout><SubscriptionPayment /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/subscription/renewal"
+          element={
+            <ProtectedRoute page="subscription_renewal">
+              <DocLayout><SubscriptionRenewal /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Loan Routes */}
+        <Route
+          path="/loan/all"
+          element={
+            <ProtectedRoute page="loan">
+              <DocLayout><AllLoans /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/loan/foreclosure"
+          element={
+            <ProtectedRoute page="loan_foreclosure">
+              <DocLayout><LoanForeclosure /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/loan/noc"
+          element={
+            <ProtectedRoute page="loan_noc">
+              <DocLayout><LoanNOC /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Other Doc Module Routes */}
+        <Route
+          path="/doc-sub/dashboard"
+          element={
+            <ProtectedRoute page="documentation">
+              <DocLayout><DocDashboard /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/doc-sub/resource-manager"
+          element={
+            <ProtectedRoute page="resource_manager">
+              <DocLayout><DocResourceManager /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master"
+          element={
+            <ProtectedRoute page="master">
+              <DocLayout><MasterPage /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Payment Routes */}
+        {/* <Route
+          path="/payment/request-form"
+          element={
+            <ProtectedRoute page="payment_request">
+              <DocLayout><PaymentRequestForm /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment/approval"
+          element={
+            <ProtectedRoute page="payment_approval">
+              <DocLayout><PaymentApproval /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment/make-payment"
+          element={
+            <ProtectedRoute page="payment_make">
+              <DocLayout><MakePayment /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment/tally-entry"
+          element={
+            <ProtectedRoute page="payment_tally">
+              <DocLayout><TallyEntry /></DocLayout>
+            </ProtectedRoute>
+          }
+        /> */}
+
+        {/* Account Routes */}
+        <Route
+          path="/account/tally-data"
+          element={
+            <ProtectedRoute page="account">
+              <DocLayout><AccountTallyData /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account/audit"
+          element={
+            <ProtectedRoute page="account">
+              <DocLayout><AccountAudit /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account/rectify"
+          element={
+            <ProtectedRoute page="account">
+              <DocLayout><AccountRectify /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account/bill-filed"
+          element={
+            <ProtectedRoute page="account">
+              <DocLayout><AccountBillFiled /></DocLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Repair Module Routes */}
+        <Route
+          path="/repair/dashboard"
+          element={
+            <ProtectedRoute page="repair_dashboard">
+              <RepairDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair/request-form"
+          element={
+            <ProtectedRoute page="repair_request_form">
+              <RequestForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair/pending-request"
+          element={
+            <ProtectedRoute page="repair_pending_request">
+              <PendingRequest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair/request-approval"
+          element={
+            <ProtectedRoute page="repair_request_approval">
+              <RequestApproval />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Asset Management Routes */}
+        <Route
+          path="/asset/dashboard"
+          element={
+            <ProtectedRoute page="asset_dashboard">
+              <AdminLayout><AssetDashboard /></AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/asset/products"
+          element={
+            <ProtectedRoute page="all_products">
+              <AdminLayout><AssetAllProducts /></AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/asset/product/:productId"
+          element={
+            <ProtectedRoute page="all_products">
+              <AdminLayout><AssetProductView /></AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/dashboard/quick-task"
           element={
@@ -203,48 +515,6 @@ function App() {
           }
         />
 
-        {/* Repair Module Routes */}
-        {/* <Route
-          path="/repair/dashboard"
-          element={
-            <ProtectedRoute page="dashboard">
-              <RepairDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/repair/request-form"
-          element={
-            <ProtectedRoute page="request_form">
-              <RequestForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/repair/pending-request"
-          element={
-            <ProtectedRoute page="pending_request">
-              <PendingRequest />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/repair/request-approval"
-          element={
-            <ProtectedRoute page="request_approval">
-              <RequestApproval />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/repair/repair-setting"
-          element={
-            <ProtectedRoute page="repair_setting">
-              <RepairSetting />
-            </ProtectedRoute>
-          }
-        /> */}
-
         {/* Backward compatibility redirects */}
         <Route path="/admin/*" element={<Navigate to="/dashboard/admin" replace />} />
         <Route path="/admin/dashboard" element={<Navigate to="/dashboard/admin" replace />} />
@@ -254,6 +524,13 @@ function App() {
         <Route path="/admin/mis-report" element={<Navigate to="/dashboard/mis-report" replace />} />
         <Route path="/admin/data/:category" element={<Navigate to="/dashboard/data/:category" replace />} />
         <Route path="/user/*" element={<Navigate to="/dashboard/admin" replace />} />
+        
+
+        {/* Standalone Product Passport Page (Accessible via QR) */}
+        <Route path="/product/:productId" element={<AssetProductView />} />
+        
+        {/* Default route */}
+        <Route path="*" element={<Navigate to="/dashboard/admin" replace />} />
       </Routes>
     </Router>
   )

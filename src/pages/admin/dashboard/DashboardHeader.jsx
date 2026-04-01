@@ -179,17 +179,17 @@ export default function DashboardHeader({
 
   // Get today's date in YYYY-MM-DD format for max date
   const getTodayDate = () => {
-    return new Date().toISOString().split('T')[0]
+    return new Date().toLocaleDateString('en-CA')
   }
 
   const isAdmin = userRole === "admin" || userRole === "super_admin" || userRole === "div_admin";
 
   return (
-    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-      <div className="flex items-center gap-4">
+    <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 lg:items-center mb-4">
+      <div className="lg:w-1/2 flex items-center justify-between lg:justify-start lg:gap-8 text-nowrap">
         <h1 className="text-2xl font-bold tracking-tight text-purple-500">Dashboard</h1>
         { isAdmin && (
-          <div className="flex items-center gap-2 ml-auto mr-5">
+          <div className="flex items-center gap-2">
             <div className="text-sm text-gray-600">Total Users</div>
             <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center">
               <span className="text-white font-bold text-sm">
@@ -320,8 +320,8 @@ export default function DashboardHeader({
       </div>
 
       {/* Desktop View - 3-column grid for admin, single row for users */}
-      <div className="hidden md:block">
-        <div className={isAdmin ? "grid grid-cols-3 gap-2" : "flex items-center gap-2 justify-end"}>
+      <div className="hidden md:block lg:w-1/2">
+        <div className={isAdmin ? "grid grid-cols-3 lg:grid-cols-3 gap-2" : "flex items-center gap-2 justify-end"}>
           {/* Row 1 */}
           {/* Date Range Filter */}
           {isAdmin && (

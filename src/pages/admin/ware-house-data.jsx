@@ -1,3 +1,4 @@
+import { authFetch } from "../../utils/authFetch";
 //REFRASYNTH Tasks Page
 "use client"
 
@@ -216,7 +217,7 @@ function AccountDataPage() {
       const pendingAccounts = []
       const historyRows = []
 
-      const response = await fetch(`${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch`)
+      const response = await authFetch(`${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch`)
 
       if (!response.ok) {
         throw new Error(`Failed to fetch data: ${response.status}`)
@@ -506,7 +507,7 @@ function AccountDataPage() {
               uploadFormData.append("mimeType", item.image.type)
               uploadFormData.append("folderId", CONFIG.DRIVE_FOLDER_ID)
 
-              const uploadResponse = await fetch(CONFIG.APPS_SCRIPT_URL, {
+              const uploadResponse = await authFetch(CONFIG.APPS_SCRIPT_URL, {
                 method: "POST",
                 body: uploadFormData,
               })
@@ -538,7 +539,7 @@ function AccountDataPage() {
       formData.append("action", "updateTaskData")
       formData.append("rowData", JSON.stringify(submissionData))
 
-      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      const response = await authFetch(CONFIG.APPS_SCRIPT_URL, {
         method: "POST",
         body: formData,
       })

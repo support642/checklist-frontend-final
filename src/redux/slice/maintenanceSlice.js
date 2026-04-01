@@ -16,9 +16,29 @@ import {
 // ============================================================
 export const maintenanceData = createAsyncThunk(
     "fetch/maintenance",
-    async ({ page = 1, search = '', startDate = "", endDate = "" } = {}) => {
-        const { data, totalCount } = await fetchMaintenanceDataSortByDate(page, search, startDate, endDate);
-        return { data, totalCount, page, search };
+    async ({ 
+        page = 1, 
+        search = '', 
+        startDate = "", 
+        endDate = "", 
+        status = 'all', 
+        frequency = 'all', 
+        name = 'all', 
+        division = 'all', 
+        departmentFilter = 'all' 
+    } = {}) => {
+        const response = await fetchMaintenanceDataSortByDate(
+            page, 
+            search, 
+            startDate, 
+            endDate, 
+            status, 
+            frequency, 
+            name, 
+            division, 
+            departmentFilter
+        );
+        return { ...response, page, search, startDate, endDate, status, frequency, name, division, departmentFilter };
     }
 );
 
@@ -27,8 +47,8 @@ export const maintenanceData = createAsyncThunk(
 // ============================================================
 export const maintenanceHistoryData = createAsyncThunk(
     "fetch/maintenanceHistory",
-    async ({ search = "", startDate = "", endDate = "" } = {}) => {
-        const { data, totalCount, approvedCount } = await fetchMaintenanceDataForHistory(search, startDate, endDate);
+    async ({ search = "", startDate = "", endDate = "", name = 'all', division = 'all', departmentFilter = 'all' } = {}) => {
+        const { data, totalCount, approvedCount } = await fetchMaintenanceDataForHistory(search, startDate, endDate, name, division, departmentFilter);
         return { data, totalCount, approvedCount };
     }
 );
@@ -60,8 +80,8 @@ export const maintenanceAdminDone = createAsyncThunk(
 // ============================================================
 export const uniqueMaintenanceTaskData = createAsyncThunk(
     "fetch/uniqueMaintenanceTask",
-    async ({ page = 0, pageSize = 50, nameFilter = "", freqFilter = "", append = false, userRole = "", userDept = "", userDiv = "", userName = "" }) => {
-        const result = await fetchUniqueMaintenanceData(page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv, userName);
+    async ({ page = 0, pageSize = 50, nameFilter = "", freqFilter = "", append = false, userRole = "", userDept = "", userDiv = "", userName = "", deptFilter = "", divFilter = "" }) => {
+        const result = await fetchUniqueMaintenanceData(page, pageSize, nameFilter, freqFilter, userRole, userDept, userDiv, userName, deptFilter, divFilter);
         return { ...result, append };
     }
 );

@@ -1,3 +1,4 @@
+import { authFetch } from "../../utils/authFetch";
 "use client"
 
 import { useState, useEffect } from "react"
@@ -317,7 +318,7 @@ const confirmMarkDone = async () => {
     formData.append('action', 'updateSalesData');
     formData.append('rowData', JSON.stringify(submissionData));
     
-    const response = await fetch(APPS_SCRIPT_URL, {
+    const response = await authFetch(APPS_SCRIPT_URL, {
       method: 'POST',
       body: formData
     });
@@ -358,7 +359,7 @@ const confirmMarkDone = async () => {
       const pendingAccounts = [];
       const historyRows = [];
       
-      const response = await fetch(`https://docs.google.com/spreadsheets/d/1OML53kwf2UBXyp6beojKt1Nhn-bUS8iu8I4-AUz9ngE/gviz/tq?tqx=out:json&sheet=SLAG CRUSHER`);
+      const response = await authFetch(`https://docs.google.com/spreadsheets/d/1OML53kwf2UBXyp6beojKt1Nhn-bUS8iu8I4-AUz9ngE/gviz/tq?tqx=out:json&sheet=SLAG CRUSHER`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch data: ${response.status}`);
@@ -613,7 +614,7 @@ const confirmMarkDone = async () => {
       formData.append('action', 'updateSalesData')
       formData.append('rowData', JSON.stringify(submissionData))
       
-      const response = await fetch(APPS_SCRIPT_URL, {
+      const response = await authFetch(APPS_SCRIPT_URL, {
         method: 'POST',
         body: formData
       })

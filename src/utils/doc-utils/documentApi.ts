@@ -186,7 +186,7 @@ export function mapBackendToFrontend(doc: BackendDocument): FrontendDocument {
     const toDateString = (dateStr: string | null | undefined) => {
         if (!dateStr) return undefined;
         const d = new Date(dateStr);
-        return isNaN(d.getTime()) ? undefined : d.toISOString().split('T')[0];
+        return isNaN(d.getTime()) ? undefined : d.toLocaleDateString('en-CA');
     };
 
     return {
@@ -200,7 +200,7 @@ export function mapBackendToFrontend(doc: BackendDocument): FrontendDocument {
         renewalDate: toDateString(doc.renewal_date),
         file: doc.image ? getFileNameFromUrl(doc.image) : null,
         fileContent: doc.image || undefined, // S3 URL goes here for viewing
-        date: toDateString(doc.created_at) || new Date().toISOString().split('T')[0],
+        date: toDateString(doc.created_at) || new Date().toLocaleDateString('en-CA'),
         status: 'Active'
     };
 }

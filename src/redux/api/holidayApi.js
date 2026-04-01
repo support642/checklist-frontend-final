@@ -1,3 +1,4 @@
+import { authAxios, createAuthAxios } from "../../utils/authAxios";
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_BASE_URL;
@@ -9,7 +10,7 @@ const API_URL = import.meta.env.VITE_API_BASE_URL;
 // Fetch all holidays
 export const fetchHolidays = async () => {
   try {
-    const response = await axios.get(`${API_URL}/holidays`);
+    const response = await authAxios.get(`${API_URL}/holidays`);
     return response.data;
   } catch (error) {
     console.error("Error fetching holidays:", error);
@@ -20,7 +21,7 @@ export const fetchHolidays = async () => {
 // Add holiday
 export const addHoliday = async (holidayData) => {
   try {
-    const response = await axios.post(`${API_URL}/holidays`, holidayData);
+    const response = await authAxios.post(`${API_URL}/holidays`, holidayData);
     return response.data;
   } catch (error) {
     console.error("Error adding holiday:", error);
@@ -31,7 +32,7 @@ export const addHoliday = async (holidayData) => {
 // Delete holiday
 export const deleteHoliday = async (id) => {
   try {
-    const response = await axios.delete(`${API_URL}/holidays/${id}`);
+    const response = await authAxios.delete(`${API_URL}/holidays/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error deleting holiday:", error);
@@ -50,7 +51,7 @@ export const fetchWorkingDays = async (month, year) => {
     if (month) params.month = month;
     if (year) params.year = year;
     
-    const response = await axios.get(`${API_URL}/working-days`, { params });
+    const response = await authAxios.get(`${API_URL}/working-days`, { params });
     return response.data;
   } catch (error) {
     console.error("Error fetching working days:", error);
@@ -61,7 +62,7 @@ export const fetchWorkingDays = async (month, year) => {
 // Add working day
 export const addWorkingDay = async (workingDayData) => {
   try {
-    const response = await axios.post(`${API_URL}/working-days`, workingDayData);
+    const response = await authAxios.post(`${API_URL}/working-days`, workingDayData);
     return response.data;
   } catch (error) {
     console.error("Error adding working day:", error);
@@ -72,7 +73,7 @@ export const addWorkingDay = async (workingDayData) => {
 // Delete working day
 export const deleteWorkingDay = async (id) => {
   try {
-    const response = await axios.delete(`${API_URL}/working-days/${id}`);
+    const response = await authAxios.delete(`${API_URL}/working-days/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error deleting working day:", error);

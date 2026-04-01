@@ -455,7 +455,7 @@ export default function TaskNavigationTabs({
                   const sequenceNumber = index + 1;
 
                   return (
-                    <tr key={`${task.id}-${task.taskStartDate}`} className="hover:bg-gray-50">
+                    <tr key={`${task.id}-${task.taskStartDate}-${index}`} className="hover:bg-gray-50">
                       {/* Add Sequence Number Cell */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
                         {sequenceNumber}
@@ -504,7 +504,7 @@ export default function TaskNavigationTabs({
                 const sequenceNumber = index + 1;
                 
                 return (
-                  <div key={`mobile-${task.id}-${task.taskStartDate}`} className="p-3 border rounded-lg shadow-sm bg-white border-gray-200">
+                  <div key={`mobile-${task.id}-${task.taskStartDate}-${index}`} className="p-3 border rounded-lg shadow-sm bg-white border-gray-200">
                     <div className="flex justify-between items-center mb-2">
                        <div className="flex items-center gap-2">
                          <span className="text-xs font-bold text-gray-400">#{sequenceNumber}</span>

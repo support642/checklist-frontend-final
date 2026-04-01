@@ -1,0 +1,437 @@
+import React, { useState, useEffect } from 'react';
+import { X, Download, FileText, Calendar, RotateCw } from 'lucide-react';
+
+const EmployeePerformanceReportModal = ({ 
+  isOpen, 
+  onClose, 
+  staffName, 
+  staffData, 
+  tasks,
+  reportDate,
+  startDate,
+  endDate,
+  onDownloadPDF,
+  onDownloadCSV,
+  onRefresh,
+  hasMaintenanceAccess = true
+}) => {
+  const today = new Date().toLocaleDateString('en-CA');
+  const [localFrom, setLocalFrom] = useState(startDate || "");
+  const [localTo, setLocalTo] = useState(endDate || today);
+
+  // Update local state when props change
+  useEffect(() => {
+    if (startDate) setLocalFrom(startDate);
+    if (endDate) setLocalTo(endDate);
+    else setLocalTo(today);
+  }, [startDate, endDate, today]);
+
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr || dateStr === "N/A" || dateStr === "Range") return dateStr;
+    try {
+      // Expected input: yyyy-mm-dd
+      const parts = dateStr.includes('T') ? dateStr.split('T')[0].split('-') : dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const [year, month, day] = parts;
+      // Output: mm/dd/yyyy
+      return `${month}/${day}/${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  if (!isOpen) return null;
+
+  // Current date for filtering tasks - Use reportDate if provided, fallback to today
+  const targetDate = reportDate || new Date().toLocaleDateString('en-CA');
+  
+  const matchesTargetDate = (t) => 
+    t.start_date === targetDate || 
+    (t.task_start_date && t.task_start_date.startsWith(targetDate));
+
+  // Helper to get unique tasks by description + frequency for the table view
+  const getUniqueTasks = (taskList) => {
+    const seen = new Set();
+    return taskList.filter(t => {
+      const key = `${t.task_description}-${t.frequency || ''}`;
+      if (!t.task_description || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  // Process tasks into categories for the table - Using unique tasks for the listing
+  const rawDaily = tasks.filter(t => t.type === 'checklist' && t.frequency?.toLowerCase() === 'daily');
+  const dailyTasks = getUniqueTasks(rawDaily);
+
+  const rawWeekly = tasks.filter(t => t.type === 'checklist' && t.frequency?.toLowerCase() === 'weekly');
+  const weeklyTasks = getUniqueTasks(rawWeekly);
+
+  const rawMonthly = tasks.filter(t => t.type === 'checklist' && t.frequency?.toLowerCase() === 'monthly');
+  const monthlyTasks = getUniqueTasks(rawMonthly);
+
+  const delegationTasks = tasks.filter(t => t.type === 'delegation');
+  
+  const maintenanceTasks = hasMaintenanceAccess 
+    ? tasks.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+    : [];
+
+  // Stats Calculation (Based on TOTAL occurrences for accurate performance)
+  const calculateStats = (taskList) => {
+    const total = taskList.length;
+    const completed = taskList.filter(t => t.is_completed).length;
+    const onTime = taskList.filter(t => t.is_on_time).length;
+    const workDoneScore = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const onTimeScore = completed > 0 ? Math.round((onTime / completed) * 100) : 0;
+    return { total, completed, onTime, workDoneScore, onTimeScore };
+  };
+
+  const checklistStats = calculateStats(tasks.filter(t => t.type === 'checklist'));
+  const delegationStats = calculateStats(delegationTasks);
+  const maintenanceStats = hasMaintenanceAccess 
+    ? calculateStats(tasks.filter(t => t.type === 'maintenance' && matchesTargetDate(t)))
+    : { total: 0, completed: 0, onTime: 0, workDoneScore: 0, onTimeScore: 0 };
+
+  // Maximum number of rows needed for the unique list
+  const maxRows = hasMaintenanceAccess
+    ? Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, maintenanceTasks.length, 1)
+    : Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, 1);
+
+  // Dynamic grid columns based on maintenance access
+  const infoGridCols = hasMaintenanceAccess
+    ? 'grid-cols-[1.2fr_1fr_1fr_1.2fr_1fr]'
+    : 'grid-cols-[1.5fr_1.2fr_1.2fr_1.2fr]';
+
+  const tableColCount = hasMaintenanceAccess ? 6 : 5;
+  const totalGridCols = hasMaintenanceAccess
+    ? 'grid-cols-[60px_1fr_1fr_1fr_1fr_1fr]'
+    : 'grid-cols-[60px_1fr_1fr_1fr_1fr]';
+
+  return (
+    <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="bg-white w-full max-w-7xl h-auto lg:h-[95vh] flex flex-col rounded-xl overflow-hidden shadow-2xl border border-gray-300">
+        
+        {/* Desktop View (Full Report - Exactly same for PDF Parity) */}
+        <div className="hidden lg:flex flex-col flex-1 overflow-hidden">
+          {/* Header Section */}
+          <div className="flex items-stretch border-b border-gray-300 h-24">
+            <div className="w-[180px] flex items-center justify-center p-3 border-r border-gray-300">
+              <img src="/Rama_TMT_logo.png" alt="Rama Logo" className="max-h-full max-w-full object-contain" />
+            </div>
+            <div className="flex-1 bg-[#FFFF00] flex flex-col items-center justify-center px-6 border-r border-gray-300">
+              <h1 className="text-4xl font-bold text-gray-900 tracking-tighter text-center uppercase">
+                Rama Udyog pvt ltd.
+              </h1>
+            </div>
+            <div className="w-[180px] flex items-center justify-center p-3">
+              <img src="/Rama_TMT_logo.png" alt="Rama Logo" className="max-h-full max-w-full object-contain" />
+            </div>
+          </div>
+
+          {/* Sub-header */}
+          <div className="bg-[#D9EAF7] border-b border-gray-300 py-2">
+            <h2 className="text-2xl font-bold text-gray-800 text-center uppercase tracking-widest">
+              Employee performance report
+            </h2>
+          </div>
+
+          {/* Employee Info Grid - Dynamic columns based on maintenance access */}
+          <div className="bg-white border-b border-gray-300 text-[10px]">
+            <div className={`grid ${infoGridCols} divide-x divide-gray-300`}>
+              {/* Column 1: Basic Info */}
+              <div className="divide-y divide-gray-300">
+                <div className="grid grid-cols-[80px_1fr] h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-600 border-r border-gray-300">Name</div>
+                  <div className="px-2 flex items-center font-bold text-gray-800">{staffName}</div>
+                </div>
+                <div className="grid grid-cols-[80px_1fr] h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-600 border-r border-gray-300">Division</div>
+                  <div className="px-2 flex items-center font-bold text-gray-800 truncate">{staffData.division || "Admin"}</div>
+                </div>
+                <div className="grid grid-cols-[80px_1fr] h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-600 border-r border-gray-300">Dept</div>
+                  <div className="px-2 flex items-center font-bold text-gray-800 truncate">{staffData.department || "HR"}</div>
+                </div>
+              </div>
+
+              {/* Column 2: Checklist Stats */}
+              <div className="divide-y divide-gray-300">
+                <div className="bg-green-50/50 h-10 flex items-center justify-center font-bold border-b border-gray-300 uppercase tracking-tighter text-green-800">Checklist</div>
+                <div className="grid grid-cols-2 h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-400 border-r border-gray-300">Assigned / Done</div>
+                  <div className="px-2 flex items-center justify-center font-bold text-gray-800">{checklistStats.total} / {checklistStats.completed}</div>
+                </div>
+                <div className="grid grid-cols-2 h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-400 border-r border-gray-300 px-1 truncate">Score / OnTime</div>
+                  <div className="px-2 flex items-center justify-center gap-1">
+                    <span className="font-bold text-green-700">{checklistStats.workDoneScore}%</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-blue-600 font-bold">{checklistStats.onTimeScore}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Column 3: Delegation Stats */}
+              <div className="divide-y divide-gray-300">
+                <div className="bg-blue-50/50 h-10 flex items-center justify-center font-bold border-b border-gray-300 uppercase tracking-tighter text-blue-800">Delegation</div>
+                <div className="grid grid-cols-2 h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-400 border-r border-gray-300">Assigned / Done</div>
+                  <div className="px-2 flex items-center justify-center font-bold text-gray-800">{delegationStats.total} / {delegationStats.completed}</div>
+                </div>
+                <div className="grid grid-cols-2 h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-400 border-r border-gray-300 px-1 truncate">Score / OnTime</div>
+                  <div className="px-2 flex items-center justify-center gap-1">
+                    <span className="font-bold text-green-700">{delegationStats.workDoneScore}%</span>
+                    <span className="text-gray-300">|</span>
+                    <span className="text-blue-600 font-bold">{delegationStats.onTimeScore}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Column 4: Maintenance Stats (conditional) */}
+              {hasMaintenanceAccess && (
+                <div className="divide-y divide-gray-300">
+                  <div className="bg-orange-50/50 h-10 flex items-center justify-center font-bold border-b border-gray-300 uppercase tracking-tighter text-orange-800">Maintenance</div>
+                  <div className="grid grid-cols-2 h-10">
+                    <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-400 border-r border-gray-300">Assigned / Done</div>
+                    <div className="px-2 flex items-center justify-center font-bold text-gray-800">{maintenanceStats.total} / {maintenanceStats.completed}</div>
+                  </div>
+                  <div className="grid grid-cols-2 h-10">
+                    <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-400 border-r border-gray-300 px-1 truncate">Score / OnTime</div>
+                    <div className="px-2 flex items-center justify-center gap-1">
+                      <span className="font-bold text-green-700">{maintenanceStats.workDoneScore}%</span>
+                      <span className="text-gray-300">|</span>
+                      <span className="text-blue-600 font-bold">{maintenanceStats.onTimeScore}%</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Last Column: Report Info */}
+              <div className="divide-y divide-gray-300">
+                <div className="grid grid-cols-[70px_1fr] h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-500 border-r border-gray-300">Period</div>
+                  <div className="px-2 flex items-center justify-center font-bold text-gray-800">{formatDateForDisplay(reportDate) || "Range"}</div>
+                </div>
+                <div className="grid grid-cols-[70px_1fr] h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-500 border-r border-gray-300">From</div>
+                  <div className="px-2 flex items-center justify-center font-bold text-gray-800 whitespace-nowrap">{formatDateForDisplay(startDate) || "N/A"}</div>
+                </div>
+                <div className="grid grid-cols-[70px_1fr] h-10">
+                  <div className="bg-[#F8F9FA] px-2 flex items-center font-bold uppercase text-gray-500 border-r border-gray-300">To</div>
+                  <div className="px-2 flex items-center justify-center font-bold text-gray-800 whitespace-nowrap">{formatDateForDisplay(endDate) || "N/A"}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Categorized Tasks Table */}
+          <div className="flex-1 overflow-auto bg-white">
+            <table className="w-full border-collapse border-b border-gray-300 text-[11px]">
+              <thead className="sticky top-0 bg-[#E9F2E9] border-b border-gray-300 z-10">
+                <tr>
+                  <th className="border border-gray-300 p-2 font-bold w-[60px] text-center">Seq No</th>
+                  <th className="border border-gray-300 p-2 font-bold text-center">Daily Task Description</th>
+                  <th className="border border-gray-300 p-2 font-bold text-center">Delegation task</th>
+                  <th className="border border-gray-300 p-2 font-bold text-center">Weekly task</th>
+                  <th className="border border-gray-300 p-2 font-bold text-center">Monthly task</th>
+                  {hasMaintenanceAccess && (
+                    <th className="border border-gray-300 p-2 font-bold text-center">maintenance</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: maxRows }).map((_, idx) => (
+                  <tr key={idx} className="h-8 hover:bg-gray-50 transition-colors border-b border-gray-200">
+                    <td className="border border-gray-300 text-center font-medium text-gray-800">{idx + 1}</td>
+                    <td className="border border-gray-300 px-2 py-1 text-gray-700 leading-tight">
+                      {dailyTasks[idx]?.task_description || ""}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1 text-gray-700 leading-tight">
+                      {delegationTasks[idx]?.task_description || ""}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1 text-gray-700 leading-tight">
+                      {weeklyTasks[idx]?.task_description || ""}
+                    </td>
+                    <td className="border border-gray-300 px-2 py-1 text-gray-700 leading-tight">
+                      {monthlyTasks[idx]?.task_description || ""}
+                    </td>
+                    {hasMaintenanceAccess && (
+                      <td className="border border-gray-300 px-2 py-1 text-gray-700 leading-tight">
+                        {maintenanceTasks[idx]?.task_description || (idx === 0 && maintenanceTasks.length === 0 ? "Nill" : "")}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer Area with Totals */}
+          <div className={`bg-[#FEF9E7] border-t border-gray-300 divide-x divide-gray-300 grid ${totalGridCols} h-10`}>
+            <div className="flex items-center justify-center font-bold text-xs">Total</div>
+            <div className="flex items-center justify-center font-bold">{dailyTasks.length}</div>
+            <div className="flex items-center justify-center font-bold">{delegationTasks.length}</div>
+            <div className="flex items-center justify-center font-bold">{weeklyTasks.length}</div>
+            <div className="flex items-center justify-center font-bold">{monthlyTasks.length}</div>
+            {hasMaintenanceAccess && (
+              <div className="flex items-center justify-center font-bold">{maintenanceTasks.length}</div>
+            )}
+          </div>
+
+          {/* Modal Controls (Desktop) */}
+          <div className="p-4 bg-gray-50 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => onDownloadPDF(localFrom, localTo, staffData)}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-bold shadow-sm"
+              >
+                <FileText size={18} />
+                Export PDF
+              </button>
+
+              {/* Footer Date Selection Filter */}
+              <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-300 shadow-inner">
+                <div className="flex items-center gap-1.5 px-2 py-1 border-r border-gray-100">
+                  <Calendar size={13} className="text-gray-400" />
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">From</span>
+                  <input 
+                    type="date" 
+                    value={localFrom}
+                    onChange={(e) => setLocalFrom(e.target.value)}
+                    className="text-[11px] font-bold text-gray-700 bg-transparent border-none focus:ring-0 p-0 w-24 outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 border-r border-gray-100">
+                  <Calendar size={13} className="text-gray-400" />
+                  <span className="text-[9px] font-bold text-gray-400 uppercase">To</span>
+                  <input 
+                    type="date" 
+                    value={localTo}
+                    onChange={(e) => setLocalTo(e.target.value)}
+                    className="text-[11px] font-bold text-gray-700 bg-transparent border-none focus:ring-0 p-0 w-24 outline-none"
+                  />
+                </div>
+                <button 
+                  onClick={() => onRefresh && onRefresh(localFrom, localTo)}
+                  className="p-1 px-2 text-blue-600 hover:bg-blue-50 rounded transition-colors group flex items-center gap-1"
+                  title="Update Report"
+                >
+                  <RotateCw size={14} className="group-active:rotate-180 transition-transform duration-500" />
+                  <span className="text-[10px] font-bold uppercase">Update</span>
+                </button>
+              </div>
+
+              {/* <button 
+                onClick={() => onDownloadCSV(localFrom, localTo)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-bold shadow-sm"
+              >
+                <Download size={18} />
+                Export CSV
+              </button> */}
+            </div>
+            <button 
+              onClick={onClose}
+              className="px-8 py-2 bg-gray-800 text-white rounded-lg hover:bg-black font-bold transition-all shadow-md active:scale-95 flex items-center gap-2"
+            >
+              <X size={18} />
+              Close Report
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile View Layout (Direct Export Popup) */}
+        <div className="lg:hidden flex flex-col w-full max-w-sm mx-auto bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-200">
+          <div className="bg-[#FFFF00] p-6 text-center">
+            <img src="/Rama_TMT_logo.png" alt="Rama Logo" className="h-12 w-auto mx-auto mb-4 object-contain" />
+            <h2 className="text-xl font-bold text-gray-900 uppercase leading-tight tracking-tighter">
+              Performance Report
+            </h2>
+            <p className="text-[10px] font-semibold text-gray-700 uppercase tracking-widest mt-1 opacity-70">
+              Export Options
+            </p>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <div className="space-y-4 text-center">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Employee</p>
+                <p className="text-lg font-bold text-gray-800 leading-tight">{staffName}</p>
+              </div>
+
+              {/* Date Selection Box (Mobile) */}
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-3">
+                <div className="flex items-center justify-between border-b border-blue-200/50 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-blue-400" />
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">From</span>
+                  </div>
+                  <input 
+                    type="date" 
+                    value={localFrom}
+                    onChange={(e) => setLocalFrom(e.target.value)}
+                    className="text-xs font-bold text-blue-700 bg-transparent border-none focus:ring-0 p-0 text-right outline-none"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-blue-400" />
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">To</span>
+                  </div>
+                  <input 
+                    type="date" 
+                    value={localTo}
+                    onChange={(e) => setLocalTo(e.target.value)}
+                    className="text-xs font-bold text-blue-700 bg-transparent border-none focus:ring-0 p-0 text-right outline-none"
+                  />
+                </div>
+                
+                <button 
+                  onClick={() => onRefresh && onRefresh(localFrom, localTo)}
+                  className="w-full flex items-center justify-center gap-2 py-2 mt-2 bg-blue-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-md"
+                >
+                  <RotateCw size={12} />
+                  Update Date Range
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <button 
+                onClick={() => onDownloadPDF(localFrom, localTo, staffData)}
+                className="flex items-center justify-center gap-3 px-6 py-4 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-bold shadow-lg active:scale-95 text-sm uppercase tracking-wider"
+              >
+                <FileText size={20} />
+                Download PDF
+              </button>
+              {/* <button 
+                onClick={onDownloadCSV}
+                className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all font-black shadow-lg active:scale-95 text-sm uppercase tracking-wider"
+              >
+                <Download size={20} />
+                Download CSV
+              </button> */}
+            </div>
+
+            <button 
+              onClick={onClose}
+              className="w-full py-3 text-gray-500 font-semibold hover:text-gray-800 transition-colors uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+            >
+              <X size={14} />
+              Cancel / Close
+            </button>
+          </div>
+
+          <div className="bg-gray-50 p-4 text-center border-t border-gray-100">
+            <p className="text-[10px] font-medium text-gray-400 uppercase">
+              Full interactive report available on desktop
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default EmployeePerformanceReportModal;

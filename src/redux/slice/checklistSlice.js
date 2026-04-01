@@ -12,9 +12,9 @@ import {
 // ============================================================
 export const checklistData = createAsyncThunk(
   "fetch/checklist",
-  async ({ page = 1, search = '' } = {}) => {
-    const { data, totalCount } = await fetchChechListDataSortByDate(page, search);
-    return { data, totalCount, page, search };
+  async ({ page = 1, search = '', status = 'all', frequency = 'all', name = 'all', division = 'all', departmentFilter = 'all' } = {}) => {
+    const response = await fetchChechListDataSortByDate(page, search, status, frequency, name, division, departmentFilter);
+    return { ...response, page, search, status, frequency, name, division, departmentFilter };
   }
 );
 
@@ -24,8 +24,8 @@ export const checklistData = createAsyncThunk(
 // ============================================================
 export const checklistHistoryData = createAsyncThunk(
   "fetch/history",
-  async (search = "") => {
-    const { data, totalCount, approvedCount } = await fetchChechListDataForHistory(search);
+  async ({ search = "", name = 'all', division = 'all', departmentFilter = 'all' } = {}) => {
+    const { data, totalCount, approvedCount } = await fetchChechListDataForHistory(search, name, division, departmentFilter);
     return { data, totalCount, approvedCount };
   }
 );

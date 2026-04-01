@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import { authFetch } from "../utils/authFetch";
+import React, { useEffect, useState, useMemo } from 'react';
 // import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw } from 'lucide-react';
 import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw, Eye, EyeOff, Upload, Image as ImageIcon } from 'lucide-react';
 import AdminLayout from '../components/layout/AdminLayout';
@@ -8,7 +9,8 @@ import { extendTaskApi } from '../redux/api/settingApi';
 import { uniqueDoerNameData } from '../redux/slice/assignTaskSlice';
 import { hasPageAccess, hasModifyAccess } from '../utils/permissionUtils';
 // import supabase from '../SupabaseClient';
-import { SYSTEM_PERMISSIONS, PAGE_PERMISSIONS, PAGE_PERMISSION_GROUPS, PAGE_SYSTEM_MAP } from '../constants/permissions';
+import { SYSTEM_PERMISSIONS, PAGE_PERMISSIONS, PAGE_PERMISSION_GROUPS, PAGE_SYSTEM_MAP, DOC_SYSTEMS, DOC_PAGES, DOC_PAGE_MAP } from '../constants/permissions';
+import { buildUnifiedPermissions, splitUnifiedPermissions, hasPermission } from '../utils/permissionAdapter';
 
 
 const Setting = () => {
@@ -88,79 +90,183 @@ const Setting = () => {
   const [currentMachineId, setCurrentMachineId] = useState(null);
   const [partInput, setPartInput] = useState('');
   
-  // Permission State
-  const [systemAccess, setSystemAccess] = useState([]);
-  const [pageAccess, setPageAccess] = useState([]);
+  // Permission State (Unified Model)
+  const [unifiedPermissions, setUnifiedPermissions] = useState({});
 
-  const togglePermission = (type, permission) => {
-    if (type === 'system') {
-      setSystemAccess(prev => {
-        const next = prev.includes(permission)
-          ? prev.filter(p => p !== permission)
-          : [...prev, permission];
-        
-        // If all system access is removed, clear page access too
-        if (next.length === 0) {
-          setPageAccess([]);
-        }
-        return next;
-      });
-    }
-    if (type === 'page_view') {
-      // Toggle view; removing view also removes modify
-      const viewKey = `${permission}_view`;
-      const modifyKey = `${permission}_modify`;
-      setPageAccess(prev =>
-        prev.includes(viewKey)
-          ? prev.filter(p => p !== viewKey && p !== modifyKey)
-          : [...prev, viewKey]
-      );
-    }
-    if (type === 'page_modify') {
-      // Selecting modify automatically implies view
-      const viewKey = `${permission}_view`;
-      const modifyKey = `${permission}_modify`;
-      setPageAccess(prev => {
-        if (prev.includes(modifyKey)) {
-          // Deselect modify (keep view)
-          return prev.filter(p => p !== modifyKey);
+  const normalizeKey = (key) => {
+    if (!key) return '';
+    return key.toLowerCase().replace(/[\/\s-]+/g, '_');
+  };
+
+  const togglePermission = (module, page, action) => {
+    const normalizedPage = normalizeKey(page);
+    setUnifiedPermissions(prev => {
+      const next = { ...prev };
+      
+      if (!next[module]) next[module] = {};
+      
+      const currentAction = next[module][normalizedPage];
+      let newAction = currentAction;
+      
+      if (action === 'view') {
+        if (currentAction === 'view' || currentAction === 'modify') {
+          newAction = null;
         } else {
-          // Select modify + ensure view is also present
-          const withView = prev.includes(viewKey) ? prev : [...prev, viewKey];
-          return [...withView, modifyKey];
+          newAction = 'view';
         }
-      });
-    }
+      } else if (action === 'modify') {
+        if (currentAction === 'modify') {
+          newAction = 'view';
+        } else {
+          newAction = 'modify';
+        }
+      }
+
+      if (newAction) {
+        next[module][normalizedPage] = newAction;
+      } else {
+        delete next[module][normalizedPage];
+      }
+
+      // Forward Cascading logic for specialized documentation pages
+      if (newAction) {
+        let parentKey = null;
+        let parentModule = module;
+
+        if (page.startsWith('Subscription/')) {
+          parentKey = 'subscription';
+          parentModule = 'subscription';
+        } else if (page.startsWith('Document/')) {
+          parentKey = 'documentation';
+          parentModule = 'documentation';
+        } else if (page.startsWith('Loan/')) {
+          parentKey = 'loan';
+          parentModule = 'loan';
+        } else if (page === 'Master') {
+          parentKey = 'master';
+          parentModule = 'master';
+        } else if (page === 'Settings') {
+          parentKey = 'settings';
+          parentModule = 'settings';
+        } else if (page === 'Resource Manager') {
+          parentKey = 'resource_manager';
+          parentModule = 'documentation';
+        }
+
+        // Apply cascading permission to parent if applicable
+        if (parentKey && (page !== parentKey || module !== parentModule)) {
+          const parentNormalized = normalizeKey(parentKey);
+          if (!next[parentModule]) next[parentModule] = {};
+          
+          const parentCurrentAction = next[parentModule][parentNormalized];
+          
+          // Ensure parent has at least the same level of access as the sub-page
+          if (newAction === 'modify' && parentCurrentAction !== 'modify') {
+            next[parentModule][parentNormalized] = 'modify';
+          } else if (newAction === 'view' && !parentCurrentAction) {
+            next[parentModule][parentNormalized] = 'view';
+          }
+        }
+      }
+
+      // Reverse Cascading logic (Uncheck parent OR Uncheck Modify -> Update all sub-pages)
+      const parentKeys = ['subscription', 'documentation', 'loan', 'master', 'settings', 'resource_manager'];
+      if (parentKeys.includes(page) && (!newAction || newAction === 'view')) {
+        const targetModuleMap = {
+          'subscription': 'subscription',
+          'documentation': 'documentation',
+          'loan': 'loan',
+          'master': 'master',
+          'settings': 'settings',
+          'resource_manager': 'documentation'
+        };
+
+        const targetModule = targetModuleMap[page];
+        if (targetModule && next[targetModule]) {
+          Object.keys(next[targetModule]).forEach(p => {
+            let belongsToParent = false;
+            // Map sub-pages to their corresponding parent keys for unchecking
+            if (page === 'subscription') belongsToParent = p.startsWith('subscription_');
+            else if (page === 'documentation') belongsToParent = (p.startsWith('document_') || p === 'dashboard' || p === 'resource_manager');
+            else if (page === 'loan') belongsToParent = p.startsWith('loan_');
+            else if (page === 'master') belongsToParent = (p === 'master');
+            else if (page === 'settings') belongsToParent = (p === 'settings');
+            else if (page === 'resource_manager') belongsToParent = (p === 'resource_manager');
+
+            if (belongsToParent) {
+              if (!newAction) {
+                // Parent is fully unchecked -> Uncheck sub-page
+                delete next[targetModule][p];
+              } else if (newAction === 'view' && next[targetModule][p] === 'modify') {
+                // Parent Modify unchecked -> Sub-page Modify unchecked (downgrade to View)
+                next[targetModule][p] = 'view';
+              }
+            }
+          });
+        }
+      }
+      
+      if (next[module] && Object.keys(next[module]).length === 0) {
+        delete next[module];
+      }
+      
+      return next;
+    });
+  };
+
+  const toggleSystemAccess = (system) => {
+    setUnifiedPermissions(prev => {
+      const next = { ...prev };
+      if (next[system]) {
+        delete next[system];
+      } else {
+        next[system] = { 'dashboard': 'view' };
+      }
+      return next;
+    });
+  };
+
+  // Derived checks for UI
+  const isSystemActive = (system) => !!unifiedPermissions[system];
+  const getPageAction = (module, page) => {
+    const normalizedPage = normalizeKey(page);
+    return unifiedPermissions[module]?.[normalizedPage] || null;
   };
 
   // Derived: does user have modify access to Settings (for gating UI buttons)
   const canModifySettings = hasModifyAccess('settings');
 
-  
-  
+
+
   const { userData, department, departmentsOnly, givenBy, machines, loading, error } = useSelector((state) => state.setting);
   const { doerName } = useSelector((state) => state.assignTask);
   // Get current logged-in user to check for super_admin role
   const { userData: currentUser } = useSelector((state) => state.login);
-  // Fallback to localStorage when Redux resets after page reload
-  const currentUserRole = (currentUser && !Array.isArray(currentUser))
-    ? currentUser.role
-    : localStorage.getItem('role');
-  const dispatch = useDispatch();
-  const canManageSettings = hasPageAccess('settings_admin');
+  
+  // Memoize currentUserRole and loginUserData to prevent infinite render loops
+  const currentUserRole = useMemo(() => {
+    return (currentUser && !Array.isArray(currentUser))
+      ? currentUser.role
+      : localStorage.getItem('role');
+  }, [currentUser]);
 
-  // Fallback to localStorage login data when Redux resets after page reload
-  const loginUserData = (currentUser && !Array.isArray(currentUser) && Object.keys(currentUser).length > 0)
-    ? currentUser
-    : {
-        user_name: localStorage.getItem('user-name'),
-        role: localStorage.getItem('role'),
-        email_id: localStorage.getItem('email_id'),
-        unit: localStorage.getItem('unit'),
-        division: localStorage.getItem('division'),
-        department: localStorage.getItem('department'),
-        user_access: localStorage.getItem('user_access')
-      };
+  const dispatch = useDispatch();
+  const canManageSettings = hasPageAccess('settings');
+
+  const loginUserData = useMemo(() => {
+    if (currentUser && !Array.isArray(currentUser) && Object.keys(currentUser).length > 0) {
+      return currentUser;
+    }
+    return {
+      user_name: localStorage.getItem('user-name'),
+      role: localStorage.getItem('role'),
+      email_id: localStorage.getItem('email_id'),
+      unit: localStorage.getItem('unit'),
+      division: localStorage.getItem('division'),
+      department: localStorage.getItem('department'),
+      user_access: localStorage.getItem('user_access')
+    };
+  }, [currentUser]);
 
   const loggedInUserId = Array.isArray(userData) ? userData.find(u => u.user_name === (loginUserData?.user_name || localStorage.getItem('user-name')))?.id : null;
 
@@ -175,17 +281,21 @@ const Setting = () => {
   // Populate user form if it's a regular user
   useEffect(() => {
     if (currentUserRole?.toLowerCase() === 'user' && loginUserData?.user_name && !isEditing) {
-      // Find the user data in the list to get all details (including password and number)
+      // Find the user data in the list to get all details
       const userFullData = Array.isArray(userData) ? userData.find(u => u.user_name === loginUserData.user_name) : null;
       
-      // If userData is still loading, we might only have basic info from localStorage
-      // But we wait until userFullData is found or userData has finished loading
       if (!userFullData && loading) return;
 
       const dataToUse = userFullData || loginUserData;
       
       const deptName = (dataToUse?.user_access || dataToUse?.department)?.split(',')[0]?.trim();
       const deptRecord = department?.find(d => d.department?.toLowerCase() === deptName?.toLowerCase());
+
+      // Set isEditing immediately to prevent subsequent effect runs in this render cycle
+      if (dataToUse.id) {
+        setIsEditing(true);
+        setCurrentUserId(dataToUse.id);
+      }
 
       setUserForm({
         username: dataToUse.user_name || '',
@@ -199,14 +309,7 @@ const Setting = () => {
         status: dataToUse.status || 'active'
       });
       
-      // Preserving existing permissions
-      setSystemAccess(dataToUse.system_access || []);
-      setPageAccess(dataToUse.page_access || []);
-      
-      if (dataToUse.id) {
-        setCurrentUserId(dataToUse.id);
-        setIsEditing(true); // Treat as editing mode for the update call
-      }
+      setUnifiedPermissions(buildUnifiedPermissions(dataToUse));
     }
   }, [loginUserData, currentUserRole, userData, department, loading, isEditing]);
 
@@ -228,7 +331,7 @@ const Setting = () => {
       }
 
       // Optional: Logic for syncing device logs if needed in future
-      // const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/logs/device-sync`);
+      // const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/logs/device-sync`);
       
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -356,7 +459,7 @@ const debugUserStatus = async () => {
       setCurrentLeaveUser(user);
       setShowLeavePopup(true);
       // Set today's date as default
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       setPopupLeaveStartDate(today);
       setPopupLeaveEndDate(today);
     } else {
@@ -412,7 +515,7 @@ const handleConfirmDelegation = async () => {
       const user = userData.find(u => u.id === userId);
       if (user && user.user_name) {
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/leave/transfer-tasks`, {
+          const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/leave/transfer-tasks`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -438,6 +541,28 @@ const handleConfirmDelegation = async () => {
     });
 
     await Promise.all(transferPromises);
+
+    // Update user records with leave dates
+    const updatePromises = selectedUsers.map(async (userId) => {
+      const user = userData.find(u => u.id === userId);
+      if (user) {
+        try {
+          await dispatch(updateUser({
+            id: user.id,
+            updatedUser: {
+              ...user,
+              leave_date: leaveStartDate,
+              leave_end_date: leaveEndDate,
+              remark: remark
+            }
+          })).unwrap();
+        } catch (error) {
+          console.error(`Error updating leave for user ${user.user_name}:`, error);
+        }
+      }
+    });
+
+    await Promise.all(updatePromises);
 
     // Close modal and reset form
     setShowDelegationModal(false);
@@ -480,7 +605,7 @@ const handleConfirmDelegation = async () => {
       setFetchError('');
 
       try {
-        const response = await fetch(
+        const response = await authFetch(
           `${import.meta.env.VITE_API_BASE_URL}/leave/user-tasks?username=${encodeURIComponent(currentLeaveUser.user_name)}&startDate=${popupLeaveStartDate}&endDate=${popupLeaveEndDate}&category=${popupLeaveCategory}`
         );
 
@@ -560,7 +685,7 @@ const handleConfirmDelegation = async () => {
       }));
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/leave/assign-individual-tasks`, {
+        const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/leave/assign-individual-tasks`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ assignments, category: popupLeaveCategory })
@@ -584,6 +709,23 @@ const handleConfirmDelegation = async () => {
         setTaskAssignments({});
         setSelectedUsers([]);
 
+        // Update user record with leave dates
+        if (currentLeaveUser) {
+          try {
+            await dispatch(updateUser({
+              id: currentLeaveUser.id,
+              updatedUser: {
+                ...currentLeaveUser,
+                leave_date: popupLeaveStartDate,
+                leave_end_date: popupLeaveEndDate,
+                remark: popupRemarks
+              }
+            })).unwrap();
+          } catch (error) {
+            console.error(`Error updating leave for user ${currentLeaveUser.user_name}:`, error);
+          }
+        }
+
         alert(`Successfully transferred ${result.tasksTransferred || 0} tasks with individual assignments!`);
         
         // Refresh data
@@ -606,7 +748,7 @@ const handleConfirmDelegation = async () => {
       setCurrentExtendUser(user);
       setShowExtendTaskPopup(true);
       // Set today's date as default
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       setExtendStartDate(today);
       setExtendEndDate(today);
     } else {
@@ -642,7 +784,7 @@ const handleConfirmDelegation = async () => {
       setExtendLoading(true);
 
       try {
-        const response = await fetch(
+        const response = await authFetch(
           `${import.meta.env.VITE_API_BASE_URL}/leave/user-tasks?username=${encodeURIComponent(currentExtendUser.user_name)}&startDate=${extendStartDate}&endDate=${extendEndDate}`
         );
 
@@ -841,14 +983,17 @@ const [userForm, setUserForm] = useState({
 const handleAddUser = async (e) => {
   e.preventDefault();
   const isSuperAdminRole = userForm.role === 'super_admin';
+  const { system_access, page_access, subscription_access_system } = splitUnifiedPermissions(unifiedPermissions);
+
   const newUser = {
     ...userForm,
-    user_access: isSuperAdminRole ? userForm.department : (systemAccess.length > 0 ? userForm.department : null),
+    user_access: isSuperAdminRole ? userForm.department : (Object.keys(unifiedPermissions).length > 0 ? userForm.department : null),
     department: userForm.department,
     unit: userForm.unit,
     division: userForm.division,
-    system_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? systemAccess : null),
-    page_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? (pageAccess.length > 0 ? pageAccess : null) : null)
+    system_access: isSuperAdminRole ? ["*"] : system_access,
+    page_access: isSuperAdminRole ? ["*"] : page_access,
+    subscription_access_system: isSuperAdminRole ? { systems: ["*"], pages: ["*"] } : subscription_access_system
   };
 
   try {
@@ -867,18 +1012,21 @@ const handleUpdateUser = async (e) => {
   
   const isSuperAdminRole = userForm.role === 'super_admin';
   // Prepare updated user data
+  const { system_access, page_access, subscription_access_system } = splitUnifiedPermissions(unifiedPermissions);
+
   const updatedUser = {
     user_name: userForm.username,
     email_id: userForm.email,
     number: userForm.phone,
     role: userForm.role,
     status: userForm.status,
-    user_access: isSuperAdminRole ? userForm.department : (systemAccess.length > 0 ? userForm.department : null),
+    user_access: isSuperAdminRole ? userForm.department : (Object.keys(unifiedPermissions).length > 0 ? userForm.department : null),
     department: userForm.department,
     unit: userForm.unit,
     division: userForm.division,
-    system_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? systemAccess : null),
-    page_access: isSuperAdminRole ? ["*"] : (systemAccess.length > 0 ? (pageAccess.length > 0 ? pageAccess : null) : null)
+    system_access: isSuperAdminRole ? ["*"] : system_access,
+    page_access: isSuperAdminRole ? ["*"] : page_access,
+    subscription_access_system: isSuperAdminRole ? { systems: ["*"], pages: ["*"] } : subscription_access_system
   };
 
 
@@ -1075,20 +1223,9 @@ const handleEditUser = (userId) => {
     status: user.status || 'active'
   });
   
-  // Load existing permissions
-  try {
-    const rawSystemAccess = user.system_access;
-    const system_access = Array.isArray(rawSystemAccess) && rawSystemAccess.length > 0 ? rawSystemAccess : [];
-    const rawPageAccess = user.page_access;
-    const page_access = Array.isArray(rawPageAccess) && rawPageAccess.length > 0 ? rawPageAccess : [];
-
-    setSystemAccess(system_access);
-    setPageAccess(page_access);
-  } catch (e) {
-    console.error("Error parsing user permissions:", e);
-    setSystemAccess([]);
-    setPageAccess([]);
-  }
+  // Load unified permissions
+  const unified = buildUnifiedPermissions(user);
+  setUnifiedPermissions(unified);
 
   setCurrentUserId(userId);
   setIsEditing(true);
@@ -1130,8 +1267,7 @@ const resetUserForm = () => {
     role: 'user',
     status: 'active'
   });
-  setSystemAccess([]);
-  setPageAccess([]);
+  setUnifiedPermissions({});
   setIsEditing(false);
 
   setCurrentUserId(null);
@@ -1297,7 +1433,7 @@ const resetUserForm = () => {
     formData.append('image', file);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/upload-part-image`, {
+      const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/settings/upload-part-image`, {
         method: 'POST',
         body: formData,
       });
@@ -1332,7 +1468,7 @@ const resetUserForm = () => {
     formData.append('image', file);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/settings/upload-part-image`, {
+      const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/settings/upload-part-image`, {
         method: 'POST',
         body: formData,
       });
@@ -1429,11 +1565,11 @@ const resetUserForm = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
             <div>
               {currentUserRole?.toLowerCase() === 'user' ? (
-                <h1 className="text-xl font-bold text-purple-700">User Details</h1>
+                <h1 className="text-xl font-bold text-purple-700">My Profile</h1>
               ) : (
                 <>
-                  <h1 className="text-lg font-bold text-gray-800">User Management System</h1>
-                  <p className="text-xs text-gray-500">Manage users, departments, and leave</p>
+                  <h1 className="text-lg font-bold text-gray-800">Global Settings Hub</h1>
+                  <p className="text-xs text-gray-500">Manage users, permissions, and system configurations across all modules</p>
                 </>
               )}
             </div>
@@ -1448,7 +1584,8 @@ const resetUserForm = () => {
                 <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
               </button>
               
-              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && canManageSettings && canModifySettings && currentUserRole?.toLowerCase() !== 'user' && (
+              {(activeTab === 'users' || activeTab === 'departments' || activeTab === 'machines') && 
+              (activeTab === 'users' ? currentUserRole?.toLowerCase() === 'super_admin' : (canManageSettings && canModifySettings)) && (
                 <>
                   <button
                     onClick={handleAddButtonClick}
@@ -1473,28 +1610,28 @@ const resetUserForm = () => {
           
           {/* Bottom Row: Tabs */}
           {currentUserRole?.toLowerCase() !== 'user' && (
-            <div className="flex border-b border-gray-200">
+            <div className="w-full max-w-full flex border-b border-gray-200 overflow-x-auto flex-nowrap scrollbar-hide custom-scrollbar-horizontal">
               <button
-                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex flex-col items-center gap-1 px-2 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-all flex-1 sm:flex-none min-w-[80px] sm:min-w-[100px] whitespace-nowrap ${
                   activeTab === 'users' 
                     ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
                 onClick={() => {
                   handleTabChange('users');
                   dispatch(userDetails());
                 }}
               >
-                <User size={18} />
-                Users
+                <User size={20} />
+                <span>Users</span>
               </button>
               {currentUserRole?.toLowerCase() !== 'user' && (
                 <>
                   <button
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`flex flex-col items-center gap-1 px-2 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-all flex-1 sm:flex-none min-w-[80px] sm:min-w-[100px] whitespace-nowrap ${
                       activeTab === 'departments' 
                         ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                     }`}
                     onClick={() => {
                       handleTabChange('departments');
@@ -1502,48 +1639,48 @@ const resetUserForm = () => {
                       dispatch(givenByDetails());
                     }}
                   >
-                    <Building size={18} />
-                    Departments
+                    <Building size={20} />
+                    <span>Departments</span>
                   </button>
                   <button
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`flex flex-col items-center gap-1 px-2 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-all flex-1 sm:flex-none min-w-[80px] sm:min-w-[100px] whitespace-nowrap ${
                       activeTab === 'leave' 
                         ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                     }`}
                     onClick={() => {
                       handleTabChange('leave');
                       dispatch(userDetails());
                     }}
                   >
-                    <Calendar size={18} />
-                    Leave
+                    <Calendar size={20} />
+                    <span>Leave</span>
                   </button>
                   <button
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`flex flex-col items-center gap-1 px-2 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-all flex-1 sm:flex-none min-w-[80px] sm:min-w-[100px] whitespace-nowrap ${
                       activeTab === 'extendTask' 
                         ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                     }`}
                     onClick={() => {
                       handleTabChange('extendTask');
                     }}
                   >
-                    <Calendar size={18} />
-                    Extend Task
+                    <Calendar size={20} />
+                    <span>Extend Task</span>
                   </button>
                   <button
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`flex flex-col items-center gap-1 px-2 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-all flex-1 sm:flex-none min-w-[80px] sm:min-w-[100px] whitespace-nowrap ${
                       activeTab === 'machines' 
                         ? 'border-purple-600 text-purple-600 bg-purple-50' 
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                     }`}
                     onClick={() => {
                       handleTabChange('machines');
                     }}
                   >
-                    <Settings size={18} />
-                    Machines
+                    <Settings size={20} />
+                    <span>Machines</span>
                   </button>
                 </>
               )}
@@ -1566,53 +1703,52 @@ const resetUserForm = () => {
         {/* Leave Management Tab */}
         {activeTab === 'leave' && (
           <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-medium text-purple-700">Leave Management</h2>
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+              <h2 className="text-lg font-bold text-purple-700">Leave Management</h2>
 
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 {/* Username Search Filter for Leave Tab */}
-                <div className="relative">
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                      <input
-                        type="text"
-                        list="leaveUsernameOptions"
-                        placeholder="Filter by username..."
-                        value={leaveUsernameFilter}
-                        onChange={(e) => setLeaveUsernameFilter(e.target.value)}
-                        className="w-48 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                      <datalist id="leaveUsernameOptions">
-                        {userData?.map(user => (
-                          <option key={user.id} value={user.user_name} />
-                        ))}
-                      </datalist>
+                <div className="relative flex-grow sm:flex-grow-0">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="text-gray-400" size={16} />
+                    </div>
+                    <input
+                      type="text"
+                      list="leaveUsernameOptions"
+                      placeholder="Filter by username..."
+                      value={leaveUsernameFilter}
+                      onChange={(e) => setLeaveUsernameFilter(e.target.value)}
+                      className="w-full sm:w-64 pl-10 pr-8 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm shadow-sm"
+                    />
+                    <datalist id="leaveUsernameOptions">
+                      {userData?.map(user => (
+                        <option key={user.id} value={user.user_name} />
+                      ))}
+                    </datalist>
 
-                      {/* Clear button for input */}
-                      {leaveUsernameFilter && (
+                    {/* Clear button for input */}
+                    {leaveUsernameFilter && (
+                      <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
                         <button
                           onClick={clearLeaveUsernameFilter}
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          className="text-gray-400 hover:text-gray-600 transition-colors"
                         >
                           <X size={16} />
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-
-                {/* Submit Button */}
-                {/* Submit Button */}
                 {/* Submit Button */}
                 {canManageSettings && (
-                <button
-                  onClick={handleSubmitLeave}
-                  className="rounded-md bg-green-600 py-2 px-4 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                >
-                  Submit Leave
-                </button>
+                  <button
+                    onClick={handleSubmitLeave}
+                    className="flex-shrink-0 rounded-md bg-green-600 py-2 px-4 text-white font-semibold hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all shadow-sm active:scale-95"
+                  >
+                    Submit Leave
+                  </button>
                 )}
               </div>
             </div>
@@ -1634,13 +1770,18 @@ const resetUserForm = () => {
             />
             <p className="text-sm font-medium text-gray-900">{user.user_name}</p>
           </div>
-          {canManageSettings && (
+          {canManageSettings && !['admin', 'div_admin'].includes(currentUserRole?.toLowerCase()) && (
             <button
               onClick={() => {
                 if(window.confirm(`Are you sure you want to clear leave for ${user.user_name}?`)) {
                   dispatch(updateUser({
                     id: user.id,
-                    updatedUser: { leave_date: null, leave_end_date: null, remark: null }
+                    updatedUser: { 
+                      ...user,
+                      leave_date: null, 
+                      leave_end_date: null, 
+                      remark: null 
+                    }
                   }));
                   // .then(() => {
                   //   setTimeout(() => window.location.reload(), 500);
@@ -1709,13 +1850,14 @@ const resetUserForm = () => {
             <div className="text-sm text-gray-900">{user.remark || 'No remarks'}</div>
           </td>
           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-            {canManageSettings && (
+            {canManageSettings && !['admin', 'div_admin'].includes(currentUserRole?.toLowerCase()) && (
               <button
                 onClick={() => {
                   if(window.confirm(`Are you sure you want to clear leave for ${user.user_name}?`)) {
                      dispatch(updateUser({
                       id: user.id,
                       updatedUser: {
+                        ...user,
                         leave_date: null,
                         leave_end_date: null,
                         remark: null
@@ -1753,7 +1895,9 @@ const resetUserForm = () => {
         <div className="flex items-center gap-2">
           {/* Input with datalist for autocomplete */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="text-gray-400" size={16} />
+            </div>
             <input
               type="text"
               list="usernameOptions"
@@ -1770,12 +1914,14 @@ const resetUserForm = () => {
 
             {/* Clear button for input */}
             {usernameFilter && (
-              <button
-                onClick={clearUsernameFilter}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X size={16} />
-              </button>
+              <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+                <button
+                  onClick={clearUsernameFilter}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             )}
           </div>
 
@@ -1958,12 +2104,12 @@ const resetUserForm = () => {
                   </span>
                 </div>
                 <div className="flex space-x-2">
-                  {(canManageSettings || user?.id === loggedInUserId) && (
+                  {((user?.id === loggedInUserId) || (canManageSettings && !['admin', 'div_admin'].includes(currentUserRole?.toLowerCase()))) && (
                     <>
                       <button onClick={() => handleEditUser(user?.id)} className="text-blue-600" title="Edit">
                         <Edit size={16} />
                       </button>
-                      {canManageSettings && user?.id !== loggedInUserId && (
+                      {canManageSettings && user?.id !== loggedInUserId && !['admin', 'div_admin'].includes(currentUserRole?.toLowerCase()) && (
                         <button onClick={() => handleDeleteUser(user?.id)} className="text-red-600" title="Delete">
                           <Trash2 size={16} />
                         </button>
@@ -2137,7 +2283,7 @@ const resetUserForm = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {(canManageSettings || user?.id === loggedInUserId) && (
+                  {((user?.id === loggedInUserId) || (canManageSettings && !['admin', 'div_admin'].includes(currentUserRole?.toLowerCase()))) && (
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleEditUser(user?.id)}
@@ -2146,7 +2292,7 @@ const resetUserForm = () => {
                       >
                         <Edit size={18} />
                       </button>
-                      {canManageSettings && user?.id !== loggedInUserId && (
+                      {canManageSettings && user?.id !== loggedInUserId && !['admin', 'div_admin'].includes(currentUserRole?.toLowerCase()) && (
                         <button
                           onClick={() => handleDeleteUser(user?.id)}
                           className="text-red-600 hover:text-red-900"
@@ -2420,7 +2566,9 @@ const resetUserForm = () => {
                 <div className="relative">
                   <div className="flex items-center gap-2">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="text-gray-400" size={16} />
+                      </div>
                       <input
                         type="text"
                         list="leaveUsernameOptions"
@@ -2436,12 +2584,14 @@ const resetUserForm = () => {
                       </datalist>
 
                       {leaveUsernameFilter && (
-                        <button
-                          onClick={clearLeaveUsernameFilter}
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          <X size={16} />
-                        </button>
+                        <div className="absolute inset-y-0 right-0 pr-2 flex items-center">
+                          <button
+                            onClick={clearLeaveUsernameFilter}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2617,13 +2767,13 @@ const resetUserForm = () => {
         {/* Machine Modal */}
         {showMachineModal && (
           <div className="fixed z-10 inset-0 overflow-y-auto">
-            <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
               <div className="fixed inset-0 transition-opacity" aria-hidden="true">
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              <div className={`inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle ${isEditingMachine ? 'sm:max-w-md' : 'sm:max-w-2xl'} sm:w-full sm:p-6`}>
-                <div>
+              <div className={`inline-block align-middle bg-white rounded-lg px-4 pt-5 pb-4 text-left shadow-xl transform transition-all sm:my-8 sm:align-middle ${isEditingMachine ? 'sm:max-w-md' : 'sm:max-w-2xl'} sm:w-full sm:p-6`}>
+                <div className="max-h-[80vh] overflow-y-auto pr-2">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
                       {isEditingMachine ? 'Edit Machine' : 'Add New Machine'}
@@ -3026,7 +3176,7 @@ const resetUserForm = () => {
                                 value={newStartDates[task.task_id] || ''}
                                 onChange={(e) => setNewStartDates(prev => ({ ...prev, [task.task_id]: e.target.value }))}
                                 className="block w-full border border-gray-300 rounded-md shadow-sm py-1 px-2 text-xs focus:ring-purple-500 focus:border-purple-500"
-                                min={new Date().toISOString().split('T')[0]}
+                                min={new Date().toLocaleDateString('en-CA')}
                               />
                             </td>
                             <td className="px-4 py-2 whitespace-nowrap text-right">
@@ -3057,7 +3207,7 @@ const resetUserForm = () => {
                 <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
               </div>
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
+              <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl sm:w-full sm:p-6">
                 <div>
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -3272,85 +3422,149 @@ const resetUserForm = () => {
                             <p className="text-xs text-gray-500 italic mb-4">
                               If no manual permissions are selected, role-based defaults apply automatically.
                             </p>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                              {/* System Access Section */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                              {/* System Access Column */}
                               <div className="space-y-3">
                                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                   System Access
                                 </label>
                                 <div className="space-y-2 bg-gray-50 p-3 rounded-md border border-gray-200">
-                                  {SYSTEM_PERMISSIONS.map(permission => (
-                                    <label key={permission} className="flex items-center gap-2 cursor-pointer group">
+                                  {SYSTEM_PERMISSIONS.filter(system => {
+                                    if (['subscription', 'loan', 'master'].includes(system)) return false;
+                                    if (userForm.role === 'user') {
+                                      return !['documentation', 'assets'].includes(system);
+                                    }
+                                    return true;
+                                  }).map(system => (
+                                    <label key={system} className="flex items-center gap-2 cursor-pointer group">
                                       <input
                                         type="checkbox"
-                                        checked={systemAccess.includes(permission)}
-                                        onChange={() => togglePermission('system', permission)}
-                                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                                        checked={isSystemActive(system)}
+                                        onChange={() => toggleSystemAccess(system)}
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
                                       />
-                                      <span className="text-sm text-gray-700 group-hover:text-purple-700 transition-colors">
-                                        {permission.charAt(0).toUpperCase() + permission.slice(1).replace('_', ' ')}
+                                      <span className="text-sm text-gray-700 group-hover:text-indigo-700 transition-colors">
+                                        {system.charAt(0).toUpperCase() + system.slice(1).replace('_', ' ')}
                                       </span>
                                     </label>
                                   ))}
                                 </div>
                               </div>
 
-                              {/* Page Access Section — View / Modify per page */}
-                              <div className="space-y-3">
+                              {/* Page Access & Actions Column (Combined) */}
+                              <div className="sm:col-span-2 space-y-3">
                                 <div className="flex items-center justify-between">
                                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                    Page Access
+                                    Page Permissions (View / Modify)
                                   </label>
                                   <div className="flex gap-4 text-xs font-semibold text-gray-400 uppercase mr-1">
                                     <span className="w-12 text-center">View</span>
                                     <span className="w-14 text-center">Modify</span>
                                   </div>
                                 </div>
-                                <div className="space-y-1 bg-gray-50 p-3 rounded-md border border-gray-200">
+                                <div className="space-y-1 bg-gray-50 p-3 rounded-md border border-gray-200 overflow-y-auto max-h-96 custom-scrollbar">
+                                  {/* Render Standard Pages */}
                                   {PAGE_PERMISSION_GROUPS.filter(group => {
+                                    if (userForm.role === 'user') {
+                                      if (['documentation', 'subscription', 'loan', 'master', 'asset_dashboard', 'all_products'].includes(group.key)) return false;
+                                    }
                                     const allowedSystems = PAGE_SYSTEM_MAP[group.key] || [];
-                                    // If no system access is selected, show nothing to encourage selection
-                                    return systemAccess.some(sys => allowedSystems.includes(sys));
+                                    return allowedSystems.some(sys => {
+                                      if (isSystemActive('documentation') && ['documentation', 'subscription', 'loan', 'master'].includes(sys)) return true;
+                                      return isSystemActive(sys);
+                                    });
                                   }).map(({ key, label }) => {
-                                    const viewKey = `${key}_view`;
-                                    const modifyKey = `${key}_modify`;
-                                    const hasView = pageAccess.includes(viewKey) || pageAccess.includes(modifyKey);
-                                    const hasModify = pageAccess.includes(modifyKey);
+                                    const action = getPageAction(PAGE_SYSTEM_MAP[key]?.[0] || 'checklist', key);
+                                    const hasView = action === 'view' || action === 'modify';
+                                    const hasModify = action === 'modify';
+                                    const module = PAGE_SYSTEM_MAP[key]?.[0] || 'checklist';
+
                                     return (
-                                      <div key={key} className="flex items-center justify-between py-1 group">
-                                        <span className="text-sm text-gray-700 flex-1 group-hover:text-purple-700 transition-colors">
-                                          {label}
-                                        </span>
+                                      <div key={key} className="flex items-center justify-between py-1 group border-b border-gray-100 last:border-0">
+                                        <div className="flex flex-col">
+                                          <span className="text-sm text-gray-700 group-hover:text-indigo-700 transition-colors font-medium">
+                                            {label}
+                                          </span>
+                                          <span className="text-[10px] text-gray-400 uppercase">{module}</span>
+                                        </div>
                                         <div className="flex gap-4 mr-1">
-                                          {/* View checkbox */}
                                           <div className="w-12 flex justify-center">
                                             <input
                                               type="checkbox"
                                               checked={hasView}
-                                              onChange={() => togglePermission('page_view', key)}
+                                              onChange={() => togglePermission(module, key, 'view')}
                                               className="rounded border-gray-300 text-blue-500 focus:ring-blue-400 h-4 w-4 cursor-pointer"
-                                              title="View only"
                                             />
                                           </div>
-                                          {/* Modify checkbox */}
                                           <div className="w-14 flex justify-center">
                                             <input
                                               type="checkbox"
                                               checked={hasModify}
-                                              onChange={() => togglePermission('page_modify', key)}
+                                              onChange={() => togglePermission(module, key, 'modify')}
                                               className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4 cursor-pointer"
-                                              title="Full modify access (implies view)"
                                             />
                                           </div>
                                         </div>
                                       </div>
                                     );
                                   })}
+
+                                  {/* Render Documentation Specific Sub-pages (Cascade) */}
+                                  {userForm.role !== 'user' && isSystemActive('documentation') && (
+                                    <div className="mt-4 pt-4 border-t border-gray-200">
+                                      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2">
+                                        Specialized Documentation Pages
+                                      </label>
+                                      {DOC_PAGES.map(page => {
+                                        // Determine module (crude check)
+                                        let module = 'documentation';
+                                        if (page.startsWith('Subscription/')) module = 'subscription';
+                                        if (page.startsWith('Loan/')) module = 'loan';
+                                        if (page === 'Master') module = 'master';
+                                        if (page === 'Settings') module = 'settings';
+                                        
+                                        if (module === 'settings') {
+                                          if (!isSystemActive('settings')) return null;
+                                        } else {
+                                          const parentAction = getPageAction(module, module);
+                                          if (!parentAction) return null;
+                                        }
+
+                                        const action = getPageAction(module, page);
+                                        const hasView = action === 'view' || action === 'modify';
+                                        const hasModify = action === 'modify';
+
+                                        return (
+                                          <div key={page} className="flex items-center justify-between py-1 group">
+                                            <span className="text-sm text-gray-600 group-hover:text-indigo-700 transition-colors italic">
+                                              {page}
+                                            </span>
+                                            <div className="flex gap-4 mr-1">
+                                              <div className="w-12 flex justify-center">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={hasView}
+                                                  onChange={() => togglePermission(module, page, 'view')}
+                                                  className="rounded border-gray-300 text-blue-400 focus:ring-blue-300 h-4 w-4 cursor-pointer"
+                                                />
+                                              </div>
+                                              <div className="w-14 flex justify-center">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={hasModify}
+                                                  onChange={() => togglePermission(module, page, 'modify')}
+                                                  className="rounded border-gray-300 text-purple-400 focus:ring-purple-300 h-4 w-4 cursor-pointer"
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
                                 <p className="text-xs text-gray-400">
-                                  <span className="text-blue-500 font-semibold">View</span> = read-only &nbsp;|&nbsp;
-                                  <span className="text-purple-600 font-semibold">Modify</span> = full access (implies view)
+                                  Select a system on the left to manage its pages. <span className="text-blue-500 font-semibold">View</span> only vs <span className="text-purple-600 font-semibold">Modify</span> access.
                                 </p>
                               </div>
                             </div>
@@ -4117,7 +4331,7 @@ const resetUserForm = () => {
                         method: "DELETE"
                       };
 
-                      const response = await fetch(endpoint, options);
+                      const response = await authFetch(endpoint, options);
                       const result = await response.json();
                       
                       if (response.ok && result.success) {

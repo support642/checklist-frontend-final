@@ -1,3 +1,4 @@
+import { authFetch } from "../utils/authFetch";
 "use client"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { CheckCircle2, Trash2, X } from "lucide-react"
@@ -18,7 +19,7 @@ const CONFIG = {
 
 
 
-function DelegationPage({ searchTerm, nameFilter, freqFilter, userRole, userDept, userDiv, userName }) {
+function DelegationPage({ searchTerm, nameFilter, deptFilter, divFilter, freqFilter, userRole, userDept, userDiv, userName }) {
  const [successMessage, setSuccessMessage] = useState("")
   const [error, setError] = useState(null)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -28,8 +29,8 @@ function DelegationPage({ searchTerm, nameFilter, freqFilter, userRole, userDept
   const { delegationTasks, loading, delegationTotal } = useSelector((state) => state.quickTask)
   const dispatch = useDispatch()
 useEffect(()=>{
-  dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))
-},[dispatch, nameFilter, freqFilter])
+  dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))
+},[dispatch, nameFilter, deptFilter, divFilter, freqFilter])
 
  // Handle checkbox selection
   const handleCheckboxChange = (taskId) => {
@@ -61,7 +62,7 @@ useEffect(()=>{
       setSelectedTasks([])
       setSuccessMessage("Tasks deleted successfully")
       // Refresh the task list
-      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))
+      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -95,7 +96,7 @@ useEffect(()=>{
   //   //  setLoading(true)
   //     setError(null)
 
-  //     const tasksRes = await fetch(`${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SOURCE_SHEET_NAME}&action=fetch`)
+  //     const tasksRes = await authFetch(`${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SOURCE_SHEET_NAME}&action=fetch`)
 
   //     if (!tasksRes.ok) throw new Error("Failed to fetch tasks")
       
@@ -130,32 +131,59 @@ useEffect(()=>{
   useEffect(() => {
     if (isInitialized) {
      // fetchData()
-     dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))
+     dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))
     }
-  }, [dispatch, isInitialized, nameFilter, freqFilter])
+  }, [dispatch, isInitialized, nameFilter, deptFilter, divFilter, freqFilter])
 
   const filteredTasks = useMemo(() => {
     let filtered = [...delegationTasks]; // Create a copy to sort
     
-    filtered = filtered.filter(task =>
-      task.task_description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // 1. Role-based restrictions (Enforce organizational boundaries)
+    const role = userRole?.toLowerCase()?.trim();
+    const targetDept = userDept?.toLowerCase()?.trim();
+    const targetDiv = userDiv?.toLowerCase()?.trim();
+    const targetName = userName?.toLowerCase()?.trim();
+
+    filtered = filtered.filter(task => {
+      if (role === 'admin') {
+        // Admin: Only show tasks within their Division AND Department
+        return task.division?.toLowerCase()?.trim() === targetDiv && 
+               (task.department || task.user_access)?.toLowerCase()?.trim() === targetDept;
+      } else if (role === 'div_admin') {
+        // Division Admin: Only show tasks within their Division
+        return task.division?.toLowerCase()?.trim() === targetDiv;
+      } else if (role === 'user') {
+        // User: Only show tasks assigned to them
+        return task.name?.toLowerCase()?.trim() === targetName;
+      }
+      return true; // super_admin sees all
+    });
+
+    // 2. Applied Filters (Search, Name, Dept, etc.)
+    if (searchTerm) {
+      filtered = filtered.filter(task =>
+        task.task_description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
 
     if (nameFilter) {
       filtered = filtered.filter(task => task.name === nameFilter)
+    }
+
+    if (deptFilter) {
+      filtered = filtered.filter(task => (task.department || task.user_access) === deptFilter)
+    }
+
+    if (divFilter) {
+      filtered = filtered.filter(task => task.division === divFilter)
     }
     
     if (freqFilter) {
       filtered = filtered.filter(task => task.frequency === freqFilter)
     }
 
-    // User role filtering - show only their own tasks
-    if (userRole?.toLowerCase() === 'user' && userName) {
-      filtered = filtered.filter(task => task.name?.toLowerCase()?.trim() === userName.toLowerCase().trim());
-    }
-
     return filtered
-  }, [delegationTasks, searchTerm, nameFilter, freqFilter, userRole, userName])
+  }, [delegationTasks, searchTerm, nameFilter, deptFilter, divFilter, freqFilter, userRole, userName, userDept, userDiv])
 
   
 
@@ -179,7 +207,7 @@ useEffect(()=>{
         <div className="mt-4 bg-red-50 p-4 rounded-md text-red-800 text-center">
           {error}{" "}
           <button 
-            onClick={() => dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, freqFilter: freqFilter, append: false }))}
+            onClick={() => dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))}
             className="underline ml-2 hover:text-red-600"
           >
             Try again

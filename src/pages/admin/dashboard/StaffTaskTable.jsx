@@ -7,6 +7,8 @@ import { fetchStaffTasksDataApi, getStaffTasksCountApi, getTotalUsersCountApi, f
 import Papa from "papaparse"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
+import EmployeePerformanceReportModal from "../../../components/modals/EmployeePerformanceReportModal"
+import { hasSystemAccess } from "../../../utils/permissionUtils"
 
 export default function StaffTasksTable({
   dashboardType,
@@ -27,6 +29,7 @@ export default function StaffTasksTable({
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedStaffName, setSelectedStaffName] = useState("")
+  const [selectedStaffData, setSelectedStaffData] = useState(null)
   const [staffTaskDetails, setStaffTaskDetails] = useState([])
   const [isModalLoading, setIsModalLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -35,15 +38,54 @@ export default function StaffTasksTable({
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [reportRange, setReportRange] = useState({
     from: startDate || "",
-    to: endDate || new Date().toISOString().split('T')[0]
+    to: endDate || new Date().toLocaleDateString('en-CA')
   })
+  const [modalRange, setModalRange] = useState({ 
+    from: startDate || "", 
+    to: endDate || new Date().toLocaleDateString('en-CA') 
+  })
+  
+  // Dashboard Pagination & Search State
+  const [dashboardPage, setDashboardPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const dashboardPageSize = 20;
+
+  const dashboardTopRef = useRef(null);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const isFirstMount = useRef(true);
+
+  // Scroll to top when page changes (skip initial mount)
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    if (dashboardTopRef.current) {
+      dashboardTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [dashboardPage]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setDashboardPage(1);
+  }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate, startDate, endDate, debouncedSearch]);
+
+  // Module permission flags
+  const hasMaintenanceAccess = hasSystemAccess('maintenance');
 
   // Sync report range with props
   useEffect(() => {
     if (startDate || endDate) {
       setReportRange({
         from: startDate || "",
-        to: endDate || new Date().toISOString().split('T')[0]
+        to: endDate || new Date().toLocaleDateString('en-CA')
       });
     }
   }, [startDate, endDate]);
@@ -100,105 +142,519 @@ export default function StaffTasksTable({
     setTotalStaffCount(0)
   }, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate, startDate, endDate])
 
-  const handleOpenModal = useCallback(async (staffName) => {
-    setSelectedStaffName(staffName)
-    setIsModalOpen(true)
-    setIsModalLoading(true)
-    setStaffTaskDetails([])
-    setCurrentPage(1)
+  const handleOpenModal = useCallback(async (staffOrName, customFrom = null, customTo = null) => {
+    const staffName = typeof staffOrName === 'string' ? staffOrName : staffOrName.name;
+    const staffData = typeof staffOrName === 'string' ? null : staffOrName;
+
+    setSelectedStaffName(staffName);
+    if (staffData) {
+      setSelectedStaffData(staffData);
+    } else {
+      // If we only have a name (e.g. from refresh), try to find it in current list
+      const found = staffMembers.find(s => s.name === staffName);
+      if (found) setSelectedStaffData(found);
+    }
+
+    setIsModalOpen(true);
+    setIsModalLoading(true);
+    setStaffTaskDetails([]);
+    
+    // Use dashboard defaults unless custom dates are provided
+    const fromDate = customFrom || startDate;
+    const toDate = customTo || endDate;
+    
+    // Update local modal range state for tracking
+    setModalRange({ from: fromDate, to: toDate });
 
     try {
-      const details = await fetchStaffDetailsApi(
-        dashboardType,
-        staffName,
-        selectedMonthYear,
-        tillDate,
-        startDate,
-        endDate
-      )
-      setStaffTaskDetails(details || [])
-    } catch (error) {
-      console.error("Error fetching staff details:", error)
-    } finally {
-      setIsModalLoading(false)
-    }
-  }, [dashboardType, selectedMonthYear, tillDate])
+      // Fetch Checklist, Delegation, and conditionally Maintenance tasks for the report
+      const fetchPromises = [
+        fetchStaffDetailsApi('checklist', staffName, selectedMonthYear, tillDate, fromDate, toDate),
+        fetchStaffDetailsApi('delegation', staffName, selectedMonthYear, tillDate, fromDate, toDate),
+      ];
+      if (hasMaintenanceAccess) {
+        fetchPromises.push(fetchStaffDetailsApi('maintenance', staffName, selectedMonthYear, tillDate, fromDate, toDate));
+      }
+      const [checklistDetails, delegationDetails, maintenanceDetails] = await Promise.all(fetchPromises);
 
-  const handleDownloadCSV = () => {
+      // Safety check: Ensure responses are arrays before mapping
+      const combined = [
+        ...(Array.isArray(checklistDetails) ? checklistDetails : []).map(t => ({ ...t, type: 'checklist' })),
+        ...(Array.isArray(delegationDetails) ? delegationDetails : []).map(t => ({ ...t, type: 'delegation' })),
+        ...(hasMaintenanceAccess && Array.isArray(maintenanceDetails) ? maintenanceDetails : []).map(t => ({ ...t, type: 'maintenance' }))
+      ];
+
+      setStaffTaskDetails(combined);
+    } catch (error) {
+      console.error("Error fetching staff details:", error);
+      setStaffTaskDetails([]);
+    } finally {
+      setIsModalLoading(false);
+    }
+  }, [dashboardType, selectedMonthYear, tillDate, startDate, endDate, hasMaintenanceAccess, staffMembers]);
+  
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr || dateStr === "N/A" || dateStr === "Range") return dateStr;
+    try {
+      // Expected input: yyyy-mm-dd
+      const parts = dateStr.includes('T') ? dateStr.split('T')[0].split('-') : dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      const [year, month, day] = parts;
+      // Output: mm/dd/yyyy
+      return `${month}/${day}/${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const handleDownloadCSV = (customFrom = null, customTo = null, customStaffInfo = null) => {
     if (!staffTaskDetails.length) return;
     
-    const data = staffTaskDetails.map((task, idx) => ({
-      "Seq No": idx + 1,
-      "Status": task.status || 'Pending',
-      "Given By": task.given_by || '—',
-      "Task Description": task.task_description,
-      "Division": task.division || '—',
-      "Department": task.department || '—',
-      "Name": task.name,
-      "Start Date": task.start_date,
-      "Submission Date": task.submission_date || '—'
-    }));
+    const defaultStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA');
+    
+    // Determine the reporting range
+    const queryFrom = (typeof customFrom === 'string') ? customFrom : (modalRange.from || startDate || defaultStart);
+    const queryTo = (typeof customTo === 'string') ? customTo : (modalRange.to || endDate || new Date().toLocaleDateString('en-CA'));
 
-    const csv = Papa.unparse(data);
+    const fromDateVal = queryFrom;
+    const toDateVal = queryTo;
+    
+    // Categorize data (matches PDF logic)
+    const getUniqueTasksCSV = (taskList) => {
+      const seen = new Set();
+      return taskList.filter(t => {
+        const key = `${t.task_description}-${t.frequency || ''}`;
+        if (!t.task_description || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
+    const targetDateForFiltering = tillDate || new Date().toLocaleDateString('en-CA');
+    const matchesTargetDate = (t) => 
+      t.start_date === targetDateForFiltering || 
+      (t.task_start_date && t.task_start_date.startsWith(targetDateForFiltering));
+
+    const rawDaily = staffTaskDetails.filter(t => t.type === 'checklist' && t.frequency?.toLowerCase() === 'daily');
+    const dailyTasks = getUniqueTasksCSV(rawDaily);
+
+    const delegationTasks = staffTaskDetails.filter(t => t.type === 'delegation');
+
+    const rawWeekly = staffTaskDetails.filter(t => t.type === 'checklist' && t.frequency?.toLowerCase() === 'weekly');
+    const weeklyTasks = getUniqueTasksCSV(rawWeekly);
+
+    const rawMonthly = staffTaskDetails.filter(t => t.type === 'checklist' && t.frequency?.toLowerCase() === 'monthly');
+    const monthlyTasks = getUniqueTasksCSV(rawMonthly);
+
+    const maintenanceTasks = hasMaintenanceAccess 
+      ? staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+      : [];
+
+    const maxRows = hasMaintenanceAccess
+      ? Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, maintenanceTasks.length, 1)
+      : Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, 1);
+
+    // Stats Calculation
+    const calculateStats = (taskList) => {
+      const total = taskList.length;
+      const completed = taskList.filter(t => t.is_completed || t.status?.toLowerCase() === 'yes' || t.status === 'Done').length;
+      const onTime = taskList.filter(t => t.is_on_time || t.color_code_for === '1' || t.color_code_for === 1).length;
+      const workDoneScore = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const onTimeScore = completed > 0 ? Math.round((onTime / completed) * 100) : 0;
+      return { total, completed, score: workDoneScore, onTime: onTimeScore };
+    };
+
+    const checklistStats = calculateStats(staffTaskDetails.filter(t => t.type === 'checklist'));
+    const delegationStats = calculateStats(delegationTasks);
+    const maintenanceStats = calculateStats(staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t)));
+
+    const staffInfo = staffMembers.find(s => s.name === selectedStaffName) || {};
+
+    // Build CSV Content as 2D array
+    const csvData = [];
+    
+    // Header
+    csvData.push(["RAMA UDYOG PVT LTD."]);
+    csvData.push(["EMPLOYEE PERFORMANCE REPORT"]);
+    csvData.push([]);
+
+    // Profile Info
+    csvData.push(["Name", selectedStaffName, "Division", staffInfo.division || "Admin"]);
+    csvData.push(["Department", staffInfo.department || "HR", "Period", selectedMonthYear || "Range"]);
+    csvData.push(["From", formatDateForDisplay(fromDateVal), "To", formatDateForDisplay(toDateVal)]);
+    csvData.push([]);
+
+    // Performance Summary
+    csvData.push(["PERFORMANCE SUMMARY"]);
+    csvData.push(["Category", "Assigned", "Completed", "Score (%)", "On-Time (%)"]);
+    csvData.push(["Checklist", checklistStats.total, checklistStats.completed, checklistStats.score, checklistStats.onTime]);
+    csvData.push(["Delegation", delegationStats.total, delegationStats.completed, delegationStats.score, delegationStats.onTime]);
+    if (hasMaintenanceAccess) {
+      csvData.push(["Maintenance", maintenanceStats.total, maintenanceStats.completed, maintenanceStats.score, maintenanceStats.onTime]);
+    }
+    csvData.push([]);
+
+    // Task Table Header
+    const tableHeader = ["Seq No", "Daily Task Description", "Delegation task", "Weekly task", "Monthly task"];
+    if (hasMaintenanceAccess) tableHeader.push("Maintenance task");
+    csvData.push(tableHeader);
+
+    // Task Rows
+    for (let i = 0; i < maxRows; i++) {
+      const row = [
+        i + 1,
+        dailyTasks[i]?.task_description || "",
+        delegationTasks[i]?.task_description || "",
+        weeklyTasks[i]?.task_description || "",
+        monthlyTasks[i]?.task_description || "",
+      ];
+      if (hasMaintenanceAccess) {
+        row.push(maintenanceTasks[i]?.task_description || (i === 0 && maintenanceTasks.length === 0 ? "Nill" : ""));
+      }
+      csvData.push(row);
+    }
+
+    // Totals Row
+    const totalsRow = [
+      "TOTAL",
+      dailyTasks.length,
+      delegationTasks.length,
+      weeklyTasks.length,
+      monthlyTasks.length
+    ];
+    if (hasMaintenanceAccess) totalsRow.push(maintenanceTasks.length);
+    csvData.push(totalsRow);
+
+    // Generate CSV
+    const csv = Papa.unparse(csvData);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `${selectedStaffName}_Work_Report_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute("download", `${selectedStaffName}_Performance_Report_${new Date().toLocaleDateString('en-CA')}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async (customFrom = null, customTo = null, customStaffInfo = null) => {
     if (!staffTaskDetails.length) return;
     
-    const doc = new jsPDF('l', 'mm', 'a4'); 
+    // Determine the reporting range - matching modal priority logic
+    const defaultStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA');
     
-    doc.setFontSize(18);
-    doc.setTextColor(124, 58, 237);
-    doc.text(`${selectedStaffName}'s Work Report`, 14, 15);
+    // Ensure we don't accidentally treat event objects as date strings
+    const pdfFromDate = formatDateForDisplay((typeof customFrom === 'string') ? customFrom : (modalRange.from || startDate || defaultStart));
+    const pdfToDate = formatDateForDisplay((typeof customTo === 'string') ? customTo : (modalRange.to || endDate || new Date().toLocaleDateString('en-CA')));
+
+    const doc = new jsPDF('p', 'mm', 'a4'); // Portrait A4: 210mm x 297mm
+    const pageW = 210;
+    const marginX = 10;
+    const usableW = pageW - 2 * marginX; // 190mm
+    const centerX = pageW / 2; // 105mm
     
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Type: ${dashboardType === 'checklist' ? 'Checklist' : 'Delegation'}`, 14, 22);
-    doc.text(`Period: ${selectedMonthYear || 'N/A'} (Till: ${tillDate})`, 14, 27);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 32);
+    // Helper to get unique tasks by description + frequency (matches modal logic)
+    const getUniqueTasksPDF = (taskList) => {
+      const seen = new Set();
+      return taskList.filter(t => {
+        const key = `${t.task_description}-${t.frequency || ''}`;
+        if (!t.task_description || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
+    // Categorize data for the table - Filtered by current date
+    const targetDateForFiltering = tillDate || new Date().toLocaleDateString('en-CA');
+    const matchesTargetDate = (t) => 
+      t.start_date === targetDateForFiltering || 
+      (t.task_start_date && t.task_start_date.startsWith(targetDateForFiltering));
+
+    // Apply unique task filtering to match the modal display
+    const rawDaily = staffTaskDetails.filter(t => 
+      t.type === 'checklist' && 
+      t.frequency?.toLowerCase() === 'daily'
+    );
+    const dailyTasks = getUniqueTasksPDF(rawDaily);
+
+    const delegationTasks = staffTaskDetails.filter(t => t.type === 'delegation');
+
+    const rawWeekly = staffTaskDetails.filter(t => 
+      t.type === 'checklist' && 
+      t.frequency?.toLowerCase() === 'weekly'
+    );
+    const weeklyTasks = getUniqueTasksPDF(rawWeekly);
+
+    const rawMonthly = staffTaskDetails.filter(t => 
+      t.type === 'checklist' && 
+      t.frequency?.toLowerCase() === 'monthly'
+    );
+    const monthlyTasks = getUniqueTasksPDF(rawMonthly);
+
+    const maintenanceTasks = hasMaintenanceAccess 
+      ? staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+      : [];
+    const maxRows = hasMaintenanceAccess
+      ? Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, maintenanceTasks.length, 1)
+      : Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, 1);
+
+    const calculateStats = (taskList) => {
+      const total = taskList.length;
+      const completed = taskList.filter(t => t.is_completed || t.status?.toLowerCase() === 'yes' || t.status === 'Done').length;
+      const onTime = taskList.filter(t => t.is_on_time || t.color_code_for === '1' || t.color_code_for === 1).length;
+      const workDoneScore = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const onTimeScore = completed > 0 ? Math.round((onTime / completed) * 100) : 0;
+      return { total, completed, onTime, workDoneScore, onTimeScore };
+    };
+
+    const checklistTasksAll = staffTaskDetails.filter(t => t.type === 'checklist');
+    const delegationTasksAll = staffTaskDetails.filter(t => t.type === 'delegation');
+    const maintenanceTasksAll = hasMaintenanceAccess 
+      ? staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+      : [];
+
+    const checklistStats = calculateStats(checklistTasksAll);
+    const delegationStats = calculateStats(delegationTasksAll);
+    const maintenanceStats = calculateStats(maintenanceTasksAll);
+
+    const staffInfo = staffMembers.find(s => s.name === selectedStaffName) || {};
+
+    // Use local PDF dates for the header
+
+    // 1. Header Section (scaled for portrait A4 - 190mm usable width)
+    const logoW = 25;
+    const logoH = 20;
+    const bannerW = usableW - 2 * logoW; // 140mm
     
-    const tableColumn = ["Seq", "Status", "Given By", "Task Description", "Division", "Department", "Name", "Start Date", "Submission Date"];
-    const tableRows = staffTaskDetails.map((task, idx) => [
-      idx + 1,
-      task.status || 'Pending',
-      task.given_by || '—',
-      task.task_description,
-      task.division || '—',
-      task.department || '—',
-      task.name,
-      task.start_date,
-      task.submission_date || '—'
-    ]);
+    // Yellow Banner
+    doc.setFillColor(255, 255, 0); 
+    doc.rect(marginX + logoW, 10, bannerW, logoH, 'F');
+    // Left & Right Borders for logos
+    doc.setDrawColor(200);
+    doc.rect(marginX, 10, logoW, logoH);
+    doc.rect(marginX + logoW + bannerW, 10, logoW, logoH);
+    
+    // Try to add Logos if available
+    try {
+      doc.addImage("/Rama_logo_pdf.png", "PNG", marginX + 2, 12, 21, 16);
+      doc.addImage("/Rama_logo_pdf.png", "PNG", marginX + logoW + bannerW + 2, 12, 21, 16);
+    } catch(e) {
+      console.warn("Logos could not be loaded into PDF", e);
+    }
+
+    // Header Text
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Rama Udyog pvt ltd.", centerX, 23, { align: "center" });
+
+    // 2. Sub-header (Blue Banner)
+    const subHeaderY = 30;
+    doc.setFillColor(217, 234, 247);
+    doc.rect(marginX, subHeaderY, usableW, 8, 'F');
+    doc.rect(marginX, subHeaderY, usableW, 8);
+    doc.setFontSize(11);
+    doc.text("EMPLOYEE PERFORMANCE REPORT", centerX, subHeaderY + 5.5, { align: "center" });
+
+    // 3. Employee Info Grid (dynamic columns based on maintenance permission)
+    const startY = 38;
+    const cellH = 7;
+    const infoCols = hasMaintenanceAccess ? 5 : 4;
+    const colW = usableW / infoCols;
+    const labelW = 20; // Fixed width for labels inside non-performance cells
+
+    // Draw a standard info cell with label on left, value on right (word-wrap if text overflows)
+    const drawStandardCell = (col, row, label, value) => {
+      const x = marginX + col * colW;
+      const y = startY + row * cellH;
+      // Label background
+      doc.setFillColor(248, 249, 250);
+      doc.rect(x, y, labelW, cellH, 'F');
+      // Cell border
+      doc.setDrawColor(200);
+      doc.rect(x, y, colW, cellH);
+      // Label-value separator line
+      doc.line(x + labelW, y, x + labelW, y + cellH);
+      
+      // Label text
+      doc.setFontSize(6);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100);
+      doc.text(label.toUpperCase(), x + 1, y + 4.5);
+      
+      // Value text - word-wrap and center each line vertically
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "bold");
+      const valueStr = String(value);
+      const availableW = colW - labelW - 2; // 2mm padding
+      const valueX = x + labelW + (colW - labelW) / 2;
+      
+      doc.setFontSize(7);
+      const lines = doc.splitTextToSize(valueStr, availableW);
+      const lineH = 2.5; // line height in mm for ~7pt font
+      const totalTextH = lines.length * lineH;
+      const startTextY = y + (cellH - totalTextH) / 2 + lineH * 0.7; // baseline offset
+      
+      lines.forEach((line, i) => {
+        doc.text(line, valueX, startTextY + i * lineH, { align: "center" });
+      });
+    };
+
+    // Draw a performance header cell (full-width centered title)
+    const drawPerfHeaderCell = (col, row, title) => {
+      const x = marginX + col * colW;
+      const y = startY + row * cellH;
+      doc.setFillColor(248, 249, 250);
+      doc.rect(x, y, colW, cellH, 'F');
+      doc.setDrawColor(200);
+      doc.rect(x, y, colW, cellH);
+      doc.setFontSize(5.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(80);
+      doc.text(title.toUpperCase(), x + colW / 2, y + 4.5, { align: "center" });
+    };
+
+    // Draw a performance stat cell with label on left half, value on right half
+    const drawPerfStatCell = (col, row, label, value) => {
+      const x = marginX + col * colW;
+      const y = startY + row * cellH;
+      const halfW = colW / 2;
+      // Label background (left half)
+      doc.setFillColor(248, 249, 250);
+      doc.rect(x, y, halfW, cellH, 'F');
+      // Cell border
+      doc.setDrawColor(200);
+      doc.rect(x, y, colW, cellH);
+      // Separator between label and value
+      doc.line(x + halfW, y, x + halfW, y + cellH);
+      
+      // Label text - fitted to left half
+      doc.setFontSize(5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(150);
+      doc.text(label.toUpperCase(), x + 1, y + 4.5);
+      
+      // Value text - centered in right half
+      doc.setTextColor(0);
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "bold");
+      doc.text(String(value), x + halfW + halfW / 2, y + 4.5, { align: "center" });
+    };
+
+    // Row 0: Titles / Headers
+    let colIdx = 0;
+    drawStandardCell(colIdx++, 0, "Name", selectedStaffName);
+    drawPerfHeaderCell(colIdx++, 0, "Checklist Performance");
+    drawPerfHeaderCell(colIdx++, 0, "Delegation Performance");
+    if (hasMaintenanceAccess) drawPerfHeaderCell(colIdx++, 0, "Maintenance Performance");
+    drawStandardCell(colIdx, 0, "Period", selectedMonthYear || "Range");
+
+    // Row 1: Stats 1
+    colIdx = 0;
+    drawStandardCell(colIdx++, 1, "Division", staffInfo.division || "Admin");
+    drawPerfStatCell(colIdx++, 1, "Assigned/Done", `${checklistStats.total} / ${checklistStats.completed}`);
+    drawPerfStatCell(colIdx++, 1, "Assigned/Done", `${delegationStats.total} / ${delegationStats.completed}`);
+    if (hasMaintenanceAccess) drawPerfStatCell(colIdx++, 1, "Assigned/Done", `${maintenanceStats.total} / ${maintenanceStats.completed}`);
+    drawStandardCell(colIdx, 1, "From", pdfFromDate);
+
+    // Row 2: Stats 2
+    colIdx = 0;
+    drawStandardCell(colIdx++, 2, "Dept", staffInfo.department || "HR");
+    drawPerfStatCell(colIdx++, 2, "Score/OnTime", `${checklistStats.workDoneScore}% | ${checklistStats.onTimeScore}%`);
+    drawPerfStatCell(colIdx++, 2, "Score/OnTime", `${delegationStats.workDoneScore}% | ${delegationStats.onTimeScore}%`);
+    if (hasMaintenanceAccess) drawPerfStatCell(colIdx++, 2, "Score/OnTime", `${maintenanceStats.workDoneScore}% | ${maintenanceStats.onTimeScore}%`);
+    drawStandardCell(colIdx, 2, "To", pdfToDate);
+
+    // 4. Categorized Table (sized for portrait A4) - columns depend on maintenance access
+    const tableHeader = hasMaintenanceAccess
+      ? ["Seq No", "Daily Task Description", "Delegation task", "Weekly task", "Monthly task", "maintenance"]
+      : ["Seq No", "Daily Task Description", "Delegation task", "Weekly task", "Monthly task"];
+    const tableBody = Array.from({ length: maxRows }).map((_, idx) => {
+      const row = [
+        idx + 1,
+        dailyTasks[idx]?.task_description || "",
+        delegationTasks[idx]?.task_description || "",
+        weeklyTasks[idx]?.task_description || "",
+        monthlyTasks[idx]?.task_description || "",
+      ];
+      if (hasMaintenanceAccess) {
+        row.push(maintenanceTasks[idx]?.task_description || (idx === 0 && maintenanceTasks.length === 0 ? "Nill" : ""));
+      }
+      return row;
+    });
+
+    // Column widths: distribute evenly across available data columns
+    const dataCols = hasMaintenanceAccess ? 5 : 4; // excluding seq col
+    const tblColW = Math.floor((usableW - 10) / dataCols); // 10mm for seq col
+    const columnStyles = { 0: { halign: 'center', cellWidth: 10 } };
+    for (let c = 1; c < dataCols; c++) {
+      columnStyles[c] = { cellWidth: tblColW };
+    }
+    columnStyles[dataCols] = { cellWidth: 'auto' }; // last data col gets remaining space
 
     autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 40,
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [124, 58, 237], textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 'auto' },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 25 },
-        6: { cellWidth: 30 },
-        7: { cellWidth: 25 },
+      head: [tableHeader],
+      body: tableBody,
+      startY: startY + 3 * cellH + 3,
+      margin: { left: marginX, right: marginX },
+      styles: { fontSize: 7, cellPadding: 1.5, lineWidth: 0.1, lineColor: [200, 200, 200] },
+      headStyles: { fillColor: [233, 242, 233], textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', fontSize: 6.5 },
+      bodyStyles: { textColor: [50, 50, 50], minCellHeight: 7 },
+      columnStyles,
+      didDrawPage: (data) => {
+        // Draw total row at the bottom of the table on the last page
+        if (data.pageCount === doc.internal.getNumberOfPages()) {
+          const finalY = data.cursor.y;
+          doc.setFillColor(254, 249, 231); // #FEF9E7
+          doc.rect(marginX, finalY, usableW, 8, 'F');
+          doc.rect(marginX, finalY, usableW, 8);
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "bold");
+          doc.text("Total", marginX + 5, finalY + 5.5, { align: "center" });
+          doc.text(String(dailyTasks.length), marginX + 10 + tblColW / 2, finalY + 5.5, { align: "center" });
+          doc.text(String(delegationTasks.length), marginX + 10 + tblColW + tblColW / 2, finalY + 5.5, { align: "center" });
+          doc.text(String(weeklyTasks.length), marginX + 10 + tblColW * 2 + tblColW / 2, finalY + 5.5, { align: "center" });
+          doc.text(String(monthlyTasks.length), marginX + 10 + tblColW * 3 + tblColW / 2, finalY + 5.5, { align: "center" });
+          if (hasMaintenanceAccess) {
+            const remainW = usableW - 10 - tblColW * 4;
+            doc.text(String(maintenanceTasks.length), marginX + 10 + tblColW * 4 + remainW / 2, finalY + 5.5, { align: "center" });
+          }
+        }
       }
     });
+
+    // Footer: "Powered By Botivate" at the bottom of the last page
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const footerY = pageHeight - 10;
+      // Divider line
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.3);
+      doc.line(marginX, footerY - 3, marginX + usableW, footerY - 3);
+      // Footer text - measure widths for true centering
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      const prefixText = "Powered By  ";
+      const brandText = "Botivate";
+      const prefixW = doc.getTextWidth(prefixText);
+      doc.setFont("helvetica", "bold");
+      const brandW = doc.getTextWidth(brandText);
+      const totalW = prefixW + brandW;
+      const startX = centerX - totalW / 2;
+      // Draw prefix
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(120);
+      doc.text(prefixText, startX, footerY);
+      // Draw brand name
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(124, 58, 237); // Purple-600
+      doc.text(brandText, startX + prefixW, footerY);
+    }
     
-    doc.save(`${selectedStaffName}_Work_Report_${new Date().toLocaleDateString()}.pdf`);
+    doc.save(`${selectedStaffName}_Performance_Report_${new Date().toLocaleDateString('en-CA')}.pdf`);
   };
 
   const getVisiblePages = () => {
@@ -273,21 +729,22 @@ const loadStaffData = useCallback(async () => {
   try {
     setIsLoading(true)
 
-    // Fetch ALL staff data (using a high limit to get everything at once)
+    // Fetch paginated staff data
     const data = await fetchStaffTasksDataApi(
       dashboardType,
       dashboardStaffFilter,
-      1,
-      1000, // Very high limit to show all
+      dashboardPage,
+      dashboardPageSize,
       selectedMonthYear,
       tillDate,
       startDate,
-      endDate
+      endDate,
+      debouncedSearch
     )
 
-    // Get total counts
+    // Get total counts respecting search
     const [staffCount, usersCount] = await Promise.all([
-      getStaffTasksCountApi(dashboardType, dashboardStaffFilter),
+      getStaffTasksCountApi(dashboardType, dashboardStaffFilter, debouncedSearch),
       getTotalUsersCountApi()
     ]);
     setTotalStaffCount(staffCount)
@@ -298,24 +755,14 @@ const loadStaffData = useCallback(async () => {
       return
     }
 
-    // Filter data by selected month-year if specified
-    let filteredData = data
-    if (selectedMonthYear) {
-      const [year, month] = selectedMonthYear.split('-').map(Number)
-      filteredData = data.filter(staff => {
-        // Placeholder filter logic
-        return true 
-      })
-    }
-
-    setStaffMembers(filteredData)
+    setStaffMembers(data)
 
   } catch (error) {
     console.error('Error loading staff data:', error)
   } finally {
     setIsLoading(false)
   }
-}, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate, startDate, endDate])
+}, [dashboardType, dashboardStaffFilter, departmentFilter, selectedMonthYear, tillDate, startDate, endDate, dashboardPage, debouncedSearch])
 
   // Initial load when component mounts or dependencies change
   useEffect(() => {
@@ -399,7 +846,8 @@ const loadStaffData = useCallback(async () => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `Work_Done_Report_${dashboardType}_${new Date().toISOString().split('T')[0]}.csv`);
+      const filenameDate = new Date().toLocaleDateString('en-US').replace(/\//g, '-');
+      link.setAttribute("download", `Work_Done_Report_${dashboardType}_${filenameDate}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -442,8 +890,8 @@ const loadStaffData = useCallback(async () => {
       
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Period: ${selectedMonthYear || 'All Months'} (Till: ${tillDate || 'N/A'})`, 14, 22);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 27);
+      doc.text(`Period: ${selectedMonthYear || 'All Months'} (Till: ${formatDateForDisplay(tillDate) || 'N/A'})`, 14, 22);
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })} ${new Date().toLocaleTimeString()}`, 14, 27);
       
       // Define table headers
       const tableColumn = ["Seq", "Name", "Division", "Department", "Total", "Done", "Pending", "Overdue", "On Time", "Score"];
@@ -475,8 +923,40 @@ const loadStaffData = useCallback(async () => {
         alternateRowStyles: { fillColor: [240, 249, 255] },
         margin: { top: 35 }
       });
+
+      // Footer: "Powered By Botivate" at the bottom of every page
+      const totalPages = doc.internal.getNumberOfPages();
+      const pageW = doc.internal.pageSize.getWidth();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const footerY = pageHeight - 10;
+        // Divider line
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.3);
+        doc.line(14, footerY - 3, pageW - 14, footerY - 3);
+        // Footer text - measure widths for true centering
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        const prefixText = "Powered By  ";
+        const brandText = "Botivate";
+        const prefixW = doc.getTextWidth(prefixText);
+        doc.setFont("helvetica", "bold");
+        const brandW = doc.getTextWidth(brandText);
+        const totalW = prefixW + brandW;
+        const startX = pageW / 2 - totalW / 2;
+        // Draw prefix
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(120);
+        doc.text(prefixText, startX, footerY);
+        // Draw brand name
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(124, 58, 237); // Purple-600
+        doc.text(brandText, startX + prefixW, footerY);
+      }
       
-      doc.save(`Work_Done_Report_${dashboardType}_${new Date().toISOString().split('T')[0]}.pdf`);
+      const filenameDate = new Date().toLocaleDateString('en-US').replace(/\//g, '-');
+      doc.save(`Work_Done_Report_${dashboardType}_${filenameDate}.pdf`);
     } catch (error) {
       console.error("Error exporting PDF:", error);
       alert("Failed to export PDF report.");
@@ -486,55 +966,69 @@ const loadStaffData = useCallback(async () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div ref={dashboardTopRef} className="space-y-4">
       {/* Show total count and active filters */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-3 md:space-y-0">
-        <div className="flex flex-col space-y-2">
-          {/* Month-Year Dropdown */}
-          <div className="flex items-center space-x-2">
-            <label htmlFor="monthYearFilter" className="text-sm font-medium text-gray-700">
-              Filter by Month:
-            </label>
-            <select
-              id="monthYearFilter"
-              value={selectedMonthYear}
-              onChange={(e) => setSelectedMonthYear(e.target.value)}
-              className="block w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value="">All Months</option>
-              {monthYearOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label} {option.isCurrent && "(Current)"}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Till Date Filter */}
-          <div className="flex items-center space-x-2">
-            <label htmlFor="tillDateFilter" className="text-sm font-medium text-gray-700">
-              Till Date:
-            </label>
-            <input
-              type="date"
-              id="tillDateFilter"
-              value={tillDate}
-              onChange={(e) => setTillDate(e.target.value)}
-              className="block w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
-            {tillDate && (
-              <button
-                onClick={() => setTillDate("")}
-                className="text-xs text-red-500 hover:text-red-700 font-medium"
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start space-y-4 md:space-y-0">
+        <div className="flex flex-col space-y-4 w-full md:w-auto">
+          {/* Filters Group */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 sm:gap-4">
+            {/* Month-Year Dropdown */}
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <label htmlFor="monthYearFilter" className="text-sm font-medium text-gray-700 min-w-[50px]">Month:</label>
+              <select
+                id="monthYearFilter"
+                value={selectedMonthYear}
+                onChange={(e) => setSelectedMonthYear(e.target.value)}
+                className="block w-full sm:w-40 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               >
-                Clear
-              </button>
-            )}
+                <option value="">All Months</option>
+                {monthYearOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} {option.isCurrent && "(Current)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Till Date Filter */}
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
+              <label htmlFor="tillDateFilter" className="text-sm font-medium text-gray-700 min-w-[50px]">Till:</label>
+              <input
+                type="date"
+                id="tillDateFilter"
+                value={tillDate}
+                onChange={(e) => setTillDate(e.target.value)}
+                className="block w-full sm:w-40 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+            </div>
+
+            {/* Name Search Box */}
+            <div className="relative group w-full sm:min-w-[200px] sm:w-auto">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                <Search size={16} />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onKeyDown={(e) => e.stopPropagation()}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search staff by name..."
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 sm:text-sm placeholder-gray-400"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery("")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
           
           {totalStaffCount > 0 && (
-            <div className="text-sm text-gray-600">
-              Total users: {totalUsersCount} | Showing: {staffMembers.length}
+            <div className="text-xs text-gray-500 font-medium">
+              Total staff found: {totalStaffCount} | Showing {staffMembers.length} on this page
             </div>
           )}
         </div>
@@ -572,7 +1066,7 @@ const loadStaffData = useCallback(async () => {
             )}
             {tillDate && (
               <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs">
-                Till: {tillDate}
+                Till: {formatDateForDisplay(tillDate)}
               </span>
             )}
           </div>
@@ -636,7 +1130,7 @@ const loadStaffData = useCallback(async () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div 
                       className="cursor-pointer group flex items-center gap-2"
-                      onClick={() => handleOpenModal(staff.name)}
+                      onClick={() => handleOpenModal(staff)}
                     >
                       <div className="bg-purple-100 p-1.5 rounded-full text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
                         <User size={14} />
@@ -688,7 +1182,7 @@ const loadStaffData = useCallback(async () => {
                 
                 <div 
                   className="text-sm font-medium mb-1 text-gray-800 cursor-pointer hover:text-purple-700 flex items-center gap-1"
-                  onClick={() => handleOpenModal(staff.name)}
+                  onClick={() => handleOpenModal(staff)}
                 >
                   <User size={12} className="text-purple-600" />
                   {staff.name} 
@@ -744,6 +1238,91 @@ const loadStaffData = useCallback(async () => {
           )}
         </div>
       )}
+
+      {/* Pagination Controls */}
+      <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="flex-1 flex justify-between sm:hidden">
+          <button
+            onClick={() => setDashboardPage(prev => Math.max(prev - 1, 1))}
+            disabled={dashboardPage === 1}
+            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setDashboardPage(prev => prev + 1)}
+            disabled={staffMembers.length < dashboardPageSize || (dashboardPage * dashboardPageSize >= totalStaffCount)}
+            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-700">
+              Showing <span className="font-medium">{(dashboardPage - 1) * dashboardPageSize + 1}</span> to <span className="font-medium">{Math.min(dashboardPage * dashboardPageSize, totalStaffCount)}</span> of{' '}
+              <span className="font-medium">{totalStaffCount}</span> results
+            </p>
+          </div>
+          <div>
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <button
+                onClick={() => setDashboardPage(1)}
+                disabled={dashboardPage === 1}
+                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronsLeft size={16} />
+              </button>
+              <button
+                onClick={() => setDashboardPage(prev => Math.max(prev - 1, 1))}
+                disabled={dashboardPage === 1}
+                className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              {(() => {
+                const totalPages = Math.ceil(totalStaffCount / dashboardPageSize);
+                let start = Math.max(1, dashboardPage - 2);
+                let end = Math.min(totalPages, start + 4);
+                if (end - start < 4) start = Math.max(1, end - 4);
+                if (start < 1) start = 1;
+                
+                const pages = [];
+                for (let i = start; i <= end; i++) pages.push(i);
+                return pages.map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setDashboardPage(p)}
+                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                      p === dashboardPage 
+                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' 
+                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ));
+              })()}
+
+              <button
+                onClick={() => setDashboardPage(prev => prev + 1)}
+                disabled={dashboardPage >= Math.ceil(totalStaffCount / dashboardPageSize)}
+                className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronRight size={16} />
+              </button>
+              <button
+                onClick={() => setDashboardPage(Math.ceil(totalStaffCount / dashboardPageSize))}
+                disabled={dashboardPage >= Math.ceil(totalStaffCount / dashboardPageSize)}
+                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <ChevronsRight size={16} />
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
 
       {/* Report Date Selection Modal */}
       {isReportModalOpen && createPortal(
@@ -837,248 +1416,33 @@ const loadStaffData = useCallback(async () => {
         document.body
       )}
 
-      {/* Task Detail Modal */}
+      {/* New Employee Performance Report Modal */}
+      {isModalOpen && createPortal(
+        <EmployeePerformanceReportModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          staffName={selectedStaffName}
+          staffData={selectedStaffData || staffMembers.find(s => s.name === selectedStaffName) || {}}
+          tasks={staffTaskDetails}
+          reportDate={tillDate}
+          startDate={modalRange.from || startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA')}
+          endDate={modalRange.to || endDate || new Date().toLocaleDateString('en-CA')}
+          onDownloadPDF={(from, to, info) => handleDownloadPDF(from, to, info || selectedStaffData || staffMembers.find(s => s.name === selectedStaffName))}
+          onDownloadCSV={(from, to, info) => handleDownloadCSV(from, to, info || selectedStaffData || staffMembers.find(s => s.name === selectedStaffName))}
+          onRefresh={(from, to) => handleOpenModal(selectedStaffName, from, to)}
+          hasMaintenanceAccess={hasMaintenanceAccess}
+        />,
+        document.body
+      )}
+
+      {/* Temporarily Disabled Task Detail Modal
       {isModalOpen && createPortal(
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-2 sm:p-4 bg-gray-900/70 backdrop-blur-md">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-white">
-              <div className="flex items-center gap-3">
-                <div className="bg-purple-600 p-2 rounded-lg text-white">
-                  <FileText size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">{selectedStaffName}'s Tasks</h3>
-                  <p className="text-xs text-gray-500">
-                    Showing {staffTaskDetails.length} tasks for {dashboardType === 'checklist' ? 'Checklist' : 'Delegation'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {staffTaskDetails.length > 0 && (
-                  <div className="relative group">
-                    <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-purple-200 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-50 transition-all shadow-sm">
-                      <Download size={14} />
-                      <span className="hidden sm:inline">Work Report</span>
-                    </button>
-                    <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-100 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[1001] py-1">
-                      <button 
-                        onClick={handleDownloadCSV}
-                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-2"
-                      >
-                        <FileText size={14} className="text-green-600" />
-                        Export as CSV
-                      </button>
-                      <button 
-                        onClick={handleDownloadPDF}
-                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 transition-colors flex items-center gap-2 border-t border-gray-50"
-                      >
-                        <FileText size={14} className="text-red-600" />
-                        Export as PDF
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-2 hover:bg-red-50 hover:text-red-600 rounded-full transition-colors text-gray-400"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="flex-1 overflow-auto p-4">
-              {isModalLoading ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mb-4"></div>
-                  <p className="text-gray-500 font-medium">Fetching task details...</p>
-                </div>
-              ) : staffTaskDetails.length === 0 ? (
-                <div className="text-center py-20 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                  <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500 font-medium text-lg">No tasks found for this period</p>
-                  <p className="text-gray-400 text-sm">Either no tasks were assigned or they are outside the selected filter.</p>
-                </div>
-              ) : (
-                <>
-                  {/* Desktop View Table */}
-                  <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">#</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Given By</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider min-w-[200px]">Task Description</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Division</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Department</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Name</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Start Date</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Submission Date</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-100">
-                        {staffTaskDetails.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((task, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-3 py-2 whitespace-nowrap text-[11px] text-gray-400">{(currentPage - 1) * pageSize + idx + 1}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                                task.status?.toLowerCase() === 'yes' || task.status?.toLowerCase() === 'done'
-                                  ? 'bg-green-100 text-green-700 border border-green-200' 
-                                  : task.status?.toLowerCase() === 'no'
-                                  ? 'bg-red-100 text-red-700 border border-red-200'
-                                  : 'bg-amber-100 text-amber-700 border border-amber-200'
-                              }`}>
-                                {task.status || 'Pending'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 whitespace-nowrap text-[11px] font-medium text-gray-700">{task.given_by || '—'}</td>
-                            <td className="px-3 py-2 text-[11px] text-gray-600 max-w-[200px] truncate" title={task.task_description}>{task.task_description}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-[11px] text-gray-600">{task.division || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-[11px] text-gray-600">{task.department || '—'}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-[11px] font-semibold text-gray-900">{task.name}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-[11px] text-gray-500">{task.start_date}</td>
-                            <td className="px-3 py-2 whitespace-nowrap text-[11px] text-gray-500 font-medium">{task.submission_date || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Mobile View Cards */}
-                  <div className="md:hidden space-y-4">
-                    {staffTaskDetails.slice((currentPage - 1) * pageSize, currentPage * pageSize).map((task, idx) => (
-                      <div key={idx} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
-                        <div className="flex justify-between items-start mb-3">
-                          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider ${
-                            task.status?.toLowerCase() === 'yes' || task.status?.toLowerCase() === 'done'
-                              ? 'bg-green-100 text-green-700'
-                              : task.status?.toLowerCase() === 'no'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-yellow-100 text-yellow-600'
-                          }`}>
-                            {task.status || 'Pending'}
-                          </span>
-                          <div className="text-[10px] text-gray-500 font-medium bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
-                            {task.given_by ? `By: ${task.given_by}` : '—'}
-                          </div>
-                        </div>
-                        
-                        <h4 className="text-sm font-semibold text-gray-900 mb-3 leading-snug">
-                          {task.task_description}
-                        </h4>
-                        
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-2 mt-2 pt-3 border-t border-gray-50">
-                          <div>
-                            <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Department</p>
-                            <p className="text-xs text-gray-700 font-medium mt-0.5 truncate">{task.department || '—'}</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Division</p>
-                            <p className="text-xs text-gray-700 font-medium mt-0.5 truncate">{task.division || '—'}</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Start Date</p>
-                            <p className="text-xs text-gray-600 mt-0.5">{task.start_date}</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Submission Date</p>
-                            <p className="text-xs text-purple-600 font-bold mt-0.5">{task.submission_date || '—'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex flex-col xl:flex-row items-center justify-between gap-4">
-              <div className="flex flex-wrap justify-center items-center gap-2 sm:gap-2">
-                {/* First Page Button */}
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  title="First Page"
-                  className="p-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm"
-                >
-                  <ChevronsLeft size={16} />
-                </button>
-
-                {/* Previous Button with Hold Behavior */}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  onMouseDown={() => startAutoPaginate(-1)}
-                  onMouseUp={stopAutoPaginate}
-                  onMouseLeave={stopAutoPaginate}
-                  onTouchStart={() => startAutoPaginate(-1)}
-                  onTouchEnd={stopAutoPaginate}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm flex items-center gap-1"
-                >
-                  <ChevronLeft size={14} />
-                  <span>Previous</span>
-                </button>
-
-                <div className="flex items-center gap-1">
-                  {getVisiblePages().map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold transition-all ${
-                        currentPage === page
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                  {Math.ceil(staffTaskDetails.length / pageSize) > (isMobile ? 2 : 5) && currentPage < Math.ceil(staffTaskDetails.length / pageSize) - (isMobile ? 0 : 2) && (
-                    <span className="text-gray-400 px-1 font-bold">...</span>
-                  )}
-                </div>
-
-                {/* Next Button with Hold Behavior */}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(staffTaskDetails.length / pageSize), prev + 1))}
-                  onMouseDown={() => startAutoPaginate(1)}
-                  onMouseUp={stopAutoPaginate}
-                  onMouseLeave={stopAutoPaginate}
-                  onTouchStart={() => startAutoPaginate(1)}
-                  onTouchEnd={stopAutoPaginate}
-                  disabled={currentPage === Math.ceil(staffTaskDetails.length / pageSize)}
-                  className="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm flex items-center gap-1"
-                >
-                  <span>Next</span>
-                  <ChevronRight size={14} />
-                </button>
-
-                {/* Last Page Button */}
-                <button
-                  onClick={() => setCurrentPage(Math.ceil(staffTaskDetails.length / pageSize))}
-                  disabled={currentPage === Math.ceil(staffTaskDetails.length / pageSize)}
-                  title="Last Page"
-                  className="p-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-all shadow-sm"
-                >
-                  <ChevronsRight size={16} />
-                </button>
-              </div>
-              
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="w-full sm:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold transition-all shadow-md active:scale-95"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+          ... (old modal content) ...
         </div>,
         document.body
       )}
+      */}
     </div>
   )
 }

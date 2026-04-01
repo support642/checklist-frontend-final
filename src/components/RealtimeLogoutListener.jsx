@@ -38,6 +38,23 @@ const RealtimeLogoutListener = () => {
       }, 500);
     });
 
+    // Listen for the 'force_logout' custom event from the backend (session invalidation)
+    eventSource.addEventListener("force_logout", () => {
+      if (Notification.permission === "granted") {
+        new Notification("Session Expired", {
+          body: "Your session has expired or your permissions were updated. Please log in again.",
+          icon: "/Rama_TMT_logo.png",
+        });
+      }
+
+      localStorage.clear();
+      
+      setTimeout(() => {
+        navigate("/login");
+        window.location.reload();
+      }, 500);
+    });
+
     eventSource.onerror = (err) => {
       console.error("SSE connection error", err);
       // The browser natively reconnects automatically if the stream drops!

@@ -1,3 +1,4 @@
+import { authAxios, createAuthAxios } from "../../utils/authAxios";
 
 
 // import supabase from "../../SupabaseClient";
@@ -23,7 +24,7 @@
 
 // export const LoginCredentialsApi = async (formData) => {
 //   try {
-//     const res = await axios.post("http://localhost:5050/api/login", formData);
+//     const res = await authAxios.post("http://localhost:5050/api/login", formData);
 
 //     return { data: res.data };  // same format
 //   } catch (err) {
@@ -39,7 +40,7 @@ const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/login`;
 
 export const LoginCredentialsApi = async (formData) => {
   try {
-    const res = await axios.post(BASE_URL, formData);
+    const res = await authAxios.post(BASE_URL, formData);
 
     return { data: res.data }; // same return format
   } catch (err) {

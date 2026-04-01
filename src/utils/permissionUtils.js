@@ -1,157 +1,156 @@
+import { MODULE_FEATURE_MAP, DOC_SYSTEMS, DOC_PAGE_MAP, PAGE_SYSTEM_MAP } from "../constants/permissions";
+import { buildUnifiedPermissions, hasPermission as hasPermissionAdapter } from "./permissionAdapter";
+
 /**
- * Permission Utilities
- * Handles page-level and system-level access checks with role-based fallbacks.
+ * Reads all permission sources from localStorage and builds a unified object.
+ * @returns {Object} Unified permissions object
  */
-import { MODULE_FEATURE_MAP } from "../constants/permissions";
-
-export const getPageAccess = () => {
+export const getUnifiedPermissions = () => {
   try {
-    const raw = localStorage.getItem("page_access");
-    if (!raw) return [];
-    let parsed = JSON.parse(raw);
-    // Handle double-stringification if it occurs
-    if (typeof parsed === "string") {
-      parsed = JSON.parse(parsed);
-    }
-    return Array.isArray(parsed) ? parsed : [];
+    const user = {
+      role: localStorage.getItem("role"),
+      system_access: JSON.parse(localStorage.getItem("system_access") || "[]"),
+      page_access: JSON.parse(localStorage.getItem("page_access") || "[]"),
+      subscription_access_system: localStorage.getItem("subscription_access_system")
+    };
+    return buildUnifiedPermissions(user);
   } catch (e) {
-    console.error("Error parsing page_access from localStorage", e);
-    return [];
-  }
-};
-
-export const getSystemAccess = () => {
-  try {
-    const raw = localStorage.getItem("system_access");
-    if (!raw) return [];
-    let parsed = JSON.parse(raw);
-    // Handle double-stringification if it occurs
-    if (typeof parsed === "string") {
-      parsed = JSON.parse(parsed);
-    }
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    console.error("Error parsing system_access from localStorage", e);
-    return [];
+    console.error("Error building unified permissions from localStorage", e);
+    return {};
   }
 };
 
 /**
- * Checks if the user has access to a specific page.
- * @param {string} page - The page identifier (e.g., 'dashboard', 'settings').
- * @returns {boolean}
+ * Universal permission check helper.
+ * @param {string} module 
+ * @param {string} page 
+ * @param {string} action - 'view' or 'modify'
+ */
+export const hasPermission = (module, page, action) => {
+  const unified = getUnifiedPermissions();
+  return hasPermissionAdapter(unified, module, page, action);
+};
+
+/**
+ * Normalizes a page key for consistent checking.
+ */
+const normalizeKey = (key) => {
+  if (!key) return '';
+  return key.toLowerCase().replace(/[\/\s-]+/g, '_');
+};
+
+/**
+ * Backward compatible page access check.
  */
 export const hasPageAccess = (page) => {
-  const pageAccess = getPageAccess();
-  const role = localStorage.getItem("role");
-
-  // Full access wildcard
-  if (pageAccess.includes("*")) return true;
-  
-  // Specific page access
-  if (pageAccess.includes(page) || pageAccess.includes(`${page}_view`) || pageAccess.includes(`${page}_modify`)) return true;
-
-  // // Development whitelist for Repair module
-  // const repairPages = ['dashboard', 'request_form', 'pending_request', 'request_approval', 'repair_setting'];
-  // if (repairPages.includes(page)) return true;
-
-  // Fallback to role-based logic if page_access is empty
-  if (!pageAccess || pageAccess.length === 0) {
-    // STRICT FALLBACK: If no explicit permissions are granted, 
-    // ONLY the base dashboard is accessible, regardless of role.
-    return page === "dashboard";
-  }
-
-  return false;
-};
-
-/**
- * Checks if a specific module/tab should be visible based on system_access.
- * @param {string} module - The module identifier (e.g., 'checklist', 'maintenance').
- * @returns {boolean}
- */
-export const canAccessModule = (module) => {
-  const feature = MODULE_FEATURE_MAP[module];
-  if (!feature) return true; // Default to visible if not mapped
-  return hasSystemAccess(feature);
-};
-
-/**
- * Checks if the user has access to a specific system/module.
- * @param {string} system - The system identifier (e.g., 'checklist', 'maintenance').
- * @returns {boolean}
- */
-export const hasSystemAccess = (system) => {
-  const systemAccess = getSystemAccess();
-  const role = localStorage.getItem("role");
-
-  // Full access wildcard
-  if (systemAccess.includes("*")) return true;
-  
-  // Specific system access
-  if (systemAccess.includes(system)) return true;
-
-  // Fallback to role-based logic
-  if (systemAccess.length === 0) {
-    // STRICT FALLBACK: If no explicit system access is granted,
-    // deny all system modules by default.
+  if (page === "dashboard") {
+    const unified = getUnifiedPermissions();
+    if (unified['*'] === '*') return true;
+    
+    const modules = Object.keys(unified);
+    // If user has no permissions at all, show dashboard as default fallback
+    if (modules.length === 0) return true;
+    // If they have any checklist-related permissions, show it
+    if (unified.checklist || unified.maintenance) return true;
+    // Otherwise (e.g. only documentation access), hide it
     return false;
   }
 
+  const unified = getUnifiedPermissions();
+  if (unified['*'] === '*') return true;
+
+  const normalizedPage = normalizeKey(page);
+
+  // 1. Check Legacy/Standard Mapping
+  const module = PAGE_SYSTEM_MAP[page]?.[0] || 'checklist';
+  if (hasPermissionAdapter(unified, module, normalizedPage, 'view')) return true;
+  
+  // 2. Check Documentation/JSON Mapping
+  const docPageIdentifier = DOC_PAGE_MAP[page];
+  if (docPageIdentifier) {
+    const normalizedDocPage = normalizeKey(docPageIdentifier);
+    let docModule = 'documentation';
+    if (normalizedDocPage.startsWith('subscription')) docModule = 'subscription';
+    else if (normalizedDocPage.startsWith('loan')) docModule = 'loan';
+    else if (normalizedDocPage.startsWith('master')) docModule = 'master';
+    
+    if (hasPermissionAdapter(unified, docModule, normalizedDocPage, 'view')) return true;
+  }
+
   return false;
 };
 
 /**
- * Checks if the user can VIEW a specific page (read-only access).
- * Returns true if `page_view` OR `page_modify` is in page_access.
- * Falls back to hasPageAccess() if neither is present (backward compat).
- * @param {string} page - e.g. 'settings', 'pending_task'
- * @returns {boolean}
+ * Checks if a specific module/tab should be visible.
+ */
+export const canAccessModule = (module) => {
+  const unified = getUnifiedPermissions();
+  if (unified['*'] === '*') return true;
+
+  // Accessible if ANY page in this module is visible, or if the system itself is active
+  return !!unified[module] || !!unified[MODULE_FEATURE_MAP[module]];
+};
+
+/**
+ * Standard system access check.
+ */
+export const hasSystemAccess = (system) => {
+  const unified = getUnifiedPermissions();
+  if (unified['*'] === '*') return true;
+  
+  // For the composite sidebar block, check any of the JSON modules
+  if (system === 'documentation' || system === 'docs') {
+    return !!unified['documentation'] || !!unified['subscription'] || !!unified['loan'] || !!unified['master'];
+  }
+
+  return !!unified[system];
+};
+
+/**
+ * Detailed view access check.
  */
 export const hasViewAccess = (page) => {
-  const pageAccess = getPageAccess();
+  return hasPageAccess(page);
+};
 
-  // Wildcard — full access
-  if (pageAccess.includes("*")) return true;
+/**
+ * Detailed modify access check.
+ */
+export const hasModifyAccess = (page) => {
+  const unified = getUnifiedPermissions();
+  if (unified['*'] === '*') return true;
 
-  // Explicit view or modify keys
-  if (pageAccess.includes(`${page}_view`)) return true;
-  if (pageAccess.includes(`${page}_modify`)) return true;
+  const normalizedPage = normalizeKey(page);
 
-  // Neither _view nor _modify is set — fall back to existing logic
-  const hasExplicitViewModify = pageAccess.some(
-    (p) => p.endsWith("_view") || p.endsWith("_modify")
-  );
-  if (!hasExplicitViewModify) {
-    return hasPageAccess(page);
+  // 1. Check Legacy/Standard Mapping
+  const module = PAGE_SYSTEM_MAP[page]?.[0] || 'checklist';
+  if (hasPermissionAdapter(unified, module, normalizedPage, 'modify')) return true;
+  
+  // 2. Check Documentation/JSON Mapping
+  const docPageIdentifier = DOC_PAGE_MAP[page];
+  if (docPageIdentifier) {
+    const normalizedDocPage = normalizeKey(docPageIdentifier);
+    let docModule = 'documentation';
+    if (normalizedDocPage.startsWith('subscription')) docModule = 'subscription';
+    else if (normalizedDocPage.startsWith('loan')) docModule = 'loan';
+    else if (normalizedDocPage.startsWith('master')) docModule = 'master';
+    
+    if (hasPermissionAdapter(unified, docModule, normalizedDocPage, 'modify')) return true;
   }
 
   return false;
 };
 
 /**
- * Checks if the user can MODIFY (fully interact with) a specific page.
- * Returns true only if `page_modify` is in page_access.
- * Falls back to hasPageAccess() if no _view/_modify keys exist at all (backward compat).
- * @param {string} page - e.g. 'settings', 'pending_task'
- * @returns {boolean}
+ * Provides the default landing page based on permissions.
  */
-export const hasModifyAccess = (page) => {
-  const pageAccess = getPageAccess();
-
-  // Wildcard — full access
-  if (pageAccess.includes("*")) return true;
-
-  // Explicit modify key
-  if (pageAccess.includes(`${page}_modify`)) return true;
-
-  // Neither _view nor _modify is set — fall back to existing logic
-  const hasExplicitViewModify = pageAccess.some(
-    (p) => p.endsWith("_view") || p.endsWith("_modify")
-  );
-  if (!hasExplicitViewModify) {
-    return hasPageAccess(page);
-  }
-
-  return false;
+export const getDefaultDashboardRoute = () => {
+  const unified = getUnifiedPermissions();
+  if (unified['*'] === '*') return "/dashboard/admin";
+  
+  if (unified.checklist || unified.maintenance) return "/dashboard/admin";
+  if (unified.documentation || unified.subscription || unified.loan || unified.master) return "/doc-sub/dashboard";
+  if (unified.assets) return "/asset/dashboard";
+  
+  return "/dashboard/admin"; // Fallback
 };

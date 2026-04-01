@@ -14,8 +14,8 @@ export const delegationData = createAsyncThunk(
 
 export const delegationDoneData = createAsyncThunk(
   "delegation/fetchDone",
-  async ({ search = "", startDate = "", endDate = "" } = {}) => {
-    return await fetchDelegation_DoneDataSortByDate(search, startDate, endDate);
+  async ({ search = "", startDate = "", endDate = "", name = 'all', division = 'all', departmentFilter = 'all' } = {}) => {
+    return await fetchDelegation_DoneDataSortByDate(search, startDate, endDate, name, division, departmentFilter);
   }
 );
 

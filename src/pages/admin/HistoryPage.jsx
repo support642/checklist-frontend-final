@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Search, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, CheckCircle2, ChevronLeft, ChevronRight, X } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 import { useDispatch, useSelector } from "react-redux"
 import { checklistHistoryData } from "../../redux/slice/checklistSlice"
@@ -12,6 +12,24 @@ import { hasPageAccess, canAccessModule, hasModifyAccess } from "../../utils/per
 import { delegationDoneData } from "../../redux/slice/delegationSlice"
 import { maintenanceHistoryData, maintenanceAdminDone } from "../../redux/slice/maintenanceSlice"
 import { postMaintenanceAdminDoneAPI } from "../../redux/api/maintenanceApi"
+
+const SearchableSelect = ({ value, onChange, options, placeholder, id }) => (
+  <div className="relative group w-full sm:min-w-[120px]">
+    <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-purple-500 transition-colors" size={10} />
+    <input
+      list={id}
+      value={value === 'all' ? '' : value}
+      onChange={(e) => onChange(e.target.value || 'all')}
+      placeholder={placeholder}
+      className="w-full pl-6 pr-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-purple-500 focus:border-transparent bg-white shadow-xs"
+    />
+    <datalist id={id}>
+      {options.map((opt) => (
+        <option key={opt} value={opt} />
+      ))}
+    </datalist>
+  </div>
+);
 
 function HistoryPage() {
   const [activeTab, setActiveTab] = useState("checklist") // 'checklist', 'delegation', or 'maintenance'
@@ -24,6 +42,9 @@ function HistoryPage() {
   const [username, setUsername] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [divisionFilter, setDivisionFilter] = useState("all")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+  const [nameFilter, setNameFilter] = useState("all")
   const [approvalStatusFilter, setApprovalStatusFilter] = useState("pending") // 'all', 'pending', 'completed'
   const ITEMS_PER_PAGE = 50
 
@@ -41,6 +62,7 @@ function HistoryPage() {
     itemCount: 0,
     type: "checklist" // 'checklist' or 'delegation'
   })
+  const [fileModal, setFileModal] = useState({ isOpen: false, urls: [] })
   const [adminRemarks, setAdminRemarks] = useState({}) // New state for admin remarks
 
   const { history, historyTotalCount, historyApprovedCount, loading } = useSelector((state) => state.checkList)
@@ -58,11 +80,17 @@ function HistoryPage() {
   }, [searchTerm])
 
   useEffect(() => {
-    dispatch(checklistHistoryData(debouncedSearch))
-    dispatch(delegationDoneData(debouncedSearch))
+    const filters = {
+      search: debouncedSearch,
+      name: nameFilter,
+      division: divisionFilter,
+      departmentFilter: departmentFilter
+    }
+    dispatch(checklistHistoryData(filters))
+    dispatch(delegationDoneData(filters))
     dispatch(uniqueDoerNameData())
-    dispatch(maintenanceHistoryData(debouncedSearch))
-  }, [dispatch, debouncedSearch])
+    dispatch(maintenanceHistoryData(filters))
+  }, [dispatch, debouncedSearch, nameFilter, divisionFilter, departmentFilter])
 
   useEffect(() => {
     const role = localStorage.getItem("role")
@@ -106,6 +134,9 @@ function HistoryPage() {
     setStartDate("")
     setEndDate("")
     setApprovalStatusFilter("pending") // Reset to pending
+    setDivisionFilter("all")
+    setDepartmentFilter("all")
+    setNameFilter("all")
     setCurrentPage(1)
     setMaintCurrentPage(1)
     setDelegationCurrentPage(1)
@@ -141,11 +172,11 @@ function HistoryPage() {
     }
   }
 
-  // Handle select all for delegation items without admin_done = 'Done' and status = 'completed'
+  // Handle select all for delegation items without admin_done = 'Done'
   const handleSelectAllDelegation = (isChecked) => {
     if (isChecked) {
       const pendingItems = filteredDelegationData
-        .filter(item => item.admin_done !== 'Done' && item.status === 'completed')
+        .filter(item => item.admin_done !== 'Done')
         .map(item => ({ id: item.id }))
       setSelectedDelegationItems(pendingItems)
     } else {
@@ -232,7 +263,7 @@ function HistoryPage() {
         dispatch(checklistHistoryData())
       } else if (type === "maintenance") {
         setSelectedMaintenanceItems([])
-        dispatch(maintenanceHistoryData())
+        dispatch(maintenanceHistoryData({}))
       } else {
         setSelectedDelegationItems([])
         dispatch(delegationDoneData())
@@ -267,8 +298,11 @@ function HistoryPage() {
           : true
 
         const matchesMember = selectedMembers.length > 0
-          ? selectedMembers.includes(item.name)
-          : true
+          ? selectedMembers.some(m => m?.toLowerCase()?.trim() === item.name?.toLowerCase()?.trim())
+          : (nameFilter !== 'all' ? item.name?.toLowerCase()?.trim() .includes(nameFilter?.toLowerCase()?.trim()) : true)
+
+        const matchesDiv = divisionFilter !== 'all' ? item.division?.toLowerCase()?.trim() .includes(divisionFilter?.toLowerCase()?.trim()) : true
+        const matchesDept = departmentFilter !== 'all' ? item.department?.toLowerCase()?.trim() .includes(departmentFilter?.toLowerCase()?.trim()) : true
 
         let matchesDateRange = true
         if (startDate || endDate) {
@@ -291,7 +325,7 @@ function HistoryPage() {
           if (end && itemDateOnly > end) matchesDateRange = false
         }
 
-        return matchesSearch && matchesMember && matchesDateRange
+        return matchesSearch && matchesMember && matchesDateRange && matchesDiv && matchesDept
       })
       .filter((item) => {
         // Apply approval status filter
@@ -309,7 +343,7 @@ function HistoryPage() {
         if (!dateB) return -1
         return dateB - dateA
       })
-  }, [history, searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
+  }, [history, searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter, nameFilter, divisionFilter, departmentFilter])
 
   // Filtered maintenance history data
   const filteredMaintenanceData = useMemo(() => {
@@ -325,8 +359,11 @@ function HistoryPage() {
           : true
 
         const matchesMember = selectedMembers.length > 0
-          ? selectedMembers.includes(item.name)
-          : true
+          ? selectedMembers.some(m => m?.toLowerCase()?.trim() === item.name?.toLowerCase()?.trim())
+          : (nameFilter !== 'all' ? item.name?.toLowerCase()?.trim() .includes(nameFilter?.toLowerCase()?.trim()) : true)
+
+        const matchesDiv = divisionFilter !== 'all' ? item.division?.toLowerCase()?.trim() .includes(divisionFilter?.toLowerCase()?.trim()) : true
+        const matchesDept = departmentFilter !== 'all' ? item.department?.toLowerCase()?.trim() .includes(departmentFilter?.toLowerCase()?.trim()) : true
 
         let matchesDateRange = true
         if (startDate || endDate) {
@@ -349,7 +386,7 @@ function HistoryPage() {
           if (end && itemDateOnly > end) matchesDateRange = false
         }
 
-        return matchesSearch && matchesMember && matchesDateRange
+        return matchesSearch && matchesMember && matchesDateRange && matchesDiv && matchesDept
       })
       .filter((item) => {
         const isDone = item.admin_done === 'Done' || item.admin_done === 'true' || item.admin_done === true;
@@ -367,7 +404,7 @@ function HistoryPage() {
         if (!dateB) return -1
         return dateB - dateA
       })
-  }, [maintHistory, searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter])
+  }, [maintHistory, searchTerm, selectedMembers, startDate, endDate, approvalStatusFilter, nameFilter, divisionFilter, departmentFilter])
 
   // Maintenance pagination
   const maintTotalPages = Math.ceil(filteredMaintenanceData.length / ITEMS_PER_PAGE) || 1
@@ -410,6 +447,7 @@ function HistoryPage() {
     if (!Array.isArray(delegation_done)) return []
 
     return delegation_done
+      .filter((item) => item.status !== 'extend') // Hide extended tasks from this list
       .filter((item) => {
         const userMatch =
           userRole === "admin" || userRole === "div_admin" ||
@@ -442,12 +480,18 @@ function HistoryPage() {
           }
         }
 
-        return matchesSearch && matchesDateRange
+        const matchesMember = nameFilter !== 'all' ? item.name?.toLowerCase()?.trim() .includes(nameFilter?.toLowerCase()?.trim()) : true
+        const matchesDiv = divisionFilter !== 'all' ? item.division?.toLowerCase()?.trim() .includes(divisionFilter?.toLowerCase()?.trim()) : true
+        const matchesDept = departmentFilter !== 'all' ? (item.department || item.user_access)?.toLowerCase()?.trim() .includes(departmentFilter?.toLowerCase()?.trim()) : true
+
+        return matchesSearch && matchesDateRange && matchesMember && matchesDiv && matchesDept
       })
       .filter((item) => {
         // Apply approval status filter
         if (approvalStatusFilter === "pending") {
-          return item.admin_done !== 'Done' && item.status === 'completed'
+          // Show all non-admin-approved entries (completed OR extend — both need admin review)
+          // Note: extend is already filtered out above
+          return item.admin_done !== 'Done'
         } else if (approvalStatusFilter === "completed") {
           return item.admin_done === 'Done'
         }
@@ -461,7 +505,16 @@ function HistoryPage() {
         if (!dateB) return -1
         return dateB.getTime() - dateA.getTime()
       })
-  }, [delegation_done, searchTerm, startDate, endDate, userRole, username, approvalStatusFilter])
+  }, [delegation_done, searchTerm, startDate, endDate, userRole, username, approvalStatusFilter, nameFilter, divisionFilter, departmentFilter])
+
+  // Recalculate delegation stats based on visible (non-extended) tasks
+  const delegationStats = useMemo(() => {
+    const baseData = (delegation_done || []).filter(item => item.status !== 'extend');
+    const total = baseData.length;
+    const approved = baseData.filter(item => item.admin_done === 'Done').length;
+    const pending = total - approved;
+    return { total, approved, pending };
+  }, [delegation_done]);
 
   // Delegation pagination
   const delegationTotalPages = Math.ceil(filteredDelegationData.length / ITEMS_PER_PAGE) || 1
@@ -501,7 +554,7 @@ function HistoryPage() {
 
   // Count pending approval items
   const pendingApprovalCount = filteredHistoryData.filter(item => item.admin_done !== 'Done').length
-  const pendingDelegationApprovalCount = filteredDelegationData.filter(item => item.admin_done !== 'Done' && item.status === 'completed').length
+  const pendingDelegationApprovalCount = filteredDelegationData.filter(item => item.admin_done !== 'Done').length
   
 
   // Confirmation Modal Component
@@ -541,6 +594,53 @@ function HistoryPage() {
     )
   }
 
+   // File View Modal Component
+  const FileModal = ({ isOpen, urls, onClose }) => {
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
+        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 max-w-md w-full mx-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">Attached Files</h2>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+          </div>
+          <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+            {urls.map((url, i) => {
+              const cleanedUrl = url.trim();
+              const ext = cleanedUrl.split('.').pop().split('?')[0].toLowerCase();
+              const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+              
+              return (
+                <a
+                  key={i}
+                  href={cleanedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center p-3 bg-gray-50 hover:bg-purple-50 rounded-lg border border-gray-200 transition-colors group"
+                >
+                  {isImage ? (
+                    <img src={cleanedUrl} alt={`File ${i+1}`} className="w-10 h-10 object-cover rounded shadow-sm mr-3" />
+                  ) : (
+                    <div className="w-10 h-10 flex items-center justify-center bg-white rounded shadow-sm border border-gray-200 mr-3">
+                      <span className="text-xs font-bold text-gray-400 uppercase">{ext.slice(0,4)}</span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">Document {i + 1}</p>
+                    <p className="text-xs text-purple-600 group-hover:underline">Click to view &rarr;</p>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return "—"
     const date = new Date(dateStr)
@@ -552,6 +652,35 @@ function HistoryPage() {
     const minutes = date.getMinutes().toString().padStart(2, '0')
     return `${day}/${month}/${year} ${hours}:${minutes}`
   }
+
+  // Derive filter options
+  const divisionOptions = useMemo(() => {
+    const all = [
+      ...(history || []).map(item => item.division),
+      ...(maintHistory || []).map(item => item.division),
+      ...(delegation_done || []).map(item => item.division)
+    ].filter(Boolean);
+    return [...new Set(all)].sort();
+  }, [history, maintHistory, delegation_done]);
+
+  const departmentOptions = useMemo(() => {
+    const all = [
+      ...(history || []).map(item => item.department),
+      ...(maintHistory || []).map(item => item.department),
+      ...(delegation_done || []).map(item => item.department)
+    ].filter(Boolean);
+    return [...new Set(all)].sort();
+  }, [history, maintHistory, delegation_done]);
+
+  const memberOptions = useMemo(() => {
+    const all = [
+      ...(history || []).map(item => item.name),
+      ...(maintHistory || []).map(item => item.name),
+      ...(delegation_done || []).map(item => item.name)
+    ].filter(Boolean);
+    return [...new Set(all)].sort();
+  }, [history, maintHistory, delegation_done]);
+
 
   return (
     <AdminLayout>
@@ -668,47 +797,67 @@ function HistoryPage() {
               </div>
             </div>
 
-            {/* Member Filter Dropdown - Only for Checklist */}
-            {activeTab === "checklist" && (userRole === "admin" || userRole === "div_admin") && doerName && doerName.length > 0 && (
-              <select
-                value={selectedMembers[0] || ""}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedMembers([e.target.value]);
-                  } else {
-                    setSelectedMembers([]);
-                  }
-                }}
-                className="px-2 py-1 border border-gray-300 rounded text-xs bg-white min-w-[100px]"
-              >
-                <option value="">All Members</option>
-                {getFilteredMembersList().map((member) => (
-                  <option key={member} value={member}>{member}</option>
-                ))}
-              </select>
-            )}
+            {/* Filter Control Group */}
+            <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-wrap sm:w-auto items-center overflow-x-hidden pt-1 sm:pt-0">
+              {/* Name Filter - Mobile Order 1 */}
+              <div className="max-sm:order-1 sm:order-none w-full sm:w-auto">
+                <SearchableSelect
+                  id="names-list"
+                  value={nameFilter}
+                  onChange={setNameFilter}
+                  options={memberOptions}
+                  placeholder="Filter by Name"
+                />
+              </div>
 
-            {/* Approval Status Filter */}
-            <select
-              value={approvalStatusFilter}
-              onChange={(e) => setApprovalStatusFilter(e.target.value)}
-              className="px-2 py-1 border border-gray-300 rounded text-xs bg-white min-w-[100px]"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="completed">Approved</option>
-            </select>
+              {/* Division Filter - Mobile Order 3 */}
+              <div className="max-sm:order-3 sm:order-none w-full sm:w-auto">
+                <SearchableSelect
+                  id="divisions-list"
+                  value={divisionFilter}
+                  onChange={setDivisionFilter}
+                  options={divisionOptions}
+                  placeholder="Division"
+                />
+              </div>
 
-            {/* Reset Button */}
-            <button
-              onClick={resetFilters}
-              className="px-2 py-1 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-            >
-              Reset
-            </button>
+              {/* Department Filter - Mobile Order 5 */}
+              <div className="max-sm:order-5 sm:order-none w-full sm:w-auto col-span-2 sm:col-auto">
+                <SearchableSelect
+                  id="departments-list"
+                  value={departmentFilter}
+                  onChange={setDepartmentFilter}
+                  options={departmentOptions}
+                  placeholder="Department"
+                />
+              </div>
+
+              {/* Approval Status Filter - Mobile Order 2 */}
+              <div className="max-sm:order-2 sm:order-none w-full sm:w-auto">
+                <select
+                  value={approvalStatusFilter}
+                  onChange={(e) => setApprovalStatusFilter(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-purple-500"
+                >
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="completed">Approved</option>
+                </select>
+              </div>
+
+              {/* Reset Button - Mobile Order 4 */}
+              <div className="max-sm:order-4 sm:order-none w-full sm:w-auto">
+                <button
+                  onClick={resetFilters}
+                  className="w-full px-2 py-1.5 text-xs text-gray-600 bg-gray-100 rounded hover:bg-gray-200 border border-gray-300"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
 
             {/* Stats - Inline */}
-            <div className="flex gap-3 ml-auto text-xs">
+            <div className="flex gap-3 ml-0 sm:ml-auto text-xs py-1">
               {activeTab === "maintenance" ? (
                 <>
                   <span className="text-purple-600 font-medium">{maintTotalCount} Total</span>
@@ -717,9 +866,9 @@ function HistoryPage() {
                 </>
               ) : activeTab === "delegation" ? (
                 <>
-                  <span className="text-purple-600 font-medium">{delegationTotalCount} Total</span>
-                  <span className="text-orange-600 font-medium">{delegationTotalCount - delegationApprovedCount} Pending</span>
-                  <span className="text-green-600 font-medium">{delegationApprovedCount} Approved</span>
+                  <span className="text-purple-600 font-medium">{delegationStats.total} Total</span>
+                  <span className="text-orange-600 font-medium">{delegationStats.pending} Pending</span>
+                  <span className="text-green-600 font-medium">{delegationStats.approved} Approved</span>
                 </>
               ) : (
                 <>
@@ -770,7 +919,7 @@ function HistoryPage() {
         {/* Table Container - More height */}
         <div className="bg-white rounded-md shadow-sm overflow-hidden">
           <style>{`
-            /* Mobile Card Layout Styles */
+            /* Mobile Card Layout Styles - Improved Grid version */
             @media (max-width: 768px) {
               .mobile-card-table {
                 display: block;
@@ -782,44 +931,78 @@ function HistoryPage() {
                 display: block;
               }
               .mobile-card-table tr {
-                display: block;
-                margin-bottom: 1rem;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.25rem 0.75rem; 
+                margin-bottom: 1.25rem;
                 border: 1px solid #e5e7eb;
-                border-radius: 0.5rem;
-                padding: 1rem;
+                border-radius: 0.75rem;
+                padding: 1.25rem;
                 background-color: #ffffff;
-                box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
               }
               .mobile-card-table td {
                 display: flex;
                 flex-direction: column;
                 text-align: left;
-                padding: 0.5rem 0;
+                padding: 0.375rem 0;
                 border: none;
                 background: transparent !important;
+                min-width: 0;
               }
               .mobile-card-table td::before {
                 content: attr(data-label);
-                font-weight: 600;
-                color: #6b7280;
-                font-size: 0.75rem;
+                font-weight: 700;
+                color: #9ca3af;
+                font-size: 0.65rem;
                 text-transform: uppercase;
-                margin-bottom: 0.25rem;
+                margin-bottom: 0.15rem;
+                letter-spacing: 0.025em;
               }
-              .mobile-card-table td:first-child {
-                border-top: none;
+              
+              /* Value styling */
+              .mobile-card-table td > div,
+              .mobile-card-table td > span {
+                font-size: 0.875rem;
+                color: #374151;
               }
+
+              /* Full width fields for better readability */
+              .mobile-card-table td.mobile-checkbox-cell,
+              .mobile-card-table td[data-label="Task Description"],
+              .mobile-card-table td[data-label="Task/Machine"],
+              .mobile-card-table td[data-label="Admin Remarks"],
+              .mobile-card-table td[data-label="Remarks"],
+              .mobile-card-table td[data-label="Reply"],
+              .mobile-card-table td[data-label="Reason"],
+              .mobile-card-table td[data-label="File"],
+              .mobile-card-table td[data-label="Proof"],
+              .mobile-card-table td[data-label="Submission Time"],
+              .mobile-card-table td[data-label="Submission Date"],
+              .mobile-card-table td[data-label="Created At"] {
+                grid-column: span 2;
+                padding-bottom: 0.5rem;
+              }
+
+              /* Special styling for checkbox row */
               .mobile-card-table td.mobile-checkbox-cell {
-                display: flex;
-                flex-direction: row;
-                justify-content: space-between;
-                align-items: center;
-                padding: 0.5rem 0;
-                border-bottom: 1px solid #e5e7eb;
-                margin-bottom: 0.5rem;
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                padding-bottom: 0.75rem !important;
+                border-bottom: 1px solid #f3f4f6 !important;
+                margin-bottom: 0.5rem !important;
               }
               .mobile-card-table td.mobile-checkbox-cell::before {
                 margin-bottom: 0;
+                font-size: 0.75rem;
+                color: #6b7280;
+              }
+              
+              .mobile-card-table td[data-label="Task ID"] div {
+                font-weight: 700;
+                color: #6366f1;
               }
             }
           `}</style>
@@ -873,6 +1056,7 @@ function HistoryPage() {
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Proof</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 min-w-[120px]">Reason</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -919,7 +1103,7 @@ function HistoryPage() {
                                 }`}
                               />
                             ) : (
-                              <div className="text-xs text-gray-600 font-medium">{item.admin_done_remarks || "—"}</div>
+                              <div className="text-xs text-gray-600 font-medium">{item.admin_remark || item.admin_done_remarks || "—"}</div>
                             )}
                           </td>
                         )}
@@ -977,19 +1161,26 @@ function HistoryPage() {
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Proof">
                           {item.image ? (
-                            <a
-                              href={item.image}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={() => {
+                                const urls = typeof item.image === 'string' ? item.image.split(',') : [item.image];
+                                if (urls.length === 1) {
+                                  window.open(urls[0].trim(), "_blank");
+                                } else {
+                                  setFileModal({ isOpen: true, urls });
+                                }
+                              }}
                               className="text-blue-600 hover:text-blue-800 underline flex items-center text-xs sm:text-sm"
                             >
                               <img
-                                src={item.image}
+                                src={typeof item.image === 'string' ? item.image.split(',')[0].trim() : item.image}
                                 alt="Proof"
                                 className="h-6 w-6 sm:h-8 sm:w-8 object-cover rounded-md mr-2"
                               />
-                              View
-                            </a>
+                              {(typeof item.image === 'string' && item.image.split(',').length > 1) 
+                                ? `View ${item.image.split(',').length} Files` 
+                                : 'View'}
+                            </button>
                           ) : (
                             <span className="text-gray-400 text-xs sm:text-sm">No file</span>
                           )}
@@ -1007,11 +1198,16 @@ function HistoryPage() {
                             </span>
                           </div>
                         </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-purple-50 min-w-[120px]" data-label="Reason">
+                          <div className="text-xs sm:text-sm text-gray-900" title={item.remark}>
+                            {item.remark || "—"}
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={isSuperAdmin ? 13 : 11} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                      <td colSpan={isSuperAdmin ? 16 : 14} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
                         {searchTerm || selectedMembers.length > 0 || startDate || endDate
                           ? "No records matching your filters"
                           : "No maintenance records found"}
@@ -1193,19 +1389,26 @@ function HistoryPage() {
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="File">
                           {historyItem.image ? (
-                            <a
-                              href={historyItem.image}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={() => {
+                                const urls = typeof historyItem.image === 'string' ? historyItem.image.split(',') : [historyItem.image];
+                                if (urls.length === 1) {
+                                  window.open(urls[0].trim(), "_blank");
+                                } else {
+                                  setFileModal({ isOpen: true, urls });
+                                }
+                              }}
                               className="text-blue-600 hover:text-blue-800 underline flex items-center text-xs sm:text-sm"
                             >
                               <img
-                                src={historyItem.image}
+                                src={typeof historyItem.image === 'string' ? historyItem.image.split(',')[0].trim() : historyItem.image}
                                 alt="Attachment"
                                 className="h-6 w-6 sm:h-8 sm:w-8 object-cover rounded-md mr-2"
                               />
-                              View
-                            </a>
+                              {(typeof historyItem.image === 'string' && historyItem.image.split(',').length > 1) 
+                                ? `View ${historyItem.image.split(',').length} Files` 
+                                : 'View'}
+                            </button>
                           ) : (
                             <span className="text-gray-400 text-xs sm:text-sm">No file</span>
                           )}
@@ -1239,7 +1442,15 @@ function HistoryPage() {
                         />
                       </th>
                     )}
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Status</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Task Description</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 min-w-[120px]">Reply</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given By</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Status</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">Created At</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Extend</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">File</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Admin Status</th>
                     {isSuperAdmin && (
                       <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50">Admin Remarks</th>
                     )}
@@ -1247,15 +1458,6 @@ function HistoryPage() {
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given By</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                    {/* <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th> */}
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Task Description</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">Created At</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Status</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Extend Date</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 min-w-[120px]">Reason</th>
-                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1279,7 +1481,70 @@ function HistoryPage() {
                             )}
                           </td>
                         )}
-                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Admin Status">
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[150px]" data-label="Task Description">
+                          <div className="text-xs sm:text-sm text-gray-900" title={item.task_description}>
+                            {item.task_description || "—"}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-purple-50 min-w-[120px]" data-label="Reply">
+                          <div className="text-xs sm:text-sm text-gray-900" title={item.reason}>
+                            {item.reason || "—"}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Given By">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Name">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-blue-50" data-label="Status">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            item.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : item.status === "extend"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-gray-100 text-gray-800"
+                          }`}>
+                            {item.status || "—"}
+                          </span>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50" data-label="Created At">
+                          <div className="text-xs sm:text-sm text-gray-900">
+                            {formatDateForDisplay(item.created_at)}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Extend">
+                          <div className="text-xs sm:text-sm text-gray-900">
+                            {item.next_extend_date ? formatDateForDisplay(item.next_extend_date) : "—"}
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[100px]" data-label="File">
+                          {item.image_url ? (
+                            <button
+                              onClick={() => {
+                                const urls = typeof item.image_url === 'string' ? item.image_url.split(',') : [item.image_url];
+                                if (urls.length === 1) {
+                                  window.open(urls[0].trim(), "_blank");
+                                } else {
+                                  setFileModal({ isOpen: true, urls });
+                                }
+                              }}
+                              className="text-blue-600 hover:text-blue-800 underline flex items-center text-xs sm:text-sm"
+                            >
+                              <img
+                                src={typeof item.image_url === 'string' ? item.image_url.split(',')[0].trim() : item.image_url}
+                                alt="Attachment"
+                                className="h-6 w-6 sm:h-8 sm:w-8 object-cover rounded-md mr-2"
+                              />
+                              {(typeof item.image_url === 'string' && item.image_url.split(',').length > 1) 
+                                ? `View ${item.image_url.split(',').length} Files` 
+                                : 'View'}
+                            </button>
+                          ) : (
+                            <span className="text-gray-400 text-xs sm:text-sm">No file</span>
+                          )}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[120px]" data-label="Admin Status">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             item.admin_done === 'Done'
                               ? "bg-green-100 text-green-800"
@@ -1320,63 +1585,6 @@ function HistoryPage() {
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Division">
                           <div className="text-xs sm:text-sm text-gray-900">{item.division || "—"}</div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Given By">
-                          <div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Name">
-                          <div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 sm:py-4 min-w-[150px]" data-label="Task Description">
-                          <div className="text-xs sm:text-sm text-gray-900" title={item.task_description}>
-                            {item.task_description || "—"}
-                          </div>
-                        </td>
-
-                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-yellow-50" data-label="Created At">
-                          <div className="text-xs sm:text-sm text-gray-900">
-                            {formatDateForDisplay(item.created_at)}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-blue-50" data-label="Status">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            item.status === "completed"
-                              ? "bg-green-100 text-green-800"
-                              : item.status === "extend"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-gray-100 text-gray-800"
-                          }`}>
-                            {item.status || "—"}
-                          </span>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Next Extend Date">
-                          <div className="text-xs sm:text-sm text-gray-900">
-                            {item.next_extend_date ? formatDateForDisplay(item.next_extend_date) : "—"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 sm:py-4 bg-purple-50 min-w-[120px]" data-label="Reason">
-                          <div className="text-xs sm:text-sm text-gray-900" title={item.reason}>
-                            {item.reason || "—"}
-                          </div>
-                        </td>
-                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="File">
-                          {item.image_url ? (
-                            <a
-                              href={item.image_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 underline flex items-center text-xs sm:text-sm"
-                            >
-                              <img
-                                src={item.image_url}
-                                alt="Attachment"
-                                className="h-6 w-6 sm:h-8 sm:w-8 object-cover rounded-md mr-2"
-                              />
-                              View
-                            </a>
-                          ) : (
-                            <span className="text-gray-400 text-xs sm:text-sm">No file</span>
-                          )}
                         </td>
                       </tr>
                     ))
@@ -1487,6 +1695,13 @@ function HistoryPage() {
           itemCount={confirmationModal.itemCount}
           onConfirm={confirmMarkDone}
           onCancel={() => setConfirmationModal({ isOpen: false, itemCount: 0, type: "checklist" })}
+        />
+
+        {/* File Modal */}
+        <FileModal
+          isOpen={fileModal.isOpen}
+          urls={fileModal.urls}
+          onClose={() => setFileModal({ isOpen: false, urls: [] })}
         />
       </div>
     </AdminLayout>

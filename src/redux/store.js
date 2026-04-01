@@ -8,6 +8,7 @@ import dashboardReducer from "./slice/dashboardSlice";
 import settingReducer from './slice/settingSlice'
 import userProfileReducer from './slice/userProfileSlice'
 import maintenanceReducer from './slice/maintenanceSlice'
+import { productApi } from './asset-redux/slices/productApi';
 
 const store = configureStore({
     reducer: {
@@ -19,8 +20,15 @@ const store = configureStore({
         dashBoard: dashboardReducer,
         setting: settingReducer,
         userProfile: userProfileReducer,
-        maintenance: maintenanceReducer
-    }
+        maintenance: maintenanceReducer,
+        [productApi.reducerPath]: productApi.reducer,
+    },
+    middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+            serializableCheck: {
+                warnAfter: 128,
+            },
+        }).concat(productApi.middleware),
 })
 
 export default store;
