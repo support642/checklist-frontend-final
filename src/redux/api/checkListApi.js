@@ -141,22 +141,25 @@ export const postChecklistAdminDoneAPI = async (selectedItems) => {
     return { error };
   }
 };
-
 // =======================================================
-// 5️⃣ Send WhatsApp Notification API (Admin Only)
+// 5️⃣ Send Email Notification (AWS Backend - Admin Only)
 // =======================================================
-export const sendChecklistWhatsAppAPI = async (selectedItems) => {
+export const sendEmailNotificationAPI = async (items) => {
   try {
-    const response = await authFetch(`${BASE_URL}/send-whatsapp`, {
+    const response = await authFetch(`${BASE_URL}/send-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: selectedItems }),
+      body: JSON.stringify({ items }),
     });
+
+    if (!response.ok) {
+      throw new Error("Email sending failed");
+    }
 
     const json = await response.json();
     return json;
   } catch (error) {
-    console.error("❌ Error Sending WhatsApp:", error);
-    return { error };
+    console.error("❌ Error Sending Email:", error);
+    throw error;
   }
 };

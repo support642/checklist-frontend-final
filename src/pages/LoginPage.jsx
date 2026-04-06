@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { useNavigate, useLocation } from "react-router-dom"
 import { loginUser } from "../redux/slice/loginSlice"
@@ -13,6 +13,7 @@ const LoginPage = () => {
   const location = useLocation()
   const { isLoggedIn, userData, error } = useSelector((state) => state.login);
   const dispatch = useDispatch();
+  const hasRedirected = useRef(false);
 
   const [isDataLoading, setIsDataLoading] = useState(false)
   const [isLoginLoading, setIsLoginLoading] = useState(false)
@@ -30,11 +31,13 @@ const LoginPage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsLoginLoading(true);
+    hasRedirected.current = false; // Reset on new login attempt
     dispatch(loginUser(formData));
   };
 
   useEffect(() => {
-    if (isLoggedIn && userData) {
+    if (isLoggedIn && userData && !hasRedirected.current) {
+      hasRedirected.current = true;
       console.log("User Data received:", userData);
 
       localStorage.setItem('user-name', userData.user_name || userData.username || "");

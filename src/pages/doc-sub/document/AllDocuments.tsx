@@ -1,12 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, FileText, Download, Edit, MessageCircle, RefreshCw, Save, X } from 'lucide-react';
+import { Plus, Search, FileText, Download, Edit, MessageCircle, RefreshCw, Save, X, Mail } from 'lucide-react';
 import useHeaderStore from '../../../store/headerStore';
 import AddDocument from './AddDocument';
-import ShareModal from './ShareModal';
+import ShareEmailModal from './ShareEmailModal';
+
 
 import { formatDate } from '../../../utils/doc-utils/dateFormatter';
 import { toast } from 'react-hot-toast';
-import { fetchAllDocuments, updateDocument, mapBackendToFrontend, BackendDocument } from '../../../utils/doc-utils/documentApi';
+import { 
+    fetchAllDocuments, 
+    mapBackendToFrontend, 
+    updateDocument, 
+    createDocument,
+    shareEmail,
+    BackendDocument
+} from '../../../utils/doc-utils/documentApi';
 import useAuthStore from '../../../store/authStore';
 
 // Frontend document interface
@@ -98,9 +106,33 @@ const AllDocuments = () => {
     const [editFormData, setEditFormData] = useState<Partial<DocumentItem>>({});
     
     // Share Modal State
-    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [shareType, setShareType] = useState<'whatsapp' | null>(null);
-    const [shareDoc, setShareDoc] = useState<{ id: string, name: string, url?: string, documentType?: string, category?: string, companyName?: string, needsRenewal?: boolean, renewalDate?: string } | null>(null);
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [shareDoc, setShareDoc] = useState<DocumentItem | null>(null);
+
+    const handleOpenShareModal = (doc: DocumentItem) => {
+        setShareDoc(doc);
+        setIsEmailModalOpen(true);
+    };
+
+    const handleSendEmail = async (recipientName: string, recipientEmail: string, recipientPhone: string, message: string) => {
+        if (!shareDoc) return;
+        
+        try {
+            // Call our real email sharing API
+            await shareEmail({
+                recipientName,
+                recipientEmail,
+                recipientPhone,
+                message,
+                documentId: Number(shareDoc.id)
+            });
+            
+            toast.success(`Document shared with ${recipientName} successfully!`);
+        } catch (err) {
+            console.error('Failed to share document:', err);
+            toast.error('Failed to share document via email');
+        }
+    };
 
     const handleEdit = (item: DocumentItem) => {
         setEditingDocId(item.id);
@@ -130,12 +162,6 @@ const AllDocuments = () => {
             console.error('Update failed:', err);
             toast.error('Failed to update document');
         }
-    };
-
-    const openShare = (type: 'whatsapp', doc: { id: string, name: string, url?: string, documentType?: string, category?: string, companyName?: string, needsRenewal?: boolean, renewalDate?: string }) => {
-        setShareType(type);
-        setShareDoc(doc);
-        setIsShareModalOpen(true);
     };
 
     const handleDownload = (fileContent: string | undefined, fileName: string | null) => {
@@ -173,14 +199,7 @@ const AllDocuments = () => {
                                 </span>
                                 <div className="hidden sm:block h-4 w-px bg-gray-200 mx-1"></div>
                                 <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                                    <button
-                                        onClick={() => openShare('whatsapp', { id: 'batch', name: `${selectedIds.size} Documents` })}
-                                        className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-100"
-                                        title="Share via WhatsApp"
-                                    >
-                                        <MessageCircle size={14} />
-                                        WhatsApp
-                                    </button>
+
                                 </div>
                             </div>
                         ) : (
@@ -269,12 +288,12 @@ const AllDocuments = () => {
                                             />
                                         </td>
                                         <td className="px-3 py-2 text-center">
-                                            <button
-                                                onClick={() => openShare('whatsapp', { id: item.id, name: item.documentName, url: item.fileContent, documentType: item.documentType, category: item.category, companyName: item.companyName, needsRenewal: item.needsRenewal, renewalDate: item.renewalDate })}
-                                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-full transition-colors outline-none"
-                                                title="Share via WhatsApp"
+                                            <button 
+                                                onClick={() => handleOpenShareModal(item)}
+                                                className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                title="Share via Email"
                                             >
-                                                <MessageCircle size={18} />
+                                                <Mail size={16} />
                                             </button>
                                         </td>
                                         {isAdmin && (
@@ -470,14 +489,13 @@ const AllDocuments = () => {
                                         <span className="text-gray-400 text-xs">-</span>
                                     )}
                                     <div className="flex gap-2">
-                                        <button
-                                            onClick={() => openShare('whatsapp', { id: item.id, name: item.documentName, url: item.fileContent, documentType: item.documentType, category: item.category, companyName: item.companyName, needsRenewal: item.needsRenewal, renewalDate: item.renewalDate })}
-                                            className="p-1.5 text-green-600 bg-green-50 rounded-lg"
-                                            title="Share via WhatsApp"
+                                        <button 
+                                            onClick={() => handleOpenShareModal(item)}
+                                            className="p-1.5 text-indigo-600 bg-indigo-50 rounded-lg"
+                                            title="Share via Email"
                                         >
-                                            <MessageCircle size={14} />
+                                            <Mail size={14} />
                                         </button>
-
                                         {isAdmin && (
                                             editingDocId === item.id ? (
                                                 <>
@@ -510,19 +528,18 @@ const AllDocuments = () => {
                 </div>
             </div>
             <AddDocument isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-            <ShareModal
-                isOpen={isShareModalOpen}
-                onClose={() => setIsShareModalOpen(false)}
-                type={shareType}
-                documentId={shareDoc?.id || ''}
-                documentName={shareDoc?.name || ''}
-                documentUrl={shareDoc?.url || ''}
-                documentType={shareDoc?.documentType || ''}
-                category={shareDoc?.category || ''}
-                companyName={shareDoc?.companyName || ''}
-                needsRenewal={shareDoc?.needsRenewal || false}
-                renewalDate={shareDoc?.renewalDate || ''}
-            />
+            
+            {shareDoc && (
+                <ShareEmailModal
+                    isOpen={isEmailModalOpen}
+                    onClose={() => {
+                        setIsEmailModalOpen(false);
+                        setShareDoc(null);
+                    }}
+                    onSend={handleSendEmail}
+                    documentName={shareDoc.documentName}
+                />
+            )}
         </>
     );
 };

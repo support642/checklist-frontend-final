@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import useDataStore, { RenewalItem } from '../../../store/dataStore';
 import useAuthStore from '../../../store/authStore';
 import useHeaderStore from '../../../store/headerStore';
@@ -674,7 +675,7 @@ const DocumentRenewal = () => {
             {/* Removed the monolithic Document Renewal Modal handling */ }
 
             {/* Document Renewal Action Modal */}
-            {isModalOpen && selectedDoc && (
+            {isModalOpen && selectedDoc && createPortal(
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in max-h-[90vh] overflow-y-auto">
                         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10">
@@ -788,7 +789,7 @@ const DocumentRenewal = () => {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>, document.body
             )}
         </div>
     );

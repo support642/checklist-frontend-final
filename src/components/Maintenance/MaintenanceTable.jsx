@@ -5,6 +5,44 @@ import {
   CheckCircle2, AlertCircle, Clock
 } from 'lucide-react';
 
+const PartNameCellDesktop = ({ partName }) => {
+  const [expanded, setExpanded] = useState(false);
+  
+  // Normalize partName into an array
+  let partsArray = [];
+  if (Array.isArray(partName)) {
+    partsArray = partName;
+  } else if (typeof partName === 'string') {
+    partsArray = partName.split(',').map(s => s.trim()).filter(Boolean);
+  }
+
+  if (partsArray.length === 0) {
+    return <div className="text-sm text-gray-500">-</div>;
+  }
+
+  if (partsArray.length <= 1) {
+    return <div className="text-sm text-gray-500 w-[190px] min-w-[190px] max-w-[190px] truncate">{partsArray[0]}</div>;
+  }
+
+  return (
+    <div className="w-[190px] min-w-[190px] max-w-[190px] flex flex-col items-start">
+      <div 
+        className={`w-full text-sm text-gray-500 transition-all duration-200 ${expanded ? 'whitespace-normal break-words' : 'truncate'}`}
+        title={!expanded ? partsArray.join(', ') : ''}
+      >
+        {partsArray.join(', ')}
+      </div>
+      <button 
+        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+        className="text-[10px] text-purple-600 hover:text-purple-800 font-bold uppercase tracking-wider mt-1.5 focus:outline-none transition-colors flex items-center gap-1"
+      >
+        {expanded ? "Show Less" : `Show More (${partsArray.length - 1})`}
+      </button>
+    </div>
+  );
+};
+
+
 const MaintenanceTable = ({ 
   tasks, 
   isLoading,
@@ -181,6 +219,13 @@ const MaintenanceTable = ({
           </span>
         );
       }
+      if (compareDate > today) {
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+            <Clock className="h-3 w-3" /> Upcoming
+          </span>
+        );
+      }
     }
 
     return (
@@ -285,8 +330,8 @@ const MaintenanceTable = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{task.machine_name || '-'}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                       {Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || '-')}
+                    <td className="px-6 py-4 align-top">
+                       <PartNameCellDesktop partName={task.part_name} />
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                        {task.part_area || '-'}

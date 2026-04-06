@@ -16,6 +16,7 @@ interface DocumentEntry {
     file: File | null;
     fileName: string;
     fileContent?: string;
+    fileError?: string;
 }
 
 interface AddDocumentProps {
@@ -88,13 +89,25 @@ const AddDocument: React.FC<AddDocumentProps> = ({ isOpen, onClose }) => {
     const handleFileChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Check if file size exceeds 5MB
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error(`File size of "${file.name}" exceeds the 5MB limit.`);
+                setEntries(prev => prev.map(item => item.id === id ? {
+                    ...item,
+                    fileError: `File too large! Must be under 5MB.`
+                } : item));
+                e.target.value = ''; // Reset the input
+                return;
+            }
+
             const reader = new FileReader();
             reader.onloadend = () => {
                 setEntries(prev => prev.map(item => item.id === id ? {
                     ...item,
                     file: file,
                     fileName: file.name,
-                    fileContent: reader.result as string
+                    fileContent: reader.result as string,
+                    fileError: undefined
                 } : item));
             };
             reader.readAsDataURL(file);
@@ -335,7 +348,9 @@ const AddDocument: React.FC<AddDocumentProps> = ({ isOpen, onClose }) => {
                                     {/* 6. File Upload */}
                                     <div>
                                         <div className="relative">
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Upload File</label>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">
+                                                Upload File <span className="text-[10px] font-normal text-gray-400 ml-1">(Max 5MB)</span>
+                                            </label>
                                             <input
                                                 type="file"
                                                 id={`file-${entry.id}`}
@@ -349,6 +364,9 @@ const AddDocument: React.FC<AddDocumentProps> = ({ isOpen, onClose }) => {
                                                 <Upload size={14} />
                                                 <span className="text-xs font-medium truncate max-w-[180px]">{entry.fileName || "Choose File"}</span>
                                             </label>
+                                            {entry.fileError && (
+                                                <p className="text-red-500 text-[10px] mt-1.5 font-semibold bg-red-50/80 px-2 py-1 rounded inline-block">{entry.fileError}</p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

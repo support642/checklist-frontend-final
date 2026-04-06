@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Plus, Trash2 } from 'lucide-react';
 import { useAddProductMutation, useUpdateProductMutation, useGetAssetUsersQuery } from '../../redux/asset-redux/slices/productApi';
+import SearchableInput from '../doc-sub-components/SearchableInput';
 const MAX_SECTIONS = 10;
 
 const InputField = ({ label, name, type = "text", value, onChange, placeholder, options, required = false }) => (
@@ -237,10 +238,22 @@ const AddProductModal = ({ isOpen, onClose, product = null }) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <InputField label="Assigned Location" name="location" type="select" options={['Warehouse', 'Office', 'Plant']} value={formData.location} onChange={handleChange} />
                                 <InputField label="Department" name="department" type="select" options={['IT', 'Production', 'Admin']} value={formData.department} onChange={handleChange} />
-                                <InputField label="Assigned To" name="assignedTo" type="select" options={userOptions} value={formData.assignedTo} onChange={handleChange} />
+                                <SearchableInput 
+                                    label="Assigned To" 
+                                    options={userOptions} 
+                                    value={formData.assignedTo ?? ""} 
+                                    onChange={(val) => setFormData(prev => ({ ...prev, assignedTo: val }))} 
+                                    placeholder="Select Assigned To" 
+                                />
                                 <InputField label="Usage Type" name="usageType" type="select" options={['Internal', 'External']} value={formData.usageType} onChange={handleChange} />
                                 <InputField label="Storage Location" name="storageLoc" value={formData.storageLoc} onChange={handleChange} placeholder="Rack / Room" />
-                                <InputField label="Responsible Person" name="responsiblePerson" type="select" options={userOptions} value={formData.responsiblePerson} onChange={handleChange} />
+                                <SearchableInput 
+                                    label="Responsible Person" 
+                                    options={userOptions} 
+                                    value={formData.responsiblePerson ?? ""} 
+                                    onChange={(val) => setFormData(prev => ({ ...prev, responsiblePerson: val }))} 
+                                    placeholder="Select Responsible Person" 
+                                />
                             </div>
                         </section>
 

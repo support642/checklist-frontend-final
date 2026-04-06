@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   CheckSquare,
@@ -166,18 +166,26 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
     }
   ];
 
-  const [openMenus, setOpenMenus] = useState({
-    systems: true,
-    checklist: true,
-    docs: false,
-    resource_manager: false,
-    renewals: false,
-    subscription_group: false,
-    payment_group: false,
-    loan_group: false,
-    assets: false,
-    repair: false
+  const [openMenus, setOpenMenus] = useState(() => {
+    const saved = localStorage.getItem("sidebar-open-menus");
+    return saved ? JSON.parse(saved) : {
+      systems: true,
+      checklist: true,
+      docs: false,
+      resource_manager: false,
+      renewals: false,
+      subscription_group: false,
+      payment_group: false,
+      loan_group: false,
+      assets: false,
+      repair: false
+    };
   });
+
+  // Persist menu state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("sidebar-open-menus", JSON.stringify(openMenus));
+  }, [openMenus]);
 
   const toggleMenu = (key) => {
     setOpenMenus(prev => ({
@@ -185,6 +193,36 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
       [key]: !prev[key]
     }));
   };
+
+  // Sidebar Scroll Persistence logic
+  const desktopNavRef = useRef(null);
+  const mobileNavRef = useRef(null);
+
+  const handleScroll = (e, key) => {
+    sessionStorage.setItem(key, e.target.scrollTop);
+  };
+
+  // Restore scroll positions after mount and permissions are loaded
+  useLayoutEffect(() => {
+    const restoreScroll = () => {
+      const savedDesktop = sessionStorage.getItem("sidebar-scroll-desktop");
+      const savedMobile = sessionStorage.getItem("sidebar-scroll-mobile");
+
+      if (savedDesktop && desktopNavRef.current) {
+        desktopNavRef.current.scrollTop = parseInt(savedDesktop, 10);
+      }
+      if (savedMobile && mobileNavRef.current) {
+        mobileNavRef.current.scrollTop = parseInt(savedMobile, 10);
+      }
+    };
+
+    // Run immediately when layout updates
+    restoreScroll();
+    
+    // Fallback for slower renders
+    const timer = setTimeout(restoreScroll, 50);
+    return () => clearTimeout(timer);
+  }, [hasDocsAccess, hasAssetsAccess, hasRepairAccess, isMobileMenuOpen, openMenus]);
 
   // Helper to check if a group has any accessible children
   const hasAccessibleChildren = (item) => {
@@ -199,7 +237,13 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
   useEffect(() => {
     const findAndExpand = (items) => {
       for (const item of items) {
-        if (item.route === location.pathname) return true;
+        const isActive = item.route && (
+          location.pathname === item.route || 
+          (item.route !== "/" && item.route !== "/dashboard/admin" && location.pathname.startsWith(item.route))
+        );
+        
+        if (isActive) return true;
+        
         if (item.children) {
           const isChildActive = findAndExpand(item.children);
           if (isChildActive && item.key) {
@@ -287,7 +331,11 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
             <span>Checklist & Delegation </span>
           </Link>
         </div>
-        <nav className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+        <nav 
+          ref={desktopNavRef}
+          onScroll={(e) => handleScroll(e, "sidebar-scroll-desktop")}
+          className="flex-1 overflow-y-auto p-2 scrollbar-thin"
+        >
           <ul className="space-y-2">
             {sidebarStructure.map(group => renderNavItem(group))}
           </ul>
@@ -417,7 +465,11 @@ export default function AdminLayout({ children, darkMode, toggleDarkMode }) {
                 <span>Checklist & Delegation</span>
               </Link>
             </div>
-            <nav className="flex-1 overflow-y-auto p-2 bg-white scrollbar-thin">
+            <nav 
+              ref={mobileNavRef}
+              onScroll={(e) => handleScroll(e, "sidebar-scroll-mobile")}
+              className="flex-1 overflow-y-auto p-2 bg-white scrollbar-thin"
+            >
               <ul className="space-y-2">
                 {sidebarStructure.map(group => renderNavItem(group))}
               </ul>

@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Search, CheckCircle2, ChevronLeft, ChevronRight, X } from "lucide-react"
+import { Search, CheckCircle2, ChevronLeft, ChevronRight, X, Bell } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 import { useDispatch, useSelector } from "react-redux"
 import { checklistHistoryData } from "../../redux/slice/checklistSlice"
@@ -11,7 +11,7 @@ import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice"
 import { hasPageAccess, canAccessModule, hasModifyAccess } from "../../utils/permissionUtils"
 import { delegationDoneData } from "../../redux/slice/delegationSlice"
 import { maintenanceHistoryData, maintenanceAdminDone } from "../../redux/slice/maintenanceSlice"
-import { postMaintenanceAdminDoneAPI } from "../../redux/api/maintenanceApi"
+import { postMaintenanceAdminDoneAPI, sendMaintenanceNotificationAPI } from "../../redux/api/maintenanceApi"
 
 const SearchableSelect = ({ value, onChange, options, placeholder, id }) => (
   <div className="relative group w-full sm:min-w-[120px]">
@@ -423,6 +423,30 @@ function HistoryPage() {
   const isMaintItemDone = (item) => {
     return item.admin_done === 'Done' || item.admin_done === 'true' || item.admin_done === true
   }
+
+  const handleSendMaintenanceNotification = async () => {
+    if (selectedMaintenanceItems.length === 0) return;
+    setMarkingAsDone(true); // Using existing loading overlay state
+    try {
+      // selectedMaintenanceItems is [{task_id: ...}, ...]
+      const selectedIds = selectedMaintenanceItems.map(item => item.task_id);
+      const selectedTasks = maintHistory.filter(m => selectedIds.includes(m.task_id));
+      
+      const { data, error } = await sendMaintenanceNotificationAPI(selectedTasks);
+      
+      if (error) {
+        throw new Error(error.message || "Failed to send notifications");
+      }
+      
+      setSuccessMessage(`Successfully sent notifications to ${selectedMaintenanceItems.length} users!`);
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error("Error sending notification:", err);
+      setSuccessMessage(`Failed to send notifications: ${err.message}`);
+    } finally {
+      setMarkingAsDone(false);
+    }
+  };
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -845,7 +869,29 @@ function HistoryPage() {
                 </select>
               </div>
 
-              {/* Reset Button - Mobile Order 4 */}
+              {/* Maintenance Approve/Notify Button Group */}
+              {activeTab === 'maintenance' && isSuperAdmin && selectedMaintenanceItems.length > 0 && (
+                <div className="flex gap-2 max-sm:w-full max-sm:flex-col">
+                  <button
+                    onClick={handleSendMaintenanceNotification}
+                    disabled={maintLoading}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all text-xs sm:text-sm font-bold shadow-md shadow-blue-100 disabled:opacity-50 group"
+                  >
+                    <Bell className={`h-4 w-4 ${maintLoading ? 'animate-bounce' : 'group-hover:animate-ring'}`} />
+                    <span>Notify ({selectedMaintenanceItems.length})</span>
+                  </button>
+                  <button
+                    onClick={handleMaintenanceApproval}
+                    disabled={maintLoading}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-all text-xs sm:text-sm font-bold shadow-md shadow-green-100 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Approve ({selectedMaintenanceItems.length})</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Reset Logic */}
               <div className="max-sm:order-4 sm:order-none w-full sm:w-auto">
                 <button
                   onClick={resetFilters}
@@ -1047,6 +1093,7 @@ function HistoryPage() {
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task ID</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Task/Machine</th>
+                    <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given By</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
                     <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division</th>
@@ -1122,6 +1169,9 @@ function HistoryPage() {
                               {item.machine_name}{item.part_name ? ` / ${Array.isArray(item.part_name) ? item.part_name.join(', ') : item.part_name}` : ''}
                             </div>
                           )}
+                        </td>
+                        <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Given By">
+                          <div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div>
                         </td>
                         <td className="px-2 sm:px-3 py-2 sm:py-4" data-label="Department">
                           <div className="text-xs sm:text-sm text-gray-900">{item.department || "—"}</div>
@@ -1207,7 +1257,7 @@ function HistoryPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={isSuperAdmin ? 16 : 14} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
+                      <td colSpan={isSuperAdmin ? 17 : 15} className="px-4 sm:px-6 py-4 text-center text-gray-500 text-xs sm:text-sm">
                         {searchTerm || selectedMembers.length > 0 || startDate || endDate
                           ? "No records matching your filters"
                           : "No maintenance records found"}

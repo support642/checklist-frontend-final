@@ -11,10 +11,23 @@ import {
   ArrowRight,
   Loader2,
   Settings,
-  Calendar
+  Calendar,
+  IndianRupee,
+  Users,
+  Award
 } from 'lucide-react';
+import { 
+  PieChart,
+  Pie,
+  Tooltip, 
+  ResponsiveContainer,
+  Cell,
+  Legend
+} from 'recharts';
 import { Link } from 'react-router-dom';
 import { hasPageAccess, hasModifyAccess } from '../../utils/permissionUtils';
+
+const COLORS = ['#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#ef4444', '#f97316', '#f59e0b'];
 
 const StatCard = ({ title, value, icon: Icon, color, bg }) => (
   <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 transition-all hover:shadow-md`}>
@@ -28,17 +41,31 @@ const StatCard = ({ title, value, icon: Icon, color, bg }) => (
   </div>
 );
 
+const MiniStatCard = ({ title, value, icon: Icon, color, bg, subValue }) => (
+  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col gap-1 transition-all hover:shadow-md h-full">
+    <div className="flex items-center justify-between mb-1">
+      <div className={`${bg} ${color} p-2 rounded-lg`}>
+        <Icon size={16} />
+      </div>
+      {subValue && <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full">{subValue}</span>}
+    </div>
+    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">{title}</p>
+    <h3 className="text-lg font-bold text-slate-900 truncate">{value}</h3>
+  </div>
+);
+
 const RepairDashboard = () => {
-  const [stats, setStats] = useState({
+  const [stats, setStats] = React.useState({
     total: 0,
     pending: 0,
     approved: 0,
     completed: 0
   });
-  const [recentRequests, setRecentRequests] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [vendorStats, setVendorStats] = React.useState([]);
+  const [recentRequests, setRecentRequests] = React.useState([]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
@@ -64,6 +91,25 @@ const RepairDashboard = () => {
             // Finalized: Admin Approved
             completed: repairs.filter(r => r.status === 'Approved').length
           });
+
+          // Aggregate vendor costs for approved repairs
+          const approvedRepairs = repairs.filter(r => r.status === 'Approved');
+          const vendorMap = {};
+          approvedRepairs.forEach(r => {
+            const vendor = r.vendor_name || 'Unassigned';
+            const amount = parseFloat(r.bill_amount) || 0;
+            vendorMap[vendor] = (vendorMap[vendor] || 0) + amount;
+          });
+
+          const processedVendorData = Object.keys(vendorMap)
+            .map(vendor => ({ 
+              name: vendor.length > 15 ? vendor.substring(0, 15) + '...' : vendor, 
+              fullName: vendor,
+              cost: vendorMap[vendor] 
+            }))
+            .sort((a, b) => b.cost - a.cost);
+          
+          setVendorStats(processedVendorData);
           setRecentRequests(repairs.slice(0, 5));
         }
       } catch (error) {
@@ -162,6 +208,122 @@ const RepairDashboard = () => {
               color="text-green-600" 
               bg="bg-green-50" 
             />
+          </div>
+
+          {/* Vendor-wise Cost Analysis Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">Vendor-wise Cost Analysis</h2>
+              <div className="bg-purple-50 text-purple-600 px-3 py-1 rounded-full text-xs font-bold border border-purple-100 italic">
+                Approved Requests Only
+              </div>
+            </div>
+
+            {/* Vendor KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <MiniStatCard 
+                title="Total Repair Cost" 
+                value={`₹${(vendorStats.reduce((sum, v) => sum + v.cost, 0)).toLocaleString()}`}
+                icon={IndianRupee} 
+                color="text-purple-600" 
+                bg="bg-purple-50" 
+              />
+              <MiniStatCard 
+                title="Total Vendors" 
+                value={vendorStats.length}
+                icon={Users} 
+                color="text-blue-600" 
+                bg="bg-blue-50" 
+              />
+              <MiniStatCard 
+                title="Avg Cost / Vendor" 
+                value={`₹${vendorStats.length > 0 ? Math.round(vendorStats.reduce((sum, v) => sum + v.cost, 0) / vendorStats.length).toLocaleString() : 0}`}
+                icon={TrendingUp} 
+                color="text-indigo-600" 
+                bg="bg-indigo-50" 
+              />
+              <MiniStatCard 
+                title="Top Vendor" 
+                value={vendorStats[0]?.fullName || 'N/A'}
+                subValue={vendorStats[0] ? `₹${vendorStats[0].cost.toLocaleString()}` : null}
+                icon={Award} 
+                color="text-amber-600" 
+                bg="bg-amber-50" 
+              />
+            </div>
+
+            {/* Donut Chart - Conditional Display */}
+            {vendorStats.length >= 2 && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-6">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800">Cost Distribution</h2>
+                    <p className="text-slate-500 text-[11px] mt-1">Percentage share of expenditures per vendor</p>
+                  </div>
+                </div>
+                
+                <div className="h-[350px] w-full flex flex-col md:flex-row items-center justify-around gap-4">
+                  <div className="h-full w-full md:w-3/5">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={vendorStats}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          innerRadius={80}
+                          outerRadius={120}
+                          paddingAngle={5}
+                          dataKey="cost"
+                        >
+                          {vendorStats.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value, name, props) => {
+                            const total = vendorStats.reduce((sum, v) => sum + v.cost, 0);
+                            const percent = ((value / total) * 100).toFixed(1);
+                            return [`₹${value.toLocaleString()} (${percent}%)`, props.payload.fullName];
+                          }}
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Legend 
+                          verticalAlign="bottom" 
+                          align="center"
+                          wrapperStyle={{ paddingTop: '20px' }}
+                          formatter={(value, entry) => <span className="text-xs font-medium text-slate-600">{entry.payload.fullName}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Decorative Center Info - shown only if space permits */}
+                  <div className="hidden lg:flex flex-col items-center justify-center text-center p-4">
+                    <div className="text-slate-400 text-xs mb-1">Total Market Share</div>
+                    <div className="text-2xl font-bold text-slate-900">100%</div>
+                    <div className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest border-t pt-1 border-slate-100">Approved Spend</div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {vendorStats.length === 1 && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-2xl border border-blue-100 flex items-center justify-center text-center">
+                <div className="max-w-md">
+                  <Award size={32} className="text-purple-600 mx-auto mb-3" />
+                  <p className="text-slate-700 font-medium">All approved repairs are currently managed by <span className="font-bold text-purple-700"> {vendorStats[0].fullName}</span>.</p>
+                  <p className="text-slate-500 text-xs mt-1 italic">Comparison charts will appear once multiple vendors are registered in approved requests.</p>
+                </div>
+              </div>
+            )}
+
+            {vendorStats.length === 0 && (
+              <div className="bg-white p-12 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center">
+                <AlertCircle size={40} className="text-slate-200 mb-2" />
+                <p className="text-slate-500 text-sm">No approved vendor expenditure recorded yet.</p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

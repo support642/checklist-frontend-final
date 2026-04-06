@@ -48,11 +48,14 @@ export const hasPageAccess = (page) => {
     if (unified['*'] === '*') return true;
     
     const modules = Object.keys(unified);
-    // If user has no permissions at all, show dashboard as default fallback
+    // If user has no permissions at all, show dashboard as default fallback (failsafe)
     if (modules.length === 0) return true;
-    // If they have any checklist-related permissions, show it
+    
+    // If they have any checklist or maintenance permissions, show it
     if (unified.checklist || unified.maintenance) return true;
-    // Otherwise (e.g. only documentation access), hide it
+    
+    // Otherwise, if they have other specific module permissions (e.g. Repair, Docs, Assets)
+    // but NOT checklist, deny access to avoid the infinite loop and redirect to their module.
     return false;
   }
 
@@ -148,9 +151,17 @@ export const getDefaultDashboardRoute = () => {
   const unified = getUnifiedPermissions();
   if (unified['*'] === '*') return "/dashboard/admin";
   
+  const modules = Object.keys(unified);
+  
+  // 1. If NO permissions are assigned, return Checklist Dashboard (Failsafe)
+  if (modules.length === 0) return "/dashboard/admin";
+
+  // 2. Prioritized Redirection: Redirect to the first available module dashboard
   if (unified.checklist || unified.maintenance) return "/dashboard/admin";
+  if (unified.repair) return "/repair/dashboard";
   if (unified.documentation || unified.subscription || unified.loan || unified.master) return "/doc-sub/dashboard";
   if (unified.assets) return "/asset/dashboard";
   
-  return "/dashboard/admin"; // Fallback
+  // 3. Final Fallback
+  return "/dashboard/admin";
 };

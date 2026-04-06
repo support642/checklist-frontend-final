@@ -149,6 +149,7 @@ const maintenanceSlice = createSlice({
         error: null,
         hasMore: true,
         currentPage: 1,
+        pendingTotalCount: 0,
         historyTotalCount: 0,
         historyApprovedCount: 0,
         uniqueMaintenancePage: 0,
@@ -186,6 +187,7 @@ const maintenanceSlice = createSlice({
                 }
 
                 state.currentPage = action.payload.page;
+                state.pendingTotalCount = parseInt(action.payload.totalCount) || 0;
 
                 // Determine pagination
                 state.hasMore = state.maintenance.length < action.payload.totalCount;

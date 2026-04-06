@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { authFetch } from '../../utils/authFetch';
+import useAuthStore from '../../store/authStore';
 import { 
   ClipboardList, 
   User, 
@@ -31,6 +32,7 @@ const RenderDescription = ({ text }) => {
 };
 
 const PendingRequest = () => {
+  const { currentUser } = useAuthStore();
   const [requests, setRequests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -113,6 +115,18 @@ const PendingRequest = () => {
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTask) return;
+
+    // Validate mandatory fields for Completed status
+    if (updateForm.status === 'Completed' || updateForm.status === '✅ Completed (कार्य पूर्ण)') {
+      if (!updateForm.work_photo_url) {
+        alert("Please upload a photo of the work done.");
+        return;
+      }
+      if (!updateForm.bill_copy_url) {
+        alert("Please upload the bill copy.");
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -528,7 +542,9 @@ const PendingRequest = () => {
                   <div className="grid grid-cols-2 gap-5 animate-fade-in pb-2">
                     {/* Photo of Work Done */}
                     <div className="relative">
-                      <label className="block text-[11px] font-bold text-slate-800 uppercase mb-1.5 tracking-wider">Photo</label>
+                      <label className="block text-[11px] font-bold text-slate-800 uppercase mb-1.5 tracking-wider">
+                        Photo <span className="text-red-500 font-normal ml-0.5">*</span>
+                      </label>
                       <label className="border-2 border-dashed border-slate-100 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50/30 transition-all group h-28 relative overflow-hidden bg-slate-50/30 shadow-inner">
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'work_photo_url')} />
                         {updateForm.work_photo_url ? (
@@ -548,7 +564,9 @@ const PendingRequest = () => {
                     </div>
                     {/* Bill Copy */}
                     <div className="relative">
-                      <label className="block text-[11px] font-bold text-slate-800 uppercase mb-1.5 tracking-wider">Bill Copy</label>
+                      <label className="block text-[11px] font-bold text-slate-800 uppercase mb-1.5 tracking-wider">
+                        Bill Copy <span className="text-red-500 font-normal ml-0.5">*</span>
+                      </label>
                       <label className="border-2 border-dashed border-slate-100 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50/30 transition-all group h-28 relative overflow-hidden bg-slate-50/30 shadow-inner">
                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, 'bill_copy_url')} />
                         {updateForm.bill_copy_url ? (

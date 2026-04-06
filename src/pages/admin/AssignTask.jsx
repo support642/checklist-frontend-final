@@ -1324,9 +1324,29 @@ useEffect(() => {
 
                       {/* Machine Part Selection */}
                       <div className="space-y-1 md:col-span-2">
-                        <label className="block text-xs font-medium text-purple-600 mb-2">
-                          Machine Part (Select Multiple)
-                        </label>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-xs font-medium text-purple-600">
+                            Machine Part (Select Multiple)
+                          </label>
+                          {maintenanceParts.length > 0 && (
+                            <label className="flex items-center gap-2 px-2 py-1 bg-purple-50 hover:bg-purple-100 rounded-md cursor-pointer transition-colors border border-purple-100 group">
+                              <input
+                                type="checkbox"
+                                className="h-3.5 w-3.5 rounded border-purple-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                                checked={maintenanceParts.length > 0 && formData.partName.length === maintenanceParts.length}
+                                onChange={(e) => {
+                                  const isChecked = e.target.checked;
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    partName: isChecked ? maintenanceParts.map(p => p.name) : [],
+                                    machinePartId: isChecked ? maintenanceParts[maintenanceParts.length - 1]?.id : null
+                                  }));
+                                }}
+                              />
+                              <span className="text-[10px] font-bold text-purple-700 uppercase tracking-tight group-hover:text-purple-800">Select All</span>
+                            </label>
+                          )}
+                        </div>
                         {!formData.partArea ? (
                           <div className="p-4 text-center text-sm text-gray-400 bg-gray-50 border border-dashed border-gray-200 rounded-md">
                             Select Machine Area first to see available parts

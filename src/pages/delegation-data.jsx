@@ -29,8 +29,20 @@ function DelegationPage({ searchTerm, nameFilter, deptFilter, divFilter, freqFil
   const { delegationTasks, loading, delegationTotal } = useSelector((state) => state.quickTask)
   const dispatch = useDispatch()
 useEffect(()=>{
-  dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))
-},[dispatch, nameFilter, deptFilter, divFilter, freqFilter])
+  dispatch(uniqueDelegationTaskData({ 
+    page: 0, 
+    pageSize: 50, 
+    nameFilter, 
+    deptFilter, 
+    divFilter, 
+    freqFilter, 
+    append: false,
+    userRole,
+    userDept,
+    userDiv,
+    userName
+  }))
+},[dispatch, nameFilter, deptFilter, divFilter, freqFilter, userRole, userDept, userDiv, userName])
 
  // Handle checkbox selection
   const handleCheckboxChange = (taskId) => {
@@ -62,7 +74,19 @@ useEffect(()=>{
       setSelectedTasks([])
       setSuccessMessage("Tasks deleted successfully")
       // Refresh the task list
-      dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))
+      dispatch(uniqueDelegationTaskData({ 
+        page: 0, 
+        pageSize: 50, 
+        nameFilter, 
+        deptFilter, 
+        divFilter, 
+        freqFilter, 
+        append: false,
+        userRole,
+        userDept,
+        userDiv,
+        userName 
+      }))
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000)
@@ -131,9 +155,21 @@ useEffect(()=>{
   useEffect(() => {
     if (isInitialized) {
      // fetchData()
-     dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))
+     dispatch(uniqueDelegationTaskData({ 
+       page: 0, 
+       pageSize: 50, 
+       nameFilter, 
+       deptFilter, 
+       divFilter, 
+       freqFilter, 
+       append: false,
+       userRole,
+       userDept,
+       userDiv,
+       userName
+     }))
     }
-  }, [dispatch, isInitialized, nameFilter, deptFilter, divFilter, freqFilter])
+  }, [dispatch, isInitialized, nameFilter, deptFilter, divFilter, freqFilter, userRole, userDept, userDiv, userName])
 
   const filteredTasks = useMemo(() => {
     let filtered = [...delegationTasks]; // Create a copy to sort
@@ -207,7 +243,19 @@ useEffect(()=>{
         <div className="mt-4 bg-red-50 p-4 rounded-md text-red-800 text-center">
           {error}{" "}
           <button 
-            onClick={() => dispatch(uniqueDelegationTaskData({ page: 0, pageSize: 50, nameFilter: nameFilter, deptFilter: deptFilter, divFilter: divFilter, freqFilter: freqFilter, append: false }))}
+            onClick={() => dispatch(uniqueDelegationTaskData({ 
+              page: 0, 
+              pageSize: 50, 
+              nameFilter, 
+              deptFilter, 
+              divFilter, 
+              freqFilter, 
+              append: false,
+              userRole,
+              userDept,
+              userDiv,
+              userName 
+            }))}
             className="underline ml-2 hover:text-red-600"
           >
             Try again

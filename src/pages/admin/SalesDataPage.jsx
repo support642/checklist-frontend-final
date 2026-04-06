@@ -1,11 +1,11 @@
-"use client"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { CheckCircle2, Upload, X, Search, History, ArrowLeft, Plus } from "lucide-react"
+import { CheckCircle2, Upload, X, Search, History, ArrowLeft, Plus, Bell } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
 import { useDispatch, useSelector } from "react-redux"
 import { checklistData, checklistHistoryData, updateChecklist } from "../../redux/slice/checklistSlice"
 import { maintenanceData, updateMaintenance } from "../../redux/slice/maintenanceSlice"
-import { postChecklistAdminDoneAPI, sendChecklistWhatsAppAPI } from "../../redux/api/checkListApi"
+import { postChecklistAdminDoneAPI, sendEmailNotificationAPI } from "../../redux/api/checkListApi"
+import { sendMaintenanceNotificationAPI } from "../../redux/api/maintenanceApi"
 import { uniqueDoerNameData } from "../../redux/slice/assignTaskSlice";
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { hasModifyAccess, canAccessModule } from "../../utils/permissionUtils";
@@ -79,6 +79,7 @@ function AccountDataPage() {
   const [maintAdditionalData, setMaintAdditionalData] = useState({});
   const [maintRemarksData, setMaintRemarksData] = useState({});
   const [maintUploadedImages, setMaintUploadedImages] = useState({});
+  const [expandedPartNames, setExpandedPartNames] = useState({});
   const maintTableContainerRef = useRef(null);
 
   const { doerName } = useSelector((state) => state.assignTask)
@@ -225,7 +226,7 @@ function AccountDataPage() {
   // NEW: Admin history selection states
   const [selectedHistoryItems, setSelectedHistoryItems] = useState([])
   const [markingAsDone, setMarkingAsDone] = useState(false)
-  const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
+
   const [confirmationModal, setConfirmationModal] = useState({
     isOpen: false,
     itemCount: 0,
@@ -267,14 +268,12 @@ function AccountDataPage() {
   // Load initial history data when showing history
   useEffect(() => {
     if (showHistory && history.length === 0) {
-      setInitialHistoryLoading(true)
       dispatch(checklistHistoryData(1))
         .then((result) => {
           if (result.payload && result.payload.length < 50) {
             setHasMoreHistory(false)
           }
         })
-        .finally(() => setInitialHistoryLoading(false))
     }
   }, [showHistory, history.length, dispatch])
 
@@ -364,37 +363,6 @@ function AccountDataPage() {
       isOpen: true,
       itemCount: selectedHistoryItems.length,
     })
-  }
-
-  // NEW: Send WhatsApp notification to selected pending items (Admin Only)
-  const handleSendWhatsApp = async () => {
-    if (selectedItems.size === 0) {
-      alert("Please select at least one item to send WhatsApp");
-      return;
-    }
-    if (sendingWhatsApp) return;
-
-    setSendingWhatsApp(true);
-    try {
-      // Get full task objects from filteredAccountData based on selected task_ids
-      const selectedTaskIds = Array.from(selectedItems);
-      const selectedTasks = filteredAccountData.filter(task => 
-        selectedTaskIds.includes(task.task_id)
-      );
-
-      const result = await sendChecklistWhatsAppAPI(selectedTasks);
-      
-      if (result.error) {
-        setSuccessMessage(`Failed to send WhatsApp: ${result.error.message || 'Unknown error'}`);
-      } else {
-        setSuccessMessage(result.message || 'WhatsApp messages sent successfully!');
-      }
-    } catch (error) {
-      console.error("Error sending WhatsApp:", error);
-      setSuccessMessage(`Failed to send WhatsApp: ${error.message}`);
-    } finally {
-      setSendingWhatsApp(false);
-    }
   }
 
   // NEW: Confirmation modal component
@@ -494,6 +462,27 @@ function AccountDataPage() {
       setSuccessMessage(`Failed to mark tasks as done: ${error.message}`);
     } finally {
       setMarkingAsDone(false);
+    }
+  };
+
+  // NEW: Handle sending email notification for selected history items
+  const handleSendEmailNotification = async () => {
+    if (selectedHistoryItems.length === 0) return;
+    
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await sendEmailNotificationAPI(selectedHistoryItems);
+      
+      if (error) {
+        throw new Error(error.message || "Failed to send email notifications");
+      }
+      
+      setSuccessMessage(`Successfully sent email notifications to ${selectedHistoryItems.length} users!`);
+    } catch (err) {
+      console.error("Error sending email:", err);
+      setError(err.message || "Failed to send email notifications");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -708,6 +697,7 @@ function AccountDataPage() {
   )
 
   const [uploadedImages, setUploadedImages] = useState({});
+  const [hasMoreHistory, setHasMoreHistory] = useState(true)
 
   // Update the handleImageUpload function
   const handleImageUpload = async (id, e) => {
@@ -789,6 +779,13 @@ function AccountDataPage() {
     });
   };
 
+  const togglePartName = (taskId) => {
+    setExpandedPartNames((prev) => ({
+      ...prev,
+      [taskId]: !prev[taskId],
+    }));
+  };
+
   const handleMaintSubmit = async () => {
     const selected = Array.from(maintSelectedItems);
     if (selected.length === 0) return;
@@ -833,6 +830,29 @@ function AccountDataPage() {
     } catch (e) {
       console.error(e);
       alert('Failed to submit maintenance tasks');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSendMaintNotification = async () => {
+    const selected = Array.from(maintSelectedItems);
+    if (selected.length === 0) return;
+    
+    setIsSubmitting(true);
+    try {
+      const selectedTasks = selected.map(id => maintenance.find(m => m.task_id === id)).filter(Boolean);
+      const { data, error } = await sendMaintenanceNotificationAPI(selectedTasks);
+      
+      if (error) {
+        throw new Error(error.message || "Failed to send notifications");
+      }
+      
+      setSuccessMessage(`Successfully sent notifications to ${selected.length} users!`);
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error("Error sending notification:", err);
+      setSuccessMessage(`Failed to send notifications: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -1025,18 +1045,31 @@ const handleSubmit = async () => {
                 </button>
               )}
               {!showHistory && (userRole === "user" || userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && hasModifyAccess('pending_task') && (
-                <button
-                  onClick={activeView === 'checklist' ? handleSubmit : handleMaintSubmit}
-                  disabled={(activeView === 'checklist' ? selectedItemsCount === 0 : maintSelectedItems.size === 0) || isSubmitting}
-                  className="flex-1 sm:flex-none rounded-md gradient-bg py-2 px-3 sm:px-4 text-white hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                >
-                  {isSubmitting ? "Processing..." : (
-                    <>
-                      <span className="hidden sm:inline">Submit Selected ({activeView === 'checklist' ? selectedItemsCount : maintSelectedItems.size})</span>
-                      <span className="sm:hidden">Submit ({activeView === 'checklist' ? selectedItemsCount : maintSelectedItems.size})</span>
-                    </>
+                <div className="flex gap-2">
+                  {activeView === 'maintenance' && (userRole === "admin" || userRole === "div_admin" || userRole === "super_admin") && maintSelectedItems.size > 0 && (
+                    <button
+                      onClick={handleSendMaintNotification}
+                      disabled={isSubmitting}
+                      className="flex-1 sm:flex-none rounded-md bg-blue-600 py-2 px-3 sm:px-4 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base flex items-center justify-center gap-2 font-bold shadow-md shadow-blue-100 group"
+                    >
+                      <Bell className={`h-4 w-4 ${isSubmitting ? 'animate-bounce' : 'group-hover:animate-ring'}`} />
+                      <span className="hidden sm:inline">Notify ({maintSelectedItems.size})</span>
+                      <span className="sm:hidden">Notify ({maintSelectedItems.size})</span>
+                    </button>
                   )}
-                </button>
+                  <button
+                    onClick={activeView === 'checklist' ? handleSubmit : handleMaintSubmit}
+                    disabled={(activeView === 'checklist' ? selectedItemsCount === 0 : maintSelectedItems.size === 0) || isSubmitting}
+                    className="flex-1 sm:flex-none rounded-md gradient-bg py-2 px-3 sm:px-4 text-white hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                  >
+                    {isSubmitting ? "Processing..." : (
+                      <>
+                        <span className="hidden sm:inline">Submit Selected ({activeView === 'checklist' ? selectedItemsCount : maintSelectedItems.size})</span>
+                        <span className="sm:hidden">Submit ({activeView === 'checklist' ? selectedItemsCount : maintSelectedItems.size})</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1142,12 +1175,24 @@ const handleSubmit = async () => {
                 <button
                   onClick={handleMarkMultipleDone}
                   disabled={markingAsDone}
-                  className="rounded-md bg-green-600 text-white px-3 sm:px-4 py-2 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm sm:text-base"
+                  className="rounded-md bg-green-600 text-white px-3 sm:px-4 py-2 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm sm:text-base mr-2"
                 >
                   {markingAsDone ? "Processing..." : (
                     <>
                       <span className="hidden sm:inline">Mark {selectedHistoryItems.length} Items as Done</span>
                       <span className="sm:hidden">Mark Done ({selectedHistoryItems.length})</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleSendEmailNotification}
+                  disabled={isSubmitting}
+                  className="rounded-md bg-indigo-600 text-white px-3 sm:px-4 py-2 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm sm:text-base"
+                >
+                  {isSubmitting ? "Sending..." : (
+                    <>
+                      <span className="hidden sm:inline">Send Email Notification ({selectedHistoryItems.length})</span>
+                      <span className="sm:hidden">Send Email ({selectedHistoryItems.length})</span>
                     </>
                   )}
                 </button>
@@ -1365,8 +1410,8 @@ const handleSubmit = async () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {currentHistoryData.length > 0 ? (
-                          currentHistoryData.map((history, index) => (
+                        {filteredHistoryData.length > 0 ? (
+                          filteredHistoryData.map((history, index) => (
                             <tr key={index} className="hover:bg-gray-50">
                               <td className="px-2 sm:px-3 py-2 sm:py-4">
                                 <div className="text-xs sm:text-sm font-medium text-gray-900 break-words">
@@ -1589,7 +1634,30 @@ const handleSubmit = async () => {
                           <div><span className="text-gray-500">M-Dept:</span> <span className="font-medium">{item.machine_department || "—"}</span></div>
                           <div><span className="text-gray-500">M-Div:</span> <span className="font-medium">{item.machine_division || "—"}</span></div>
                           <div><span className="text-gray-500">Machine:</span> <span className="font-medium">{item.machine_name || "—"}</span></div>
-                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{item.machine_name}{item.part_name ? ` / ${Array.isArray(item.part_name) ? item.part_name.join(', ') : item.part_name}` : '' || "—"}</span></div>
+                          <div className="col-span-2 mt-1 flex flex-wrap items-start">
+                            <span className="text-gray-500 mr-1">Part:</span> 
+                            {(() => {
+                              const partNameStr = Array.isArray(item.part_name) ? item.part_name.join(', ') : (item.part_name || "");
+                              const fullDisplay = item.machine_name + (partNameStr ? ` / ${partNameStr}` : "");
+                              const isExpanded = expandedPartNames[item.task_id];
+                              const shouldTruncate = fullDisplay.length > 80;
+                              return (
+                                <div className="inline-flex flex-col flex-1 min-w-0">
+                                  <div className={`font-medium ${isExpanded ? "max-h-[100px] overflow-y-auto pr-1 text-xs" : "line-clamp-2 text-xs"}`}>
+                                    {fullDisplay || "—"}
+                                  </div>
+                                  {shouldTruncate && (
+                                    <button
+                                      onClick={() => togglePartName(item.task_id)}
+                                      className="text-purple-600 text-[10px] font-bold hover:underline mt-0.5 text-left w-fit uppercase"
+                                    >
+                                      {isExpanded ? "Show Less" : "Show More"}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
                           <div><span className="text-gray-500">Area:</span> <span className="font-medium">{item.part_area || "—"}</span></div>
                           <div><span className="text-gray-500">Given By:</span> <span className="font-medium">{item.given_by || "—"}</span></div>
                           <div><span className="text-gray-500">Planned Date:</span> <span className="font-medium">{item.planned_date || "—"}</span></div>
@@ -1650,7 +1718,7 @@ const handleSubmit = async () => {
                                   {maintUploadedImages[item.task_id] && maintUploadedImages[item.task_id].length < 5 && (
                                     <label className="cursor-pointer ml-auto bg-purple-100 text-purple-600 rounded-full p-2 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
                                       <Plus className="h-4 w-4" />
-                                      <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleMaintImageUpload(item.task_id, e)} />
+                                      <input type="file" multiple className="hidden" accept="*/*" onChange={(e) => handleMaintImageUpload(item.task_id, e)} />
                                     </label>
                                   )}
                                 </div>
@@ -1679,7 +1747,7 @@ const handleSubmit = async () => {
                                     type="file"
                                     multiple
                                     className="hidden"
-                                    accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
+                                    accept="*/*"
                                     onChange={(e) => handleMaintImageUpload(item.task_id, e)}
                                   />
                                 </label>
@@ -1832,7 +1900,7 @@ const handleSubmit = async () => {
                                 {maintUploadedImages[item.task_id] && maintUploadedImages[item.task_id].length < 5 && (
                                   <label className="cursor-pointer ml-2 bg-purple-100 text-purple-600 rounded-full p-1 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
                                     <Plus className="h-4 w-4" />
-                                    <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleMaintImageUpload(item.task_id, e)} />
+                                    <input type="file" multiple className="hidden" accept="*/*" onChange={(e) => handleMaintImageUpload(item.task_id, e)} />
                                   </label>
                                 )}
                               </div>
@@ -1847,7 +1915,7 @@ const handleSubmit = async () => {
                                 <input
                                   type="file"
                                   className="hidden"
-                                  accept="image/*"
+                                  accept="*/*"
                                   onChange={(e) => handleMaintImageUpload(item.task_id, e)}
                                   disabled={!isSelected}
                                 />
@@ -1860,7 +1928,28 @@ const handleSubmit = async () => {
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_department || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_division || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.machine_name || "—"}</div></td>
-                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{Array.isArray(item.part_name) ? item.part_name.join(', ') : (item.part_name || "—")}</div></td>
+                          <td className="px-2 sm:px-3 py-2 sm:py-4 border-b min-w-[150px] max-w-[300px]">
+                            {(() => {
+                              const partNameStr = Array.isArray(item.part_name) ? item.part_name.join(', ') : (item.part_name || "—");
+                              const isExpanded = expandedPartNames[item.task_id];
+                              const shouldTruncate = partNameStr.length > 80;
+                              return (
+                                <div className="flex flex-col">
+                                  <div className={`text-xs sm:text-sm text-gray-900 ${isExpanded ? "max-h-[120px] overflow-y-auto pr-2 custom-scrollbar break-words" : "line-clamp-2 break-words"}`}>
+                                    {partNameStr}
+                                  </div>
+                                  {shouldTruncate && (
+                                    <button
+                                      onClick={() => togglePartName(item.task_id)}
+                                      className="text-purple-600 text-[10px] font-bold hover:underline mt-1 text-left w-fit uppercase"
+                                    >
+                                      {isExpanded ? "Show Less" : "Show More"}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.part_area || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.given_by || "—"}</div></td>
                           <td className="px-2 sm:px-3 py-2 sm:py-4 border-b whitespace-nowrap"><div className="text-xs sm:text-sm text-gray-900">{item.name || "—"}</div></td>
@@ -2021,7 +2110,7 @@ const handleSubmit = async () => {
                                   {uploadedImages[account.task_id] && uploadedImages[account.task_id].length < 5 && (
                                     <label className="cursor-pointer ml-auto bg-purple-100 text-purple-600 rounded-full p-2 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
                                       <Plus className="h-4 w-4" />
-                                      <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleImageUpload(account.task_id, e)} />
+                                      <input type="file" multiple className="hidden" accept="*/*" onChange={(e) => handleImageUpload(account.task_id, e)} />
                                     </label>
                                   )}
                                 </div>
@@ -2050,7 +2139,7 @@ const handleSubmit = async () => {
                                     type="file"
                                     multiple
                                     className="hidden"
-                                    accept=".pdf,.doc,.docx,.xls,.xlsx,image/*"
+                                    accept="*/*"
                                     onChange={(e) => handleImageUpload(account.task_id, e)}
                                   />
                                 </label>
@@ -2252,7 +2341,7 @@ const handleSubmit = async () => {
                                 {uploadedImages[account.task_id] && uploadedImages[account.task_id].length < 5 && (
                                   <label className="cursor-pointer ml-2 bg-purple-100 text-purple-600 rounded-full p-1 hover:bg-purple-200 transition-colors flex-shrink-0" title="Add another file">
                                     <Plus className="h-4 w-4" />
-                                    <input type="file" multiple className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,image/*" onChange={(e) => handleImageUpload(account.task_id, e)} />
+                                    <input type="file" multiple className="hidden" accept="*/*" onChange={(e) => handleImageUpload(account.task_id, e)} />
                                   </label>
                                 )}
                               </div>
@@ -2274,7 +2363,7 @@ const handleSubmit = async () => {
                                 <input
                                   type="file"
                                   className="hidden"
-                                  accept="image/*"
+                                  accept="*/*"
                                   onChange={(e) => handleImageUpload(account.task_id, e)}
                                   disabled={!isSelected}
                                 />

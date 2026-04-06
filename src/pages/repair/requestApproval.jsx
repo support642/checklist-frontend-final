@@ -270,7 +270,10 @@ const RequestApproval = () => {
             
             <div className="flex items-center gap-2">
                <button 
-                 onClick={() => setView(view === 'pending' ? 'history' : 'pending')}
+                 onClick={() => {
+                   setView(view === 'pending' ? 'history' : 'pending');
+                   setSelectedRequest(null);
+                 }}
                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all shadow-sm border
                    ${view === 'history' 
                      ? 'bg-purple-50 border-purple-100 text-purple-600' 
@@ -309,86 +312,118 @@ const RequestApproval = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* List Section */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center p-20 text-slate-400">
-                    <Loader2 className="animate-spin h-10 w-10 mb-4 text-purple-500" />
-                    <p className="font-medium text-sm">Fetching pending approvals...</p>
-                  </div>
-                ) : filteredRequests.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center p-20 text-slate-400 text-center">
-                    <div className="bg-slate-50 p-6 rounded-full mb-4">
-                      <ShieldCheck className="h-12 w-12 text-slate-200" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-slate-900">Queue is Clear</h3>
-                    <p className="max-w-xs mx-auto text-sm">No repair requests currently awaiting approval.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-50">
-                    {filteredRequests.map((req) => (
-                      <div 
-                        key={req.id} 
-                        onClick={() => setSelectedRequest(prev => prev?.id === req.id ? null : req)}
-                        className={`p-5 flex items-center justify-between gap-4 cursor-pointer transition-all
-                          ${selectedRequest?.id === req.id ? 'bg-purple-50' : 'hover:bg-slate-50/50'}`}
-                      >
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div className={`shrink-0 h-12 w-12 rounded-xl flex items-center justify-center font-bold text-purple-600
-                            ${selectedRequest?.id === req.id ? 'bg-white' : 'bg-purple-100'}`}>
-                            {req.machine_name.charAt(0)}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-bold text-purple-600 font-mono bg-purple-100/50 px-1.5 py-0.5 rounded">{req.id}</span>
-                              <p className="font-bold text-slate-900 truncate">{req.machine_name}</p>
-                            </div>
-                            <p className="text-xs text-slate-500 truncate italic">"{req.issue_description}"</p>
-                            <div className="flex items-center gap-3 mt-2 text-[11px] font-medium text-slate-400">
-                              <span className="flex items-center gap-1"><User size={12} /> {req.assigned_person}</span>
-                              <span className="flex items-center gap-1"><Calendar size={12} /> {formatTimestampToDDMMYYYY(req.submission_date)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {view === 'history' ? (
-                           <div className="text-right shrink-0">
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border
-                                 ${req.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                                 {req.status}
-                              </span>
-                           </div>
-                        ) : (
-                           <Eye className={`${selectedRequest?.id === req.id ? 'text-purple-600' : 'text-slate-300'}`} size={20} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+          {/* Combined Table & Mobile List Section */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center p-20 text-slate-400">
+                <Loader2 className="animate-spin h-10 w-10 mb-4 text-purple-500" />
+                <p className="font-medium text-sm">Fetching requests...</p>
               </div>
-            </div>
-
-            {/* Details Sidebar (Desktop Only) */}
-            <div className="hidden lg:block lg:sticky lg:top-6">
-              {selectedRequest ? (
-                renderRequestDetails(selectedRequest)
-              ) : (
-                <div className="bg-white/50 border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center text-slate-400 h-full flex items-center justify-center">
-                  <p className="text-sm">Select a {view === 'history' ? 'processed' : 'pending'} request from the list to view full details.</p>
+            ) : filteredRequests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-20 text-slate-400 text-center">
+                <div className="bg-slate-50 p-6 rounded-full mb-4">
+                  <ShieldCheck className="h-12 w-12 text-slate-200" />
                 </div>
-              )}
-            </div>
+                <h3 className="text-lg font-semibold text-slate-900">Queue is Clear</h3>
+                <p className="max-w-xs mx-auto text-sm">No {view === 'history' ? 'processed' : 'pending'} repair requests found.</p>
+              </div>
+            ) : (
+              <>
+                {/* Desktop View Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-100">
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Machine Name</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Problem Statement</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Technician</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date Created</th>
+                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredRequests.map((req) => (
+                        <tr 
+                          key={req.id} 
+                          onClick={() => setSelectedRequest(req)}
+                          className="hover:bg-purple-50/50 cursor-pointer transition-colors group"
+                        >
+                          <td className="px-6 py-4 font-mono text-purple-600 font-bold text-xs">{req.id}</td>
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-slate-900 text-sm">{req.machine_name}</span>
+                          </td>
+                          <td className="px-6 py-4 max-w-xs">
+                            <p className="text-xs text-slate-500 italic truncate" title={req.issue_description}>
+                              "{req.issue_description}"
+                            </p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-[10px] font-bold uppercase border border-slate-200">
+                                {req.assigned_person?.charAt(0) || <User size={10} />}
+                              </div>
+                              <span className="text-xs font-medium text-slate-700">{req.assigned_person}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-xs text-slate-500">
+                            {formatTimestampToDDMMYYYY(req.submission_date)}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <div className="flex justify-end">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border
+                                  ${req.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                    req.status === 'Rejected' ? 'bg-red-50 text-red-600 border-red-100' :
+                                    'bg-purple-50 text-purple-600 border-purple-100'}`}>
+                                  {req.status === 'Completed' || req.status === '✅ Completed (कार्य पूर्ण)' ? 'Awaiting Approval' : req.status}
+                                </span>
+                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile View List */}
+                <div className="md:hidden divide-y divide-slate-50">
+                  {filteredRequests.map((req) => (
+                    <div 
+                      key={req.id} 
+                      onClick={() => setSelectedRequest(req)}
+                      className="p-5 active:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] font-bold text-purple-600 font-mono bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                          {req.id}
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border
+                          ${req.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                            req.status === 'Rejected' ? 'bg-red-50 text-red-600 border-red-100' :
+                            'bg-purple-50 text-purple-600 border-purple-100'}`}>
+                          {req.status === 'Completed' || req.status === '✅ Completed (कार्य पूर्ण)' ? 'Pending' : req.status}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-slate-900 mb-1">{req.machine_name}</h3>
+                      <p className="text-xs text-slate-500 italic line-clamp-2 leading-relaxed mb-3">"{req.issue_description}"</p>
+                      <div className="flex items-center gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-tight">
+                        <span className="flex items-center gap-1.5"><User size={12} className="text-slate-300" /> {req.assigned_person}</span>
+                        <span className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-300" /> {formatTimestampToDDMMYYYY(req.submission_date)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile Popup Modal */}
+      {/* Detail Modal */}
       {selectedRequest && (
-         <div className="lg:hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            {renderRequestDetails(selectedRequest, true)}
-         </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          {renderRequestDetails(selectedRequest, true)}
+        </div>
       )}
     </AdminLayout>
   );

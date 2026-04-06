@@ -133,26 +133,6 @@ export const postDelegationAdminDoneAPI = async (items) => {
   }
 };
 
-// Send WhatsApp Notification for Delegation (Admin Only)
-export const sendDelegationWhatsAppAPI = async (selectedItems) => {
-  try {
-    const response = await authAxios.post(`${API}/delegation/send-whatsapp`, {
-      items: selectedItems.map(item => ({
-        task_id: item.task_id,
-        name: item.name,
-        task_description: item.task_description,
-        planned_date: item.planned_date,
-        task_start_date: item.task_start_date,
-        given_by: item.given_by
-      }))
-    });
-    return response.data;
-  } catch (error) {
-    console.error("❌ Error sending delegation WhatsApp:", error);
-    return { error };
-  }
-};
-
 // REVERT TO PENDING (Admin Only)
 export const revertDelegationTaskAPI = async (items) => {
   try {
@@ -164,36 +144,13 @@ export const revertDelegationTaskAPI = async (items) => {
   }
 };
 
-// SUBMIT
-// export const insertDelegationDoneAndUpdate = async ({
-//   selectedDataArray,
-//   uploadedImages,
-// }) => {
-//   const formData = new FormData();
-//   formData.append("selectedData", JSON.stringify(selectedDataArray));
-
-//   Object.entries(uploadedImages).forEach(([taskId, file]) => {
-//     formData.append(`image_${taskId}`, file);
-//   });
-
-//   const { data } = await authAxios.post(`${API}/delegation/submit`, formData);
-//   return data;
-// };
-
-
-
-// SINGLE — send all tasks in one go
-// export const insertDelegationDoneAndUpdate = createAsyncThunk(
-//   "delegation/submit",
-//   async ({ selectedDataArray }, { rejectWithValue }) => {
-//     try {
-//       const { data } = await authAxios.post(`${API}/delegation/submit`, {
-//         selectedData: selectedDataArray,
-//       });
-
-//       return data;
-//     } catch (err) {
-//       return rejectWithValue(err.response?.data || err.message);
-//     }
-//   }
-// );
+// SEND EMAIL NOTIFICATION (Admin Only)
+export const sendDelegationEmailAPI = async (items) => {
+  try {
+    const { data } = await api.post(`/delegation/send-email`, { items });
+    return { data, error: null };
+  } catch (err) {
+    console.error("❌ Send Email error:", err);
+    return { data: null, error: err.response?.data || err.message };
+  }
+};

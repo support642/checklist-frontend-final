@@ -1,7 +1,7 @@
 import { authFetch } from "../utils/authFetch";
 import React, { useEffect, useState, useMemo } from 'react';
 // import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw } from 'lucide-react';
-import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw, Eye, EyeOff, Upload, Image as ImageIcon } from 'lucide-react';
+import { Plus, User, Building, X, Save, Edit, Trash2, Settings, Search, ChevronDown, Calendar, RefreshCw, Eye, EyeOff, Upload, Image as ImageIcon, Copy } from 'lucide-react';
 import AdminLayout from '../components/layout/AdminLayout';
 import { useDispatch, useSelector } from 'react-redux';
 import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenByDetails, departmentDetails, updateDepartment, updateUser, userDetails, machineDetails, createMachineThunk, updateMachineThunk, deleteMachineThunk } from '../redux/slice/settingSlice';
@@ -12,6 +12,101 @@ import { hasPageAccess, hasModifyAccess } from '../utils/permissionUtils';
 import { SYSTEM_PERMISSIONS, PAGE_PERMISSIONS, PAGE_PERMISSION_GROUPS, PAGE_SYSTEM_MAP, DOC_SYSTEMS, DOC_PAGES, DOC_PAGE_MAP } from '../constants/permissions';
 import { buildUnifiedPermissions, splitUnifiedPermissions, hasPermission } from '../utils/permissionAdapter';
 
+
+
+// Reusable Chips + Overflow component for table columns
+const ChipsOverflow = ({ items, title }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const partList = Array.isArray(items) ? items.filter(p => p && p.trim() !== '') : (items ? items.split(',').map(p => p.trim()).filter(p => p !== '') : []);
+  if (partList.length === 0) return <span className="text-gray-400">—</span>;
+
+  const maxVisible = isMobile ? 2 : 3;
+  const visibleItems = partList.slice(0, maxVisible);
+  const overflowCount = partList.length - maxVisible;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center">
+      {visibleItems.map((item, idx) => (
+        <span 
+          key={idx} 
+          className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md text-[11px] font-medium border border-purple-100 truncate max-w-[120px]"
+          title={item}
+        >
+          {item}
+        </span>
+      ))}
+      
+      {overflowCount > 0 && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(true);
+          }}
+          className="px-2 py-0.5 bg-purple-600 text-white rounded-md text-[11px] font-bold hover:bg-purple-700 transition-colors shadow-sm whitespace-nowrap"
+          title={`View all ${partList.length} parts`}
+          aria-label={`View all ${partList.length} parts for ${title}`}
+        >
+          +{overflowCount} more
+        </button>
+      )}
+
+      {/* Overflow Modal/Popover Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsOpen(false)}
+        >
+          <div 
+            className={`bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col transform transition-all animate-in zoom-in-95 duration-200 ${isMobile ? 'translate-y-0 mt-auto rounded-b-none' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-purple-100 text-purple-600 rounded-lg">
+                  <ImageIcon size={18} />
+                </div>
+                <h3 className="font-bold text-gray-900 truncate">Parts: {title}</h3>
+              </div>
+              <button 
+                onClick={() => setIsOpen(false)}
+                className="p-1 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto max-h-[60vh] space-y-2 custom-scrollbar">
+              {partList.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-2.5 bg-white border border-gray-100 rounded-lg hover:border-purple-200 hover:bg-purple-50/30 transition-all group">
+                  <div className="h-2 w-2 rounded-full bg-purple-300 group-hover:bg-purple-500 transition-colors"></div>
+                  <span className="text-sm text-gray-700 font-medium">{item}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div className="p-4 border-t border-gray-100 bg-white">
+              <button 
+                onClick={() => setIsOpen(false)}
+                className="w-full py-2.5 bg-gray-900 hover:bg-black text-white font-bold rounded-lg transition-all shadow-md active:scale-[0.98]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Setting = () => {
   const [activeTab, setActiveTab] = useState('users');
@@ -89,6 +184,52 @@ const Setting = () => {
   const [isEditingMachine, setIsEditingMachine] = useState(false);
   const [currentMachineId, setCurrentMachineId] = useState(null);
   const [partInput, setPartInput] = useState('');
+  const [machineSearch, setMachineSearch] = useState('');
+  
+  // Handlers for Machine Part Management
+  const handlePartPaste = (e) => {
+    e.preventDefault();
+    const paste = e.clipboardData.getData('text');
+    if (!paste) return;
+
+    // Split by comma, trim, filter out empty strings
+    const newParts = paste.split(',')
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
+    if (newParts.length > 0) {
+      setMachineForm(prev => {
+        const existingParts = prev.part_name || [];
+        const uniqueNewParts = newParts.filter(p => !existingParts.includes(p));
+        
+        if (uniqueNewParts.length === 0) return prev;
+
+        return {
+          ...prev,
+          part_name: [...existingParts, ...uniqueNewParts],
+          part_images: [...(prev.part_images || []), ...new Array(uniqueNewParts.length).fill(null)]
+        };
+      });
+    }
+  };
+
+  const handleCopyAllParts = () => {
+    if (machineForm.part_name.length === 0) return;
+    const text = machineForm.part_name.join(', ');
+    navigator.clipboard.writeText(text);
+    alert('All part names copied to clipboard!');
+  };
+
+  const handleRemoveAllParts = () => {
+    if (machineForm.part_name.length === 0) return;
+    if (window.confirm('Are you sure you want to remove all parts?')) {
+      setMachineForm(prev => ({
+        ...prev,
+        part_name: [],
+        part_images: []
+      }));
+    }
+  };
   
   // Permission State (Unified Model)
   const [unifiedPermissions, setUnifiedPermissions] = useState({});
@@ -236,9 +377,20 @@ const Setting = () => {
   // Derived: does user have modify access to Settings (for gating UI buttons)
   const canModifySettings = hasModifyAccess('settings');
 
-
-
   const { userData, department, departmentsOnly, givenBy, machines, loading, error } = useSelector((state) => state.setting);
+
+  // Filtered Machines Logic
+  const filteredMachines = useMemo(() => {
+    if (!machineSearch || !machines) return machines;
+    const query = machineSearch.toLowerCase();
+    return machines.filter(m => 
+      (m.machine_name || '').toLowerCase().includes(query) ||
+      (m.machine_area || '').toLowerCase().includes(query) ||
+      (m.machine_department || '').toLowerCase().includes(query) ||
+      (m.machine_division || '').toLowerCase().includes(query) ||
+      (Array.isArray(m.part_name) ? m.part_name.join(' ') : (m.part_name || '')).toLowerCase().includes(query)
+    );
+  }, [machines, machineSearch]);
   const { doerName } = useSelector((state) => state.assignTask);
   // Get current logged-in user to check for super_admin role
   const { userData: currentUser } = useSelector((state) => state.login);
@@ -269,6 +421,29 @@ const Setting = () => {
   }, [currentUser]);
 
   const loggedInUserId = Array.isArray(userData) ? userData.find(u => u.user_name === (loginUserData?.user_name || localStorage.getItem('user-name')))?.id : null;
+
+  // Memoized available doers for leave transfer/delegation
+  const availableDoersForLeave = useMemo(() => {
+    if (!userData || userData.length === 0) return [];
+    
+    const userRole = localStorage.getItem('role')?.toLowerCase();
+    const userUnit = localStorage.getItem('unit');
+    const userDivision = localStorage.getItem('division');
+    const userAccess = localStorage.getItem('user_access') || '';
+    const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
+
+    return userData.filter(u => {
+      // Exclude users already selected for leave if necessary, but usually we just filter by scope
+      if (userRole === 'div_admin') {
+        return u.unit === userUnit && u.division === userDivision;
+      }
+      if (userRole === 'admin' && userDepartments.length > 0) {
+        const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
+        return u.unit === userUnit && u.division === userDivision && userDepartments.includes(uDept);
+      }
+      return true; // super_admin
+    }).map(u => u.user_name).sort();
+  }, [userData]);
 
   const togglePasswordVisibility = (userId) => {
   setShowPasswords(prev => ({
@@ -2658,8 +2833,21 @@ const resetUserForm = () => {
         {/* Machines Tab */}
         {activeTab === 'machines' && (
           <div className="bg-white shadow rounded-lg overflow-hidden border border-purple-200">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex justify-between items-center">
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b border-purple px-6 py-4 border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-3">
               <h2 className="text-lg font-medium text-purple-700">Machine Management</h2>
+              
+              <div className="relative w-full sm:w-auto">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="text-gray-400" size={16} />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search machines..."
+                  value={machineSearch}
+                  onChange={(e) => setMachineSearch(e.target.value)}
+                  className="w-full sm:w-64 pl-10 pr-4 py-2 border border-purple-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm transition-all"
+                />
+              </div>
             </div>
 
             {loading && (
@@ -2673,8 +2861,8 @@ const resetUserForm = () => {
               <div className="h-[calc(100vh-275px)] overflow-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                 {/* Mobile Card View */}
                 <div className="sm:hidden space-y-3 p-3">
-                  {machines && machines.length > 0 ? (
-                    machines.map((machine, index) => (
+                  {filteredMachines && filteredMachines.length > 0 ? (
+                    filteredMachines.map((machine, index) => (
                       <div key={machine.id} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
                         <div className="flex justify-between items-start mb-2">
                           <p className="text-sm font-medium text-gray-900">#{index + 1} {machine.machine_name || '—'}</p>
@@ -2689,8 +2877,11 @@ const resetUserForm = () => {
                             </div>
                           )}
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div><span className="text-gray-500">Part:</span> <span className="font-medium">{Array.isArray(machine.part_name) ? machine.part_name.join(', ') : (machine.part_name || '—')}</span></div>
+                        <div className="grid grid-cols-1 gap-2 text-xs">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-gray-500">Part:</span> 
+                            <ChipsOverflow items={machine.part_name} title={machine.machine_name} />
+                          </div>
                           <div><span className="text-gray-500">Area:</span> <span className="font-medium">{machine.machine_area || '—'}</span></div>
                         </div>
                       </div>
@@ -2713,8 +2904,8 @@ const resetUserForm = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {machines && machines.length > 0 ? (
-                      machines.map((machine, index) => (
+                    {filteredMachines && filteredMachines.length > 0 ? (
+                      filteredMachines.map((machine, index) => (
                         <tr key={machine.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm font-medium text-gray-900">{machine.machine_name || '—'}</span>
@@ -2722,8 +2913,8 @@ const resetUserForm = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm text-gray-600">{machine.machine_area || '—'}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-gray-600">{Array.isArray(machine.part_name) ? machine.part_name.join(', ') : (machine.part_name || '—')}</span>
+                          <td className="px-6 py-4 max-w-[450px]">
+                            <ChipsOverflow items={machine.part_name} title={machine.machine_name} />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className="text-sm text-gray-600">{machine.machine_department || '—'}</span>
@@ -2751,9 +2942,9 @@ const resetUserForm = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="4" className="px-6 py-10 text-center text-gray-500">
+                        <td colSpan="6" className="px-6 py-10 text-center text-gray-500">
                           <Settings className="mx-auto h-8 w-8 text-gray-400 mb-2 opacity-50" />
-                          <p className="text-sm">No machines found.</p>
+                          <p className="text-sm">{machineSearch ? 'No matching machines found.' : 'No machines found.'}</p>
                         </td>
                       </tr>
                     )}
@@ -2812,17 +3003,37 @@ const resetUserForm = () => {
                             />
                           </div>
                           <div>
-                            <label htmlFor="part_name_edit" className="block text-sm font-medium text-gray-700">Part Names & Images</label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label htmlFor="part_name_edit" className="block text-sm font-medium text-gray-700">Part Names & Images</label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleCopyAllParts}
+                                  className="p-1 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                  title="Copy All Parts"
+                                >
+                                  <Copy size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveAllParts}
+                                  className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Remove All Parts"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
                             <div className="mt-1 space-y-2">
-                              <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
+                              <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px] bg-white">
                                 {machineForm.part_name.map((part, idx) => (
-                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm cursor-pointer select-text">
                                     {part}
                                     <button type="button" onClick={() => {
                                       const newNames = machineForm.part_name.filter((_, i) => i !== idx);
                                       const newImages = machineForm.part_images.filter((_, i) => i !== idx);
                                       setMachineForm(prev => ({ ...prev, part_name: newNames, part_images: newImages }));
-                                    }} className="text-purple-600 hover:text-purple-900">&times;</button>
+                                    }} className="text-purple-600 hover:text-purple-900 select-none">&times;</button>
                                   </span>
                                 ))}
                                 <input
@@ -2830,13 +3041,15 @@ const resetUserForm = () => {
                                   id="part_name_edit"
                                   value={partInput}
                                   onChange={(e) => setPartInput(e.target.value)}
+                                  onPaste={handlePartPaste}
                                   onKeyDown={(e) => {
                                     if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
                                       e.preventDefault();
-                                      if (!machineForm.part_name.includes(partInput.trim())) {
+                                      const trimmedInput = partInput.trim();
+                                      if (!machineForm.part_name.includes(trimmedInput)) {
                                         setMachineForm(prev => ({ 
                                           ...prev, 
-                                          part_name: [...prev.part_name, partInput.trim()],
+                                          part_name: [...prev.part_name, trimmedInput],
                                           part_images: [...(prev.part_images || []), null]
                                         }));
                                       }
@@ -2958,17 +3171,37 @@ const resetUserForm = () => {
                             />
                           </div>
                           <div>
-                            <label htmlFor="part_name_add" className="block text-sm font-medium text-gray-700">Part Names & Images</label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label htmlFor="part_name_add" className="block text-sm font-medium text-gray-700">Part Names & Images</label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleCopyAllParts}
+                                  className="p-1 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                  title="Copy All Parts"
+                                >
+                                  <Copy size={16} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveAllParts}
+                                  className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Remove All Parts"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
                             <div className="mt-1 space-y-2">
-                              <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px]">
+                              <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded-md min-h-[42px] bg-white">
                                 {machineForm.part_name.map((part, idx) => (
-                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-sm cursor-pointer select-text">
                                     {part}
                                     <button type="button" onClick={() => {
                                       const newNames = machineForm.part_name.filter((_, i) => i !== idx);
                                       const newImages = machineForm.part_images.filter((_, i) => i !== idx);
                                       setMachineForm(prev => ({ ...prev, part_name: newNames, part_images: newImages }));
-                                    }} className="text-purple-600 hover:text-purple-900">&times;</button>
+                                    }} className="text-purple-600 hover:text-purple-900 select-none">&times;</button>
                                   </span>
                                 ))}
                                 <input
@@ -2976,13 +3209,15 @@ const resetUserForm = () => {
                                   id="part_name_add"
                                   value={partInput}
                                   onChange={(e) => setPartInput(e.target.value)}
+                                  onPaste={handlePartPaste}
                                   onKeyDown={(e) => {
                                     if ((e.key === 'Enter' || e.key === ',') && partInput.trim()) {
                                       e.preventDefault();
-                                      if (!machineForm.part_name.includes(partInput.trim())) {
+                                      const trimmedInput = partInput.trim();
+                                      if (!machineForm.part_name.includes(trimmedInput)) {
                                         setMachineForm(prev => ({ 
                                           ...prev, 
-                                          part_name: [...prev.part_name, partInput.trim()],
+                                          part_name: [...prev.part_name, trimmedInput],
                                           part_images: [...(prev.part_images || []), null]
                                         }));
                                       }
@@ -3921,44 +4156,21 @@ const resetUserForm = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Delegate To (Doer Name) <span className="text-red-500">*</span>
                         </label>
-                        <select
-                          value={selectedDoer}
-                          onChange={(e) => setSelectedDoer(e.target.value)}
-                          className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                        >
-                          <option value="">Select a doer...</option>
-                          {doerName && doerName.length > 0 ? (
-                            doerName
-                              .filter(name => {
-                                const userRole = localStorage.getItem('role')?.toLowerCase();
-                                const userUnit = localStorage.getItem('unit');
-                                const userDivision = localStorage.getItem('division');
-                                const userAccess = localStorage.getItem('user_access') || '';
-                                const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
-                                if (userRole === 'div_admin') {
-                                  const user = userData?.find(u => u.user_name === name);
-                                  return user && user.unit === userUnit && user.division === userDivision;
-                                }
-                                if (userRole === 'admin' && userDepartments.length > 0) {
-                                  // find user object by name to check department
-                                  const user = userData?.find(u => u.user_name === name);
-                                  if (user) {
-                                    const uDept = (user.user_access || user.department || '').split(',')[0].trim().toLowerCase();
-                                    return user.unit === userUnit && user.division === userDivision && userDepartments.includes(uDept);
-                                  }
-                                  return false;
-                                }
-                                return true;
-                              })
-                              .map((name, index) => (
-                                <option key={index} value={name}>
-                                  {name}
-                                </option>
-                              ))
-                          ) : (
-                            <option value="" disabled>No doers available</option>
-                          )}
-                        </select>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            list="bulkDoerOptions"
+                            placeholder="Search or select a doer..."
+                            value={selectedDoer}
+                            onChange={(e) => setSelectedDoer(e.target.value)}
+                            className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 text-sm"
+                          />
+                          <datalist id="bulkDoerOptions">
+                            {availableDoersForLeave.map((name, index) => (
+                              <option key={index} value={name} />
+                            ))}
+                          </datalist>
+                        </div>
                       </div>
                       <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                         <p className="text-xs text-blue-800">
@@ -4163,39 +4375,21 @@ const resetUserForm = () => {
                                             {task.task_start_date ? new Date(task.task_start_date).toLocaleDateString() : '-'}
                                           </td>
                                           <td className="px-3 py-2">
-                                            <select
-                                              value={taskAssignments[task.task_id] || ''}
-                                              onChange={(e) => handleTaskAssignment(task.task_id, e.target.value)}
-                                              className="w-full text-xs border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-                                            >
-                                              <option value="">Select user...</option>
-                                               {userData && userData.length > 0 ? (
-                                                userData
-                                                  .filter(u => {
-                                                    const userRole = localStorage.getItem('role')?.toLowerCase();
-                                                    const userUnit = localStorage.getItem('unit');
-                                                    const userDivision = localStorage.getItem('division');
-                                                    const userAccess = localStorage.getItem('user_access') || '';
-                                                    const userDepartments = userAccess ? userAccess.split(',').map(d => d.trim().toLowerCase()) : [];
-                                                    if (userRole === 'div_admin') {
-                                                      const uDeptScope = u.unit === userUnit && u.division === userDivision;
-                                                      return uDeptScope;
-                                                    }
-                                                    if (userRole === 'admin' && userDepartments.length > 0) {
-                                                      const uDept = (u.user_access || u.department || '').split(',')[0].trim().toLowerCase();
-                                                      return u.unit === userUnit && u.division === userDivision && userDepartments.includes(uDept);
-                                                    }
-                                                    return true;
-                                                  })
-                                                  .map((user) => (
-                                                    <option key={user.id} value={user.user_name}>
-                                                      {user.user_name}
-                                                    </option>
-                                                  ))
-                                              ) : (
-                                                <option value="" disabled>No users available</option>
-                                              )}
-                                            </select>
+                                            <div className="relative">
+                                              <input
+                                                type="text"
+                                                list={`doerOptions-${task.task_id}`}
+                                                placeholder="Search user..."
+                                                value={taskAssignments[task.task_id] || ''}
+                                                onChange={(e) => handleTaskAssignment(task.task_id, e.target.value)}
+                                                className="w-full text-xs border border-gray-300 rounded-md shadow-sm py-1 px-2 focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                                              />
+                                              <datalist id={`doerOptions-${task.task_id}`}>
+                                                {availableDoersForLeave.map((name, index) => (
+                                                  <option key={index} value={name} />
+                                                ))}
+                                              </datalist>
+                                            </div>
                                           </td>
                                           <td className="px-3 py-2 text-center">
                                             <button

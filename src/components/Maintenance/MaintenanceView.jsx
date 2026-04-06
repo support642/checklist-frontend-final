@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { hasPageAccess } from '../../utils/permissionUtils';
@@ -16,7 +17,7 @@ import { RefreshCw, ClipboardList, X, Settings2, MapPin, Cog } from 'lucide-reac
 const MachineModal = ({ isOpen, onClose, machines }) => {
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] border border-gray-200 animate-in zoom-in-95 duration-200">
         {/* Modal Header */}
@@ -106,14 +107,16 @@ const MachineModal = ({ isOpen, onClose, machines }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 };
 
 const MaintenanceView = ({ startDate = "", endDate = "" }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const userRole = localStorage.getItem("role");
+  const userRole = localStorage.getItem("role")?.toLowerCase();
+  const userDivision = localStorage.getItem("division")?.toLowerCase() || '';
+  const userDepartment = localStorage.getItem("department")?.toLowerCase() || '';
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false);
   
   const { 
@@ -122,6 +125,7 @@ const MaintenanceView = ({ startDate = "", endDate = "" }) => {
     machineParts, 
     loading, 
     error,
+    pendingTotalCount,
     historyTotalCount,
     historyApprovedCount
   } = useSelector((state) => state.maintenance);
@@ -172,10 +176,35 @@ const MaintenanceView = ({ startDate = "", endDate = "" }) => {
     return Array.from(uniqueMap.values());
   }, [maintenance, history]);
 
+  // --- Filtered Machine Data based on Role/Division/Dept ---
+  const filteredMachines = useMemo(() => {
+    if (!machineParts) return [];
+    
+    return machineParts.filter(machine => {
+      // Super admin sees all machines
+      if (!userRole || userRole === 'super_admin') return true;
+      
+      const mDivision = (machine.machine_division || '').toLowerCase().trim();
+      const mDepartment = (machine.machine_department || '').toLowerCase().trim();
+      
+      // User and Admin - Filter by both Division and Department
+      if (userRole === 'user' || userRole === 'admin') {
+        return mDivision === userDivision.trim() && mDepartment === userDepartment.trim();
+      }
+      
+      // Div Admin - Filter by Division only
+      if (userRole === 'div_admin') {
+        return mDivision === userDivision.trim();
+      }
+      
+      return true; // Default fallback (e.g. for super_admin)
+    });
+  }, [machineParts, userRole, userDivision, userDepartment]);
+
   // --- Aggregate Stats ---
   const stats = useMemo(() => {
-    // 1. Total Unique Tasks
-    const totalTasks = allMaintenanceTasks.length;
+    // 1. Total Unique Tasks based on accurate backend counts
+    const totalTasks = (pendingTotalCount || 0) + (historyTotalCount || 0);
 
     // Helper to determine task category
     const getTaskCategory = (task) => {
@@ -228,13 +257,13 @@ const MaintenanceView = ({ startDate = "", endDate = "" }) => {
     });
 
     return {
-      totalMachines: machineParts.length || 0,
+      totalMachines: filteredMachines.length || 0,
       totalTasks: totalTasks,
       completedTasks: completedCount,
       pendingTasks: pendingTodayCount + pendingApprovalCount, 
       overdueTasks: overdueCount
     };
-  }, [allMaintenanceTasks, machineParts]);
+  }, [allMaintenanceTasks, filteredMachines, pendingTotalCount, historyTotalCount]);
 
   // --- Derive Department Data ---
   const deptData = useMemo(() => {
@@ -381,7 +410,7 @@ const MaintenanceView = ({ startDate = "", endDate = "" }) => {
       <MachineModal 
         isOpen={isMachineModalOpen} 
         onClose={() => setIsMachineModalOpen(false)} 
-        machines={machineParts} 
+        machines={filteredMachines} 
       />
 
       {/* Stats Cards */}

@@ -21,6 +21,8 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, deptFilter, divFilte
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+  const [expandedPartNames, setExpandedPartNames] = useState({});
+
 
   const { uniqueMaintenanceTasks, loading, uniqueMaintenanceHasMore, uniqueMaintenancePage, uniqueMaintenanceTotal } = useSelector((state) => state.maintenance);
   const dispatch = useDispatch();
@@ -98,7 +100,11 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, deptFilter, divFilte
       frequency: task.frequency || '',
       duration: task.duration || '',
       status: task.status || '',
-      remark: task.remark || ''
+      remark: task.remark || '',
+      machine_department: task.machine_department || '',
+      machine_division: task.machine_division || '',
+      enable_reminder: task.enable_reminder ?? false,
+      require_attachment: task.require_attachment || 'no',
     });
   };
 
@@ -154,6 +160,13 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, deptFilter, divFilte
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const togglePartName = (taskId) => {
+    setExpandedPartNames((prev) => ({
+      ...prev,
+      [taskId]: !prev[taskId],
+    }));
   };
 
   // Handle checkbox selection
@@ -411,11 +424,32 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, deptFilter, divFilte
                       </div>
                       
                       {/* Part Name */}
-                      <div>
+                      <div className="col-span-2 mt-1">
                         <span className="text-gray-500">Part:</span>{' '}
                         {editingTaskId === task.task_id ? (
                           <input type="text" value={editFormData.part_name} onChange={(e) => handleInputChange('part_name', e.target.value)} className="w-full px-1 py-0.5 border border-gray-300 rounded text-xs mt-1" />
-                        ) : (<span className="font-medium">{Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || "—")}</span>)}
+                        ) : (() => {
+                          const partNameStr = Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || "—");
+                          const isExpanded = expandedPartNames[task.task_id];
+                          const shouldTruncate = partNameStr.length > 80;
+                          return (
+                            <div className="inline-flex flex-col ml-1 align-top max-w-[calc(100%-40px)] w-full overflow-hidden">
+                              <div className={`font-medium w-full ${isExpanded ? "max-h-[100px] overflow-y-auto overflow-x-hidden" : "line-clamp-2 text-xs overflow-hidden"}`}>
+                                <div className="break-words whitespace-normal text-xs pr-1" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '100%' }}>
+                                  {partNameStr}
+                                </div>
+                              </div>
+                              {shouldTruncate && (
+                                <button
+                                  onClick={() => togglePartName(task.task_id)}
+                                  className="text-purple-600 text-[10px] font-bold hover:underline mt-1 text-left w-fit uppercase"
+                                >
+                                  {isExpanded ? "Show Less" : "Show More"}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Part Area */}
@@ -530,10 +564,31 @@ function MaintenanceQuickTaskPage({ searchTerm, nameFilter, deptFilter, divFilte
                       </td>
                       
                       {/* Part Name */}
-                      <td className="px-2 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-2 sm:px-6 py-2 sm:py-4 text-sm text-gray-500 min-w-[200px] max-w-[400px]">
                         {editingTaskId === task.task_id ? (
                           <input type="text" value={editFormData.part_name} onChange={(e) => handleInputChange('part_name', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm" />
-                        ) : (Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || "—"))}
+                        ) : (() => {
+                          const partNameStr = Array.isArray(task.part_name) ? task.part_name.join(', ') : (task.part_name || "—");
+                          const isExpanded = expandedPartNames[task.task_id];
+                          const shouldTruncate = partNameStr.length > 100;
+                          return (
+                            <div className="flex flex-col max-w-[350px] w-full overflow-hidden">
+                              <div className={`w-full ${isExpanded ? "max-h-[150px] overflow-y-auto overflow-x-hidden custom-scrollbar" : "line-clamp-2 overflow-hidden"}`}>
+                                <div className="break-words whitespace-normal pr-2 text-sm text-gray-500" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '100%' }}>
+                                  {partNameStr}
+                                </div>
+                              </div>
+                              {shouldTruncate && (
+                                <button
+                                  onClick={() => togglePartName(task.task_id)}
+                                  className="text-purple-600 text-[10px] font-bold hover:underline mt-1 text-left w-fit uppercase"
+                                >
+                                  {isExpanded ? "Show Less" : "Show More"}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Part Area */}

@@ -77,15 +77,21 @@ const ProtectedRoute = ({ children, page }) => {
 
   // Permission check
   if (page && !hasPageAccess(page)) {
-    // If user doesn't even have dashboard access, redirect to their default allowed dashboard or login
-    if (page === "dashboard") {
-      const defaultRoute = getDefaultDashboardRoute();
-      if (defaultRoute === "/dashboard/admin") {
-         return <Navigate to="/login" replace />
-      }
-      return <Navigate to={defaultRoute} replace />
+    const defaultRoute = getDefaultDashboardRoute();
+    
+    // If the default route is the same as current route, we have a loop.
+    // Break the loop by redirecting to login.
+    if (defaultRoute === location.pathname) {
+       console.error("Redirection loop detected. Redirecting to login.");
+       return <Navigate to="/login" replace />;
     }
-    return <Navigate to={getDefaultDashboardRoute()} replace />
+
+    // Special handling for the main dashboard entry point
+    if (page === "dashboard" && defaultRoute === "/dashboard/admin") {
+       return <Navigate to="/login" replace />;
+    }
+
+    return <Navigate to={defaultRoute} replace />;
   }
 
   return children

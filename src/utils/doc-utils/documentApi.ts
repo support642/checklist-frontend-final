@@ -180,6 +180,28 @@ export async function fetchDocumentStats(): Promise<{
     return data.stats;
 }
 
+// Share document via email
+export async function shareEmail(shareData: {
+    recipientName: string;
+    recipientEmail: string;
+    recipientPhone: string;
+    message: string;
+    documentId: number;
+}): Promise<{ success: boolean; message: string }> {
+    const res = await authFetch(`${API_BASE_URL}/documents/share-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shareData)
+    });
+
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.details || 'Failed to share document');
+    }
+
+    return await res.json();
+}
+
 // Utility: Convert backend document to frontend format
 export function mapBackendToFrontend(doc: BackendDocument): FrontendDocument {
     // Helper to ensure YYYY-MM-DD for date inputs

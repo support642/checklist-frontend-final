@@ -246,9 +246,10 @@ export default function StaffTasksTable({
     const rawMonthly = staffTaskDetails.filter(t => t.type === 'checklist' && t.frequency?.toLowerCase() === 'monthly');
     const monthlyTasks = getUniqueTasksCSV(rawMonthly);
 
-    const maintenanceTasks = hasMaintenanceAccess 
-      ? staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+    const rawMaintenance = hasMaintenanceAccess 
+      ? staffTaskDetails.filter(t => t.type === 'maintenance')
       : [];
+    const maintenanceTasks = getUniqueTasksCSV(rawMaintenance);
 
     const maxRows = hasMaintenanceAccess
       ? Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, maintenanceTasks.length, 1)
@@ -266,7 +267,7 @@ export default function StaffTasksTable({
 
     const checklistStats = calculateStats(staffTaskDetails.filter(t => t.type === 'checklist'));
     const delegationStats = calculateStats(delegationTasks);
-    const maintenanceStats = calculateStats(staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t)));
+    const maintenanceStats = calculateStats(staffTaskDetails.filter(t => t.type === 'maintenance'));
 
     const staffInfo = staffMembers.find(s => s.name === selectedStaffName) || {};
 
@@ -392,9 +393,10 @@ export default function StaffTasksTable({
     );
     const monthlyTasks = getUniqueTasksPDF(rawMonthly);
 
-    const maintenanceTasks = hasMaintenanceAccess 
-      ? staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+    const rawMaintenance = hasMaintenanceAccess 
+      ? staffTaskDetails.filter(t => t.type === 'maintenance')
       : [];
+    const maintenanceTasks = getUniqueTasksPDF(rawMaintenance);
     const maxRows = hasMaintenanceAccess
       ? Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, maintenanceTasks.length, 1)
       : Math.max(dailyTasks.length, delegationTasks.length, weeklyTasks.length, monthlyTasks.length, 1);
@@ -411,7 +413,7 @@ export default function StaffTasksTable({
     const checklistTasksAll = staffTaskDetails.filter(t => t.type === 'checklist');
     const delegationTasksAll = staffTaskDetails.filter(t => t.type === 'delegation');
     const maintenanceTasksAll = hasMaintenanceAccess 
-      ? staffTaskDetails.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+      ? staffTaskDetails.filter(t => t.type === 'maintenance')
       : [];
 
     const checklistStats = calculateStats(checklistTasksAll);
@@ -545,9 +547,9 @@ export default function StaffTasksTable({
     // Row 0: Titles / Headers
     let colIdx = 0;
     drawStandardCell(colIdx++, 0, "Name", selectedStaffName);
-    drawPerfHeaderCell(colIdx++, 0, "Checklist Performance");
-    drawPerfHeaderCell(colIdx++, 0, "Delegation Performance");
-    if (hasMaintenanceAccess) drawPerfHeaderCell(colIdx++, 0, "Maintenance Performance");
+    drawPerfHeaderCell(colIdx++, 0, "Checklist");
+    drawPerfHeaderCell(colIdx++, 0, "Delegation");
+    if (hasMaintenanceAccess) drawPerfHeaderCell(colIdx++, 0, "Maintenance");
     drawStandardCell(colIdx, 0, "Period", selectedMonthYear || "Range");
 
     // Row 1: Stats 1
@@ -789,9 +791,10 @@ const loadStaffData = useCallback(async () => {
     )
   }
 
-  // Role check for export button
+  // Role check for report access
   const userRole = localStorage.getItem("role") || "";
   const canExportReport = ["super_admin", "admin", "div_admin"].includes(userRole.toLowerCase());
+  const isSuperAdmin = userRole.toLowerCase() === "super_admin";
 
   const handleExportCSV = async (customRange = null) => {
     try {
@@ -1129,14 +1132,14 @@ const loadStaffData = useCallback(async () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div 
-                      className="cursor-pointer group flex items-center gap-2"
-                      onClick={() => handleOpenModal(staff)}
+                      className={`${isSuperAdmin ? 'cursor-pointer group' : ''} flex items-center gap-2`}
+                      onClick={() => isSuperAdmin && handleOpenModal(staff)}
                     >
-                      <div className="bg-purple-100 p-1.5 rounded-full text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                      <div className={`p-1.5 rounded-full ${isSuperAdmin ? 'bg-purple-100 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors' : 'bg-gray-100 text-gray-400'}`}>
                         <User size={14} />
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-gray-900 group-hover:text-purple-700 transition-colors border-b border-transparent group-hover:border-purple-200">
+                        <div className={`text-sm font-medium transition-colors ${isSuperAdmin ? 'text-gray-900 group-hover:text-purple-700 border-b border-transparent group-hover:border-purple-200' : 'text-gray-500'}`}>
                           {staff.name}
                         </div>
                         {staff.email && !staff.email.includes('example.com') && (
@@ -1181,15 +1184,15 @@ const loadStaffData = useCallback(async () => {
                 </div>
                 
                 <div 
-                  className="text-sm font-medium mb-1 text-gray-800 cursor-pointer hover:text-purple-700 flex items-center gap-1"
-                  onClick={() => handleOpenModal(staff)}
+                  className={`text-sm font-medium mb-1 flex items-center gap-1 ${isSuperAdmin ? 'text-gray-800 cursor-pointer hover:text-purple-700' : 'text-gray-500'}`}
+                  onClick={() => isSuperAdmin && handleOpenModal(staff)}
                 >
-                  <User size={12} className="text-purple-600" />
+                  <User size={12} className={isSuperAdmin ? 'text-purple-600' : 'text-gray-400'} />
                   {staff.name} 
                   <span className="text-[10px] text-gray-500 font-normal ml-1">
                     ({staff.division || "N/A"} - {staff.department || "N/A"})
                   </span>
-                  <ExternalLink size={10} className="text-gray-400 ml-auto" />
+                  {isSuperAdmin && <ExternalLink size={10} className="text-gray-400 ml-auto" />}
                 </div>
                 
                 {staff.email && !staff.email.includes('example.com') && (

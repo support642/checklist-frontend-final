@@ -125,7 +125,7 @@ export interface ShareItem {
     docSerial: string;
     docName: string;
     docFile: string;
-    sharedVia: 'Email' | 'WhatsApp';
+    sharedVia: 'Email';
     recipientName: string;
     contactInfo: string;
 }
@@ -139,9 +139,9 @@ export interface ShareItem {
 //         docSerial: 'SN-001',
 //         docName: 'Project Proposal_v2.pdf',
 //         docFile: 'document.pdf',
-//         sharedVia: 'WhatsApp',
+//         sharedVia: 'Email',
 //         recipientName: 'Rahul Sharma',
-//         contactInfo: '+91 98765 43210'
+//         contactInfo: 'rahul.sharma@example.com'
 //     },
 //     {
 //         id: 'share-2',

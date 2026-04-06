@@ -213,3 +213,26 @@ export const updateUniqueMaintenanceTaskApi = async (updatedTask, originalTask) 
     });
     return res.json();
 };
+// =======================================================
+// 9️⃣ Send Maintenance Notification API
+// =======================================================
+export const sendMaintenanceNotificationAPI = async (items) => {
+    try {
+        const response = await authFetch(`${BASE_URL}/send-notification`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items }),
+        });
+
+        if (!response.ok) {
+            const errJson = await response.json();
+            throw new Error(errJson.error || "Failed to send notification");
+        }
+
+        const json = await response.json();
+        return { data: json };
+    } catch (error) {
+        console.error("❌ Error Sending Maintenance Notification:", error);
+        return { error };
+    }
+};

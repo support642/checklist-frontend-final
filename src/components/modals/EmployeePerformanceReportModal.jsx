@@ -42,6 +42,10 @@ const EmployeePerformanceReportModal = ({
 
   if (!isOpen) return null;
 
+  // Safety check for super_admin access
+  const userRole = localStorage.getItem("role") || "";
+  if (userRole.toLowerCase() !== "super_admin") return null;
+
   // Current date for filtering tasks - Use reportDate if provided, fallback to today
   const targetDate = reportDate || new Date().toLocaleDateString('en-CA');
   
@@ -72,15 +76,16 @@ const EmployeePerformanceReportModal = ({
 
   const delegationTasks = tasks.filter(t => t.type === 'delegation');
   
-  const maintenanceTasks = hasMaintenanceAccess 
-    ? tasks.filter(t => t.type === 'maintenance' && matchesTargetDate(t))
+  const rawMaintenance = hasMaintenanceAccess 
+    ? tasks.filter(t => t.type === 'maintenance')
     : [];
+  const maintenanceTasks = getUniqueTasks(rawMaintenance);
 
   // Stats Calculation (Based on TOTAL occurrences for accurate performance)
   const calculateStats = (taskList) => {
     const total = taskList.length;
-    const completed = taskList.filter(t => t.is_completed).length;
-    const onTime = taskList.filter(t => t.is_on_time).length;
+    const completed = taskList.filter(t => t.is_completed || t.status?.toLowerCase() === 'yes' || t.status === 'Done').length;
+    const onTime = taskList.filter(t => t.is_on_time || t.color_code_for === '1' || t.color_code_for === 1).length;
     const workDoneScore = total > 0 ? Math.round((completed / total) * 100) : 0;
     const onTimeScore = completed > 0 ? Math.round((onTime / completed) * 100) : 0;
     return { total, completed, onTime, workDoneScore, onTimeScore };
@@ -89,7 +94,7 @@ const EmployeePerformanceReportModal = ({
   const checklistStats = calculateStats(tasks.filter(t => t.type === 'checklist'));
   const delegationStats = calculateStats(delegationTasks);
   const maintenanceStats = hasMaintenanceAccess 
-    ? calculateStats(tasks.filter(t => t.type === 'maintenance' && matchesTargetDate(t)))
+    ? calculateStats(tasks.filter(t => t.type === 'maintenance'))
     : { total: 0, completed: 0, onTime: 0, workDoneScore: 0, onTimeScore: 0 };
 
   // Maximum number of rows needed for the unique list
