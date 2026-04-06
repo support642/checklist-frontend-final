@@ -30,6 +30,4 @@ export const createAuthAxios = (config) => {
 };
 
 // Also export a configured default global instance
-export const authAxios = createAuthAxios({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5050/api'
-});
+export const authAxios = createAuthAxios({});
