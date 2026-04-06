@@ -8,6 +8,7 @@ import { createDepartment, createUser, deleteUser, departmentOnlyDetails, givenB
 import { extendTaskApi } from '../redux/api/settingApi';
 import { uniqueDoerNameData } from '../redux/slice/assignTaskSlice';
 import { hasPageAccess, hasModifyAccess } from '../utils/permissionUtils';
+import Toast from '../components/Toast';
 // import supabase from '../SupabaseClient';
 import { SYSTEM_PERMISSIONS, PAGE_PERMISSIONS, PAGE_PERMISSION_GROUPS, PAGE_SYSTEM_MAP, DOC_SYSTEMS, DOC_PAGES, DOC_PAGE_MAP } from '../constants/permissions';
 import { buildUnifiedPermissions, splitUnifiedPermissions, hasPermission } from '../utils/permissionAdapter';
@@ -112,6 +113,8 @@ const Setting = () => {
   const [activeTab, setActiveTab] = useState('users');
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeptModal, setShowDeptModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
   const [isEditing, setIsEditing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentDeptId, setCurrentDeptId] = useState(null);
@@ -629,24 +632,22 @@ const debugUserStatus = async () => {
 
   const handleUserSelection = (userId, isSelected) => {
     if (isSelected) {
-      // Open popup form when checkbox is checked
-      const user = userData.find(u => u.id === userId);
-      setCurrentLeaveUser(user);
-      setShowLeavePopup(true);
-      // Set today's date as default
-      const today = new Date().toLocaleDateString('en-CA');
-      setPopupLeaveStartDate(today);
-      setPopupLeaveEndDate(today);
+      setSelectedUsers(prev => [...prev, userId]);
     } else {
-      // Close popup and clear selection when unchecked
-      setShowLeavePopup(false);
-      setCurrentLeaveUser(null);
-      setPopupLeaveStartDate('');
-      setPopupLeaveEndDate('');
-      setPopupDoer('');
-      setPopupRemarks('');
       setSelectedUsers(prev => prev.filter(id => id !== userId));
     }
+  };
+
+  const handleOpenIndividualLeave = (user) => {
+    setCurrentLeaveUser(user);
+    setShowLeavePopup(true);
+    
+    // Pre-fill with existing leave data if available, otherwise use defaults
+    const today = new Date().toLocaleDateString('en-CA');
+    setPopupLeaveStartDate(user.leave_date ? new Date(user.leave_date).toLocaleDateString('en-CA') : today);
+    setPopupLeaveEndDate(user.leave_end_date ? new Date(user.leave_end_date).toLocaleDateString('en-CA') : today);
+    setPopupRemarks(user.remark || '');
+    setPopupDoer(''); 
   };
 
   const handleSelectAll = (e) => {
@@ -663,6 +664,22 @@ const handleSubmitLeave = async () => {
     return;
   }
 
+  // Pre-fill dates if exactly one user is selected
+  if (selectedUsers.length === 1) {
+    const user = userData.find(u => u.id === selectedUsers[0]);
+    if (user) {
+      const today = new Date().toLocaleDateString('en-CA');
+      setLeaveStartDate(user.leave_date ? new Date(user.leave_date).toLocaleDateString('en-CA') : today);
+      setLeaveEndDate(user.leave_end_date ? new Date(user.leave_end_date).toLocaleDateString('en-CA') : today);
+      setRemark(user.remark || '');
+    }
+  } else {
+    // Reset for bulk selection
+    const today = new Date().toLocaleDateString('en-CA');
+    setLeaveStartDate(today);
+    setLeaveEndDate(today);
+    setRemark('');
+  }
 
   // Show delegation modal instead of directly submitting
   setShowDelegationModal(true);
@@ -684,6 +701,13 @@ const handleConfirmDelegation = async () => {
     return;
   }
 
+  // Capture current form values for database update before state might change
+  const finalStartDate = leaveStartDate;
+  const finalEndDate = leaveEndDate;
+  const finalRemark = remark;
+
+  let totalTasksTransferred = 0;
+
   try {
     // Call API to transfer tasks
     const transferPromises = selectedUsers.map(async (userId) => {
@@ -696,8 +720,8 @@ const handleConfirmDelegation = async () => {
             body: JSON.stringify({
               username: user.user_name,
               delegateTo: selectedDoer,
-              startDate: leaveStartDate,
-              endDate: leaveEndDate,
+              startDate: finalStartDate,
+              endDate: finalEndDate,
               category: bulkLeaveCategory
             })
           });
@@ -708,6 +732,7 @@ const handleConfirmDelegation = async () => {
             console.error('Error transferring tasks:', result.message);
           } else {
             console.log(`Transferred ${result.tasksTransferred} tasks from ${user.user_name} to ${selectedDoer}`);
+            totalTasksTransferred += (result.tasksTransferred || 0);
           }
         } catch (error) {
           console.error('Error in task transfer:', error);
@@ -716,6 +741,12 @@ const handleConfirmDelegation = async () => {
     });
 
     await Promise.all(transferPromises);
+
+    if (totalTasksTransferred === 0) {
+      setToast({ show: true, message: "There is no tasks in these dates", type: "info" });
+    } else {
+      setToast({ show: true, message: `Successfully transferred ${totalTasksTransferred} tasks!`, type: "success" });
+    }
 
     // Update user records with leave dates
     const updatePromises = selectedUsers.map(async (userId) => {
@@ -726,9 +757,9 @@ const handleConfirmDelegation = async () => {
             id: user.id,
             updatedUser: {
               ...user,
-              leave_date: leaveStartDate,
-              leave_end_date: leaveEndDate,
-              remark: remark
+              leave_date: finalStartDate,
+              leave_end_date: finalEndDate,
+              remark: finalRemark
             }
           })).unwrap();
         } catch (error) {
@@ -739,7 +770,7 @@ const handleConfirmDelegation = async () => {
 
     await Promise.all(updatePromises);
 
-    // Close modal and reset form
+    // Close modal and reset form AFTER all updates are done
     setShowDelegationModal(false);
     setSelectedDoer('');
     setSelectedUsers([]);
@@ -859,6 +890,12 @@ const handleConfirmDelegation = async () => {
         planned_date: task.planned_date
       }));
 
+      // Capture current form values for database update
+      const finalStartDate = popupLeaveStartDate;
+      const finalEndDate = popupLeaveEndDate;
+      const finalRemarks = popupRemarks;
+      const finalUser = currentLeaveUser;
+
       try {
         const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/leave/assign-individual-tasks`, {
           method: "POST",
@@ -872,7 +909,24 @@ const handleConfirmDelegation = async () => {
           throw new Error(result.message || 'Failed to assign tasks');
         }
 
-        // Close popup and reset form
+        // Update user record with leave dates using CAPTURED values
+        if (finalUser) {
+          try {
+            await dispatch(updateUser({
+              id: finalUser.id,
+              updatedUser: {
+                ...finalUser,
+                leave_date: finalStartDate,
+                leave_end_date: finalEndDate,
+                remark: finalRemarks
+              }
+            })).unwrap();
+          } catch (error) {
+            console.error(`Error updating leave for user ${finalUser.user_name}:`, error);
+          }
+        }
+
+        // Close popup and reset form ONLY after database update is handled
         setShowLeavePopup(false);
         setCurrentLeaveUser(null);
         setPopupLeaveStartDate('');
@@ -884,24 +938,13 @@ const handleConfirmDelegation = async () => {
         setTaskAssignments({});
         setSelectedUsers([]);
 
-        // Update user record with leave dates
-        if (currentLeaveUser) {
-          try {
-            await dispatch(updateUser({
-              id: currentLeaveUser.id,
-              updatedUser: {
-                ...currentLeaveUser,
-                leave_date: popupLeaveStartDate,
-                leave_end_date: popupLeaveEndDate,
-                remark: popupRemarks
-              }
-            })).unwrap();
-          } catch (error) {
-            console.error(`Error updating leave for user ${currentLeaveUser.user_name}:`, error);
-          }
+        // toast message handled below
+        
+        if ((result.tasksTransferred || 0) === 0) {
+          setToast({ show: true, message: "There is no tasks in these dates", type: "info" });
+        } else {
+          setToast({ show: true, message: `Successfully transferred ${result.tasksTransferred} tasks!`, type: "success" });
         }
-
-        alert(`Successfully transferred ${result.tasksTransferred || 0} tasks with individual assignments!`);
         
         // Refresh data
         // setTimeout(() => window.location.reload(), 1000);
@@ -1943,7 +1986,13 @@ const resetUserForm = () => {
               onChange={(e) => handleUserSelection(user.id, e.target.checked)}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <p className="text-sm font-medium text-gray-900">{user.user_name}</p>
+            <button 
+              onClick={() => handleOpenIndividualLeave(user)}
+              className="text-sm font-medium text-purple-700 hover:text-purple-900 hover:underline cursor-pointer text-left"
+              title="Click to process individual leave"
+            >
+              {user.user_name}
+            </button>
           </div>
           {canManageSettings && !['admin', 'div_admin'].includes(currentUserRole?.toLowerCase()) && (
             <button
@@ -2009,7 +2058,13 @@ const resetUserForm = () => {
             />
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
-            <div className="text-sm font-medium text-gray-900">{user.user_name}</div>
+            <button 
+              onClick={() => handleOpenIndividualLeave(user)}
+              className="text-sm font-medium text-purple-700 hover:text-purple-900 hover:underline cursor-pointer text-left"
+              title="Click to process individual leave"
+            >
+              {user.user_name}
+            </button>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <div className="text-sm text-gray-900">
@@ -4557,6 +4612,13 @@ const resetUserForm = () => {
           </div>
         )}
 
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ ...toast, show: false })}
+        />
+      )}
       </div>
     </AdminLayout>
   );
