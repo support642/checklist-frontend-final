@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { useSearchParams } from "react-router-dom"
 import { Search, CheckCircle2, ChevronLeft, ChevronRight, X, Bell } from "lucide-react"
 import AdminLayout from "../../components/layout/AdminLayout"
@@ -585,9 +586,9 @@ function HistoryPage() {
   const ConfirmationModal = ({ isOpen, itemCount, onConfirm, onCancel }) => {
     if (!isOpen) return null
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
-        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 max-w-md w-full mx-4">
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+        <div className="bg-white rounded-lg shadow-2xl p-4 sm:p-6 max-w-md w-full mx-4 border border-gray-100 animate-in fade-in zoom-in duration-300">
           <div className="flex items-center justify-center mb-4">
             <div className="bg-green-100 text-green-600 rounded-full p-3 mr-4">
               <CheckCircle2 className="h-6 w-6" />
@@ -602,19 +603,20 @@ function HistoryPage() {
           <div className="flex justify-center space-x-4">
             <button
               onClick={onCancel}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors text-sm sm:text-base"
+              className="px-6 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-all font-medium text-sm sm:text-base border border-gray-200"
             >
               Cancel
             </button>
             <button
               onClick={onConfirm}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm sm:text-base"
+              className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-all font-medium shadow-lg shadow-green-100 text-sm sm:text-base"
             >
               Confirm
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )
   }
 
@@ -622,16 +624,16 @@ function HistoryPage() {
   const FileModal = ({ isOpen, urls, onClose }) => {
     if (!isOpen) return null;
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
-        <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 max-w-md w-full mx-4">
-          <div className="flex items-center justify-between mb-4">
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+        <div className="bg-white rounded-xl shadow-2xl p-4 sm:p-6 max-w-lg w-full mx-4 border border-gray-100 animate-in fade-in zoom-in duration-300">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
             <h2 className="text-lg sm:text-xl font-bold text-gray-800">Attached Files</h2>
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
-              <X className="h-5 w-5 text-gray-500" />
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600">
+              <X className="h-5 w-5" />
             </button>
           </div>
-          <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
             {urls.map((url, i) => {
               const cleanedUrl = url.trim();
               const ext = cleanedUrl.split('.').pop().split('?')[0].toLowerCase();
@@ -643,25 +645,28 @@ function HistoryPage() {
                   href={cleanedUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center p-3 bg-gray-50 hover:bg-purple-50 rounded-lg border border-gray-200 transition-colors group"
+                  className="flex items-center p-3 bg-gray-50 hover:bg-purple-50 rounded-xl border border-gray-100 transition-all group hover:border-purple-200 hover:shadow-sm"
                 >
                   {isImage ? (
-                    <img src={cleanedUrl} alt={`File ${i+1}`} className="w-10 h-10 object-cover rounded shadow-sm mr-3" />
+                    <img src={cleanedUrl} alt={`File ${i+1}`} className="w-12 h-12 object-cover rounded-lg shadow-sm mr-4" />
                   ) : (
-                    <div className="w-10 h-10 flex items-center justify-center bg-white rounded shadow-sm border border-gray-200 mr-3">
-                      <span className="text-xs font-bold text-gray-400 uppercase">{ext.slice(0,4)}</span>
+                    <div className="w-12 h-12 flex items-center justify-center bg-white rounded-lg shadow-sm border border-gray-100 mr-4">
+                      <span className="text-[10px] font-black text-purple-600 uppercase tracking-tighter">{ext.slice(0,3)}</span>
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">Document {i + 1}</p>
-                    <p className="text-xs text-purple-600 group-hover:underline">Click to view &rarr;</p>
+                    <p className="text-sm font-bold text-gray-800 truncate mb-0.5">Document {i + 1}</p>
+                    <p className="text-[10px] font-medium text-purple-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                      Click to view &rarr;
+                    </p>
                   </div>
                 </a>
               );
             })}
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -868,28 +873,6 @@ function HistoryPage() {
                   <option value="completed">Approved</option>
                 </select>
               </div>
-
-              {/* Maintenance Approve/Notify Button Group */}
-              {activeTab === 'maintenance' && isSuperAdmin && selectedMaintenanceItems.length > 0 && (
-                <div className="flex gap-2 max-sm:w-full max-sm:flex-col">
-                  <button
-                    onClick={handleSendMaintenanceNotification}
-                    disabled={maintLoading}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all text-xs sm:text-sm font-bold shadow-md shadow-blue-100 disabled:opacity-50 group"
-                  >
-                    <Bell className={`h-4 w-4 ${maintLoading ? 'animate-bounce' : 'group-hover:animate-ring'}`} />
-                    <span>Notify ({selectedMaintenanceItems.length})</span>
-                  </button>
-                  <button
-                    onClick={handleMaintenanceApproval}
-                    disabled={maintLoading}
-                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-all text-xs sm:text-sm font-bold shadow-md shadow-green-100 disabled:opacity-50"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Approve ({selectedMaintenanceItems.length})</span>
-                  </button>
-                </div>
-              )}
 
               {/* Reset Logic */}
               <div className="max-sm:order-4 sm:order-none w-full sm:w-auto">
